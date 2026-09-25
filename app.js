@@ -8,7 +8,26 @@ state=root.stores.find(s=>s.id===root.activeStoreId);
 let undoData=null,baseline=JSON.stringify(root),backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
 function updateTools(){document.querySelectorAll('[data-undo]').forEach(b=>b.disabled=!undoData);const date=new Date(backupAt);$('#backup-date').textContent=backupAt&&!isNaN(date)?`最終バックアップ書き出し：${date.toLocaleString('ja-JP')}`:'バックアップはまだ書き出していません';}
-function save(edit=true){if(storageError){$('#saved').textContent=storageError;return false;}if(externalChangeDetected){$('#saved').textContent='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';return false;}try{const next=JSON.stringify(root);localStorage.setItem(storageKey,next);if(edit&&next!==baseline)undoData=baseline;if(!edit)undoData=null;baseline=next;updateTools();$('#saved').textContent='この端末に保存しました';return true;}catch(e){$('#saved').textContent='保存できません。今回の変更は反映していません。空き容量を確認してください。';alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。');return false;}}
+function writeRoot(candidate,{edit=true,allowStorageError=false,success='この端末に保存しました'}={}){
+ if(storageError&&!allowStorageError){$('#saved').textContent=storageError;return false;}
+ if(externalChangeDetected){$('#saved').textContent='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';return false;}
+ try{
+  const next=JSON.stringify(candidate);
+  localStorage.setItem(storageKey,next);
+  if(edit&&next!==baseline)undoData=baseline;
+  if(!edit)undoData=null;
+  baseline=next;updateTools();$('#saved').textContent=success;return true;
+ }catch(e){
+  $('#saved').textContent='保存できません。今回の変更は反映していません。空き容量を確認してください。';
+  alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。');
+  return false;
+ }
+}
+function replaceRoot(candidate,options){
+ if(!writeRoot(candidate,options))return false;
+ root=candidate;state=root.stores.find(s=>s.id===root.activeStoreId);return true;
+}
+function save(edit=true){return writeRoot(root,{edit});}
 function persistChange(fn,edit=true){
  const before=JSON.stringify(root),beforeBaseline=baseline,beforeUndo=undoData;
  try{fn();}catch(e){
@@ -25,8 +44,14 @@ function undo(){
  const actions=el('div',{class:'actions'});
  actions.append(button('いいえ',close),button('はい',()=>{
   if(!undoData){close();return;}
-  try{localStorage.setItem(storageKey,undoData);root=JSON.parse(undoData);state=root.stores.find(s=>s.id===root.activeStoreId);baseline=undoData;undoData=null;render();updateTools();$('#saved').textContent='直前の操作を取り消しました';close();}
-  catch(e){error.textContent='保存できないため取り消しませんでした。';}
+  try{
+   const candidate=JSON.parse(undoData);
+   if(!replaceRoot(candidate,{edit:false,success:'直前の操作を取り消しました'})){
+    error.textContent=externalChangeDetected?'別の画面でデータが変更されています。アプリを開き直してください。':storageError||'保存できないため取り消しませんでした。';
+    return;
+   }
+   render();close();
+  }catch(e){error.textContent='保存できないため取り消しませんでした。';}
  },'primary'));
  const error=el('p',{class:'error',role:'alert'});body.append(error,actions);
  actions.firstElementChild.focus();
@@ -136,8 +161,8 @@ function renderBirthdays(){
   const row=el('div',{class:'birthday-notice'});
   row.append(el('span',{},`${notice.store}：${notice.name}さん${notice.days===0?'は今日が誕生日です':`の誕生日まであと${notice.days}日です`}（${Number(notice.birthday.slice(5,7))}月${Number(notice.birthday.slice(8))}日）`),button('確認済み',()=>{
    const candidate=structuredClone(root);candidate.birthdayAcknowledgements=[...(candidate.birthdayAcknowledgements||[]),notice.key];
-   if(storageError){alert(storageError);return;}
-   try{localStorage.setItem(storageKey,JSON.stringify(candidate));root=candidate;state=root.stores.find(s=>s.id===root.activeStoreId);baseline=JSON.stringify(root);undoData=null;updateTools();renderBirthdays();}catch{alert('確認済みの状態を保存できませんでした。');}
+   if(!replaceRoot(candidate,{edit:false,success:'誕生日の確認済みを保存しました'}))return;
+   renderBirthdays();
   }));host.append(row);
  }
 }
@@ -298,7 +323,11 @@ function openBackup(){
  const restore=button('このバックアップで全店舗を復元',()=>{
   if(!candidate)return;
   if(!confirm(`現在の全店舗データを、選択したバックアップの${candidate.stores.length}店舗に置き換えます。現在の内容は先にバックアップしてください。復元しますか？`))return;
-  try{localStorage.setItem(storageKey,JSON.stringify(candidate));root=candidate;state=root.stores.find(s=>s.id===root.activeStoreId);storageError='';baseline=JSON.stringify(root);undoData=null;updateTools();render();$('#saved').textContent='全店舗を復元しました';close();}catch(e){error.textContent='保存できないため復元しませんでした。空き容量を確認してください。';}
+  if(!replaceRoot(candidate,{edit:false,allowStorageError:true,success:'全店舗を復元しました'})){
+   error.textContent=externalChangeDetected?'別の画面でデータが変更されています。安全のため復元を停止しました。アプリを開き直してから、もう一度復元してください。':'保存できないため復元しませんでした。空き容量を確認してください。';
+   return;
+  }
+  storageError='';render();close();
  },'danger');restore.disabled=true;
  const unlock=button('バックアップを確認',async()=>{
   candidate=null;restore.disabled=true;error.textContent='';summary.textContent='';

@@ -1,0 +1,9 @@
+{
+  "name": "shift-webapp-regression",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "node --test tests/regression.test.mjs",
+    "check": "node --check app.js && node --check model.js && node --check stores.js && node --check birthdays.js && node --check crypto-backup.js && node --check sw.js"
+  }
+}

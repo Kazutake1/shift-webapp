@@ -125,3 +125,18 @@ footer{display:flow-root}
 .undo-button{display:inline-flex;align-items:center;justify-content:center}.undo-button svg{display:block;flex-shrink:0}
 
 #birthday-notices{margin-bottom:16px;padding:16px 20px;border:1px solid #b8cbdc;border-radius:12px;background:#e7eff6;color:#233e55}#birthday-notices h2{font-size:16px;margin:0 0 8px}.birthday-notice{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px}.birthday-notice button{flex-shrink:0;background:white;border-color:#b8cbdc;color:#233e55}
+
+/* A4横の印刷領域内に表と罫線を収める。画面表示には適用しない。 */
+@media print{
+ #paper,.print-mode #paper{break-inside:avoid;page-break-inside:avoid}
+ #paper .paper-header{line-height:1.15}
+ #paper .paper-header #store-name{min-width:0;overflow-wrap:anywhere}
+ #paper #paper-period{flex-shrink:0;white-space:nowrap}
+ #schedule tbody tr{height:4.3mm}
+ #schedule td.slot button{height:4.3mm;min-height:0}
+ #schedule td.notes-cell button{height:21.5mm;min-height:0}
+ #paper .table-scroll .table-rules{
+  left:0!important;top:0!important;width:100%!important;height:100%!important;overflow:hidden;
+ }
+}
+

@@ -52,7 +52,7 @@ export function encryptedBackupInfo(text){
 }
 export async function encryptBackupText(plainText,password,exportedAt=new Date().toISOString()){
  if(typeof plainText!=='string'||!plainText)throw Error('バックアップデータが空です。');
- if(typeof password!=='string'||password.length<12)throw Error('バックアップ用パスワードは12文字以上にしてください。');
+ if(typeof password!=='string'||password.length<8)throw Error('バックアップ用パスワードは8文字以上にしてください。');
  const salt=crypto.getRandomValues(new Uint8Array(SALT_BYTES));
  const iv=crypto.getRandomValues(new Uint8Array(IV_BYTES));
  const key=await deriveKey(password,salt,ITERATIONS);

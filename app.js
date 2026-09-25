@@ -194,12 +194,12 @@ function openStores(){
 function openBackup(){
  const body=openDialog('バックアップ・復元');
  hint(body,'通常データはこの端末内だけに保存します。新しいバックアップは、端末上で暗号化してから保存・共有します。');
- hint(body,'バックアップ用パスワードは保存されません。忘れると復元できません。12文字以上で設定してください。');
- const password=el('input',{type:'password',minlength:12,autocomplete:'new-password'}),confirmPassword=el('input',{type:'password',minlength:12,autocomplete:'new-password'});
+ hint(body,'バックアップ用パスワードは保存されません。忘れると復元できません。8文字以上で設定してください。');
+ const password=el('input',{type:'password',minlength:8,autocomplete:'new-password'}),confirmPassword=el('input',{type:'password',minlength:8,autocomplete:'new-password'});
  const exportError=el('p',{class:'error',role:'alert'});
  const exportButton=button('暗号化バックアップを作成',async()=>{
   exportError.textContent='';
-  if(password.value.length<12){exportError.textContent='バックアップ用パスワードは12文字以上にしてください。';password.focus();return;}
+  if(password.value.length<8){exportError.textContent='バックアップ用パスワードは8文字以上にしてください。';password.focus();return;}
   if(password.value!==confirmPassword.value){exportError.textContent='確認用パスワードが一致しません。';confirmPassword.focus();return;}
   exportButton.disabled=true;
   try{
@@ -212,7 +212,7 @@ function openBackup(){
   }catch(e){if(e?.name!=='AbortError')exportError.textContent=e.message||'暗号化バックアップを作成できませんでした。';}
   finally{exportButton.disabled=false;}
  },'primary');
- body.append(field('バックアップ用パスワード（12文字以上）',password),field('パスワードをもう一度入力',confirmPassword),exportError,exportButton,el('hr'));
+ body.append(field('バックアップ用パスワード（8文字以上）',password),field('パスワードをもう一度入力',confirmPassword),exportError,exportButton,el('hr'));
  hint(body,'復元は新しい暗号化バックアップ（.shiftbackup）に加えて、以前の暗号化されていないJSONバックアップにも対応します。');
  const file=el('input',{type:'file',accept:'.shiftbackup,.json,application/json'}),restorePassword=el('input',{type:'password',autocomplete:'current-password'}),summary=el('p'),error=el('p',{class:'error',role:'alert'});
  let candidate=null,selectedText='',encrypted=false;

@@ -392,5 +392,4 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   reg.update().catch(()=>{});
  }).catch(()=>{$('#offline-status').textContent='通信がないときの起動準備に失敗しました。接続中に開き直してください。';});
 }else $('#offline-status').textContent='この接続ではホーム画面・通信なし起動の準備を利用できません。';
-if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'read_visible_shift_week',title:'表示中のシフトを読む',description:'表示中の週の登録内容を読み取ります。変更はしません。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw Error('入力は空のオブジェクトにしてください');return structuredClone({store:state.store,fixed:state.fixed,week:week()});}})).catch(()=>{});}catch{}}
 

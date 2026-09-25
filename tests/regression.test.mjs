@@ -243,3 +243,9 @@ test('iPhone印刷後の画面復帰処理を維持',()=>{
  assert.match(app,/addEventListener\('afterprint',finishPrint\)/);
  assert.match(app,/addEventListener\('visibilitychange'/);
 });
+
+test('シフトデータを外部の実験的ブラウザー機能へ公開しない',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.equal(app.includes('document.modelContext'),false);
+ assert.equal(app.includes('read_visible_shift_week'),false);
+});

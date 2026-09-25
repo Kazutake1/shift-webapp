@@ -122,7 +122,8 @@ function field(label,input){const wrapper=el('label',{class:'field'},label);wrap
 function hint(parent,text){parent.append(el('p',{class:'hint'},text));}
 function confirmChange(existing){return !existing||confirm('登録済みの内容を変更しますか？');}
 function commit(fn){fn();save();render();close();}
-function employeesList(parent,choose,currentId){const choices=el('div',{class:'choices'});state.employees.forEach(e=>{if(e.hidden&&e.id!==currentId)return;const shiftName=employeeShiftName(e),label=e.name===shiftName?e.name:`${e.name}（シフト：${shiftName}）`;const b=button(label+(e.hidden?'（非表示）':''),()=>choose(e));choices.append(b);});parent.append(choices);if(!choices.children.length)hint(parent,'選択できる従業員がいません。従業員管理から追加してください。');}
+function employeesList(parent,choose,currentId,filter){const choices=el('div',{class:'choices'});state.employees.forEach(e=>{if(filter&&!filter(e))return;if(e.hidden&&e.id!==currentId)return;const shiftName=employeeShiftName(e),label=e.name===shiftName?e.name:`${e.name}（シフト：${shiftName}）`;const b=button(label+(e.hidden?'（非表示）':''),()=>choose(e));choices.append(b);});parent.append(choices);if(!choices.children.length)hint(parent,'選択できる従業員がいません。従業員管理から追加してください。');}
+function withinFirstMonth(employee,date){if(!employee?.hireDate)return false;const hire=new Date(employee.hireDate+'T12:00:00Z'),target=new Date(date+'T12:00:00Z');if(Number.isNaN(hire.getTime())||Number.isNaN(target.getTime())||target<hire)return false;const y=hire.getUTCFullYear(),m=hire.getUTCMonth()+1,day=hire.getUTCDate(),last=new Date(Date.UTC(y,m+1,0,12)).getUTCDate(),limit=new Date(Date.UTC(y,m,Math.min(day,last),12));return target<=limit;}
 function openCell(d,row,b){activeCell={d,row,b};if(row===0)return openFixed();if(row===4)return openExtra(d,b);const existing=week().days[d].shifts[row-1][b];if(existing)return editShift(d,row,b,structuredClone(existing));const body=openDialog('従業員を選択');hint(body,`${week().days[d].date}　${timeLabel(bands[b].start)}〜${timeLabel(bands[b].end)} ／ 時間帯に関係なく全従業員を表示`);employeesList(body,e=>commit(()=>week().days[d].shifts[row-1][b]=makeShift(e,b)));}
 function editShift(d,row,b,draft){const body=openDialog('勤務を編集');const name=button(`${draft.name}　変更`,()=>{try{Object.assign(draft,workingTimes(start.value,end.value));}catch{}const picker=openDialog('従業員を変更');employeesList(picker,e=>editShift(d,row,b,{...draft,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId);picker.append(button('戻る',()=>editShift(d,row,b,draft)));});body.append(name);const start=el('input',{type:'time',required:'',value:timeValue(draft.start)}),end=el('input',{type:'time',required:'',value:timeValue(draft.end)});const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));body.append(rowEl);hint(body,'6:00から翌朝6:00までの勤務を入力。0:00〜5:59は翌日として扱います。');if(b===4){body.append(button('22:00〜翌1:00',()=>{start.value='22:00';end.value='01:00';}),button('22:00〜翌6:00',()=>{start.value='22:00';end.value='06:00';}));}const err=el('p',{class:'error',role:'alert'});body.append(err);const actions=el('div',{class:'actions'});actions.append(button('削除',()=>{if(confirm('この勤務を削除しますか？'))commit(()=>week().days[d].shifts[row-1][b]=null);},'danger'),button('保存',()=>{try{const times=workingTimes(start.value,end.value);if(confirmChange(true))commit(()=>week().days[d].shifts[row-1][b]={...draft,...times});}catch(e){err.textContent=e.message;}},'primary'));body.append(actions);}
 function openNotes(d){const body=openDialog('備考');const input=el('textarea',{rows:6,maxlength:180});input.value=week().days[d].notes;body.append(field('自由入力（180文字まで）',input),button('保存',()=>{if(confirmChange(week().days[d].notes&&week().days[d].notes!==input.value))commit(()=>week().days[d].notes=input.value);},'primary'));}
@@ -138,7 +139,7 @@ function openExtra(d,b){
   const change=button(`${draft.name}　変更`,()=>{
    let times={};try{times=workingTimes(start.value,end.value);}catch{}
    content.replaceChildren();
-   employeesList(content,e=>trainingEditor({...draft,...times,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId);
+   employeesList(content,e=>trainingEditor({...draft,...times,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId,e=>withinFirstMonth(e,week().days[d].date));
    content.append(button('戻る',()=>trainingEditor({...draft,...times})));
   });
   const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));
@@ -150,7 +151,8 @@ function openExtra(d,b){
  const training=()=>{
   if(existing?.type==='training')return trainingEditor({...existing,start:Number.isInteger(existing.start)?existing.start:band.start,end:Number.isInteger(existing.end)?existing.end:band.end});
   content.replaceChildren();
-  employeesList(content,e=>trainingEditor({type:'training',employeeId:e.id,name:employeeShiftName(e),start:band.start,end:band.end}));
+  hint(content,'入社年月日から1か月以内の従業員だけを表示します。');
+  employeesList(content,e=>trainingEditor({type:'training',employeeId:e.id,name:employeeShiftName(e),start:band.start,end:band.end}),null,e=>withinFirstMonth(e,week().days[d].date));
  };
  const task=()=>{
   content.replaceChildren();

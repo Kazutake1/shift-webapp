@@ -102,7 +102,7 @@ test('複数画面の競合後は誕生日確認・Undo・復元で古いデー�
  await stale.locator('#editor').getByRole('button',{name:'バックアップを確認'}).click();
  await expect(stale.locator('#editor')).toContainText('復元対象');
  await stale.locator('#editor').getByRole('button',{name:'このバックアップで全店舗を復元'}).click();
- await expect(stale.locator('#dialog-body .error')).toContainText('安全のため復元を停止しました');
+ await expect(stale.locator('#dialog-body .error').filter({hasText:'安全のため復元を停止しました'})).toHaveCount(1);
  root=await savedRoot(latest);
  store=root.stores.find(s=>s.id===root.activeStoreId);
  expect(store.store).not.toBe('競合復元店');

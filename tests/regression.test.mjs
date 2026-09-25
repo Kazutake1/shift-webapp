@@ -64,7 +64,9 @@ test('登録済みシフトは従業員の改名・削除後も名前を保持',
 });
 
 test('同じ従業員の勤務時間重複だけを検出し、隣接時間と編集中セルは除外する',()=>{
- const s=initialState(),day=s.weeks[s.current].days[0],employee=s.employees[0];
+ const s=initialState(),employee=s.employees[0];
+ const day={shifts:Array.from({length:3},()=>Array(5).fill(null))};
+ day.shifts[0][0]=makeShift(employee,0);
  const overlapping=makeShift(employee,0,480,600);
  assert.equal(employeeShiftConflicts(day,overlapping).length,1);
  const adjacent=makeShift(employee,0,540,600);

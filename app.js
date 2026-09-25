@@ -230,7 +230,7 @@ function openPreview(){
  }finally{finishPrint();}
  const doc=document.implementation.createHTMLDocument('週間シフト表の印刷プレビュー');
  const style=doc.createElement('style');
- style.textContent=css+'\nhtml{width:297mm;height:210mm;padding:8mm;overflow:hidden;background:white}body.print-layout{width:281mm}';
+ style.textContent=css+'\nhtml{width:297mm;height:210mm;padding:8mm;overflow:hidden;background:white}body.print-layout{width:281mm;height:194mm;display:flex;align-items:center}';
  doc.head.append(style);doc.body.className='print-layout';
  const main=doc.createElement('main');main.append(paper);doc.body.append(main);
  paper.querySelectorAll('button').forEach(n=>n.tabIndex=-1);

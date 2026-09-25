@@ -1,0 +1,127 @@
+*{box-sizing:border-box}body{margin:0;background:#eef2f5;color:#172b38;font-family:-apple-system,BlinkMacSystemFont,"Hiragino Kaku Gothic ProN","Yu Gothic",sans-serif;font-size:16px}button,input,select,textarea{font:inherit}button{cursor:pointer;background:white;color:#193f58;border:1px solid #b5c3cc;border-radius:7px;padding:10px 15px;min-height:44px}button:hover{background:#edf4f8}button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible{outline:3px solid #2586b6;outline-offset:2px}button.primary{background:#193f58;color:white;border-color:#193f58}button.danger{color:#b32929}button:disabled{opacity:.4;cursor:default}.appbar{background:#193f58;color:white;display:flex;align-items:center;justify-content:space-between;padding:14px 24px;gap:15px}.brand{font-size:20px;font-weight:700}.brand span{font-size:11px;margin-left:12px;letter-spacing:2px;opacity:.7}nav{display:flex;gap:9px}.appbar button{background:#ffffff0e;color:white;border-color:#ffffff50}main{padding:18px 24px;max-width:1800px;margin:auto}.controls{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:12px;flex-wrap:wrap}.week-nav{display:flex;align-items:center;gap:18px}.store-control{display:flex;gap:16px;align-items:center;font-size:14px}input,textarea,select{border:1px solid #aebcc5;border-radius:6px;padding:10px;background:white;max-width:100%}#store{width:160px;padding:8px;margin-left:8px}#saved{font-size:12px;color:#456658}#notice{font-size:14px;line-height:1.6;margin:8px 0;color:#70500e}#paper{background:white;color:black;padding:18px;border:1px solid #c8d0d6;box-shadow:0 3px 12px #193f5809}.paper-header{display:flex;justify-content:space-between;margin:0 0 8px;font-size:14px;min-height:20px}.table-scroll{overflow-x:auto}table{width:100%;min-width:960px;border-collapse:collapse;table-layout:fixed;color:#000;font-family:Arial,"Yu Gothic",sans-serif;border:2px solid #111}col.date,col.day{width:3.52%}col.notes{width:8.45%}th,td{padding:0;border:1px solid #bbb}thead th{height:28px;font-size:14px;text-align:left;padding-left:3px;border-bottom:3px double #111}thead .month{text-align:center;border-right:2px solid #111;padding:0}thead .notes-head{text-align:center;border-left:2px solid #111}thead .boundary{border-left:2px solid #111}tbody tr{height:25px}td.slot{border-left:2px solid #111;background-image:none}td.slot.occupied{background:white}td.slot button{display:block;width:100%;min-height:24px;height:24px;padding:0 2px;border:0;border-radius:0;color:black;font-size:clamp(11px,1.08vw,18px);font-weight:700;line-height:1.1;background:transparent;white-space:normal;overflow-wrap:anywhere}td.slot button:hover{background:#e6f1f8}td.slot button:focus-visible{outline-offset:-3px}td.slot .long{font-size:clamp(10px,.92vw,15px)}td.date-cell{position:relative;text-align:center;border-right:2px solid #111;border-bottom:2px solid #111;font-family:inherit;font-size:clamp(20px,2.1vw,32px);font-weight:400}td.date-cell small{position:absolute;bottom:6px;right:4px;font-family:sans-serif;font-size:12px;color:black}td.day-cell{font-size:18px;font-weight:700;text-align:center;border-right:2px solid #111;border-bottom:2px solid #111}td.day-blank{border-right:2px solid #111}td.notes-cell{border-left:2px solid #111;border-bottom:2px solid #111;vertical-align:top}td.notes-cell button{border:0;color:black;border-radius:0;background:transparent;width:100%;height:124px;padding:5px;font-size:12px;text-align:left;white-space:pre-wrap;overflow-wrap:anywhere;vertical-align:top}tr.day-start>td{border-top:2px solid #111}tr.extra>td{border-top:2px solid #111;border-bottom:2px solid #111}.red{color:#e60000}.blue{color:#0070c0}footer{font-size:12px;color:#586a76;line-height:1.6}footer p{margin:6px 0}a{color:#245d7c}dialog{width:min(600px,calc(100vw - 32px));max-height:90dvh;overflow-y:auto;border:0;border-radius:14px;padding:24px;box-shadow:0 20px 70px #0003}dialog::backdrop{background:#12273788}.dialog-top{display:flex;align-items:center;justify-content:space-between;gap:15px;margin-bottom:15px}h2{font-size:21px;margin:0}.dialog-top button{font-size:24px;padding:0;width:44px}.hint{font-size:14px;color:#546a78;line-height:1.7}.choices{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;margin:15px 0}.choices button{text-align:left;min-height:50px}.field{display:flex;flex-direction:column;gap:7px;margin:15px 0}.row{display:flex;gap:12px}.row>.field{flex:1;min-width:0}.actions{display:flex;gap:10px;justify-content:flex-end;margin-top:20px}.employee-row{display:flex;align-items:center;gap:8px;border-bottom:1px solid #dde4e8;padding:10px 0;background:white}.employee-row .name{flex:1;min-width:0;overflow-wrap:anywhere}.employee-row button{padding:5px 9px;font-size:13px}.employee-row .handle{touch-action:none;cursor:grab;font-size:22px;user-select:none}.employee-row.dragging{opacity:.5}.employee-row.drop-target{border-top:3px solid #26799f}.muted{color:#667b88;font-size:12px}.fixed-grid label{display:grid;grid-template-columns:110px 1fr;align-items:center;gap:14px;margin:12px 0}.error{color:#b32929;font-size:14px}.preview-bar{display:flex;justify-content:center;gap:12px}.print-mode .controls,.print-mode footer{display:none}.print-mode #paper{margin-top:18px}.print-mode td button{pointer-events:none}.print-mode .table-scroll{overflow:visible}.print-mode table{min-width:0}.print-mode #paper{width:100%}@media(max-width:1100px){main{padding:12px}.appbar{padding:12px}#paper{padding:10px}.store-control{margin-left:auto}.week-nav{gap:10px}nav button{padding:8px 10px}}@media print{@page{size:A4 landscape;margin:8mm}html,body{margin:0;background:white;font-size:10pt;-webkit-print-color-adjust:exact;print-color-adjust:exact}.no-print,dialog{display:none!important}main{padding:0;margin:0;max-width:none}#paper,.print-mode #paper{border:0;box-shadow:none;padding:0;margin:0;width:100%}.paper-header{font-size:10pt;margin-bottom:2mm;min-height:4mm}.table-scroll{overflow:visible!important}table{min-width:0;width:100%;border-width:.35mm}thead th{height:5mm;font-size:8pt}tbody tr{height:4.65mm}td.slot button{height:4.65mm;min-height:0;font-size:8pt!important;padding:0 .3mm;color:black}td.slot .long{font-size:6.7pt!important}td.date-cell{font-size:17pt}td.day-cell{font-size:11pt}td.date-cell small{font-size:7pt;bottom:1mm}td.notes-cell button{height:23.25mm;min-height:0;font-size:7pt}tr{break-inside:avoid}table{break-inside:avoid}button{outline:none!important}td.slot button:hover{background:transparent}}
+
+td.date-cell.month-date{font-size:clamp(13px,1.3vw,21px)}@media print{td.date-cell.month-date{font-size:11pt}}
+
+/* 太線は単一の前面レイヤーで一度だけ描画。元の境界幅は維持する。 */
+.table-scroll{position:relative;isolation:isolate}
+.table-rules{position:absolute;z-index:2;pointer-events:none;overflow:visible}
+#schedule{border-color:transparent}
+#schedule td.slot,#schedule td.notes-cell,#schedule thead .boundary,#schedule thead .notes-head{border-left-color:transparent}
+#schedule td.date-cell,#schedule td.day-cell,#schedule td.day-blank,#schedule thead .month{border-right-color:transparent}
+#schedule td.date-cell,#schedule td.day-cell,#schedule td.notes-cell{border-bottom-color:transparent}
+#schedule tr.day-start>td{border-top-color:transparent}
+#schedule tr.extra>td{border-top-color:transparent;border-bottom-color:transparent}
+#schedule thead th{border-bottom-color:transparent}
+.fixed-setting{border:1px solid #c7d2da;border-radius:8px;padding:12px 16px;margin:16px 0}
+.fixed-setting legend{padding:0 6px;font-weight:700}
+.fixed-setting .field{margin:0 0 12px}
+.weekday-options{display:flex;flex-wrap:wrap;gap:6px}
+.weekday-options label{display:flex;align-items:center;gap:5px;min-height:44px;padding:7px 9px;border:1px solid #c7d2da;border-radius:6px;cursor:pointer}
+.weekday-options input{width:18px;height:18px;margin:0;accent-color:#193f58}
+
+/* 時間方向の罫線は、見出しと本文を同じ座標で描画する。 */
+#schedule thead th,#schedule td.slot{border-left-color:transparent;border-right-color:transparent}
+
+.appbar{flex-wrap:wrap}.appbar nav{flex-wrap:wrap}.brand{white-space:nowrap}#store{min-height:44px;width:190px}.store-control{flex-wrap:wrap}#dialog-body>button{margin:4px 6px 4px 0}#dialog-body input[type=file]{width:100%}
+
+.appbar .brand #store{margin:0;width:auto;min-width:180px;max-width:min(360px,calc(100vw - 24px));min-height:44px;background:#193f58;color:white;border-color:#ffffff70;font-size:20px;font-weight:700;padding:8px 32px 8px 12px}.appbar .brand #store option{background:white;color:#193f58}
+
+[hidden]{display:none!important}#settings{display:flex;align-items:center;justify-content:center;width:44px;padding:8px}#settings-page{max-width:900px;margin:0 auto;padding:24px}.settings-heading{display:flex;justify-content:space-between;align-items:center;gap:16px}.settings-heading h1{font-size:24px;margin:0}#settings-store{color:#546a78;margin:24px 0}.settings-menu{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:16px}.settings-menu button{min-height:88px;text-align:left;padding:24px;font-weight:700;font-size:18px}@media(max-width:600px){.settings-menu{grid-template-columns:1fr}#settings-page{padding:16px}}
+
+.week-nav{flex-wrap:wrap}#backup-date{font-size:14px;color:#546a78}.settings-menu{margin-top:20px}
+
+.save-status{text-align:right;margin-top:8px;min-height:20px}.undo-button{width:44px;height:44px;padding:0;font-size:27px;line-height:1}.controls .store-control{margin-left:auto}
+
+/* 保存メッセージを説明文の右に置き、表の下に空行を作らない。 */
+.save-status{float:right;margin:6px 0 0 16px;min-height:0;line-height:19.2px}
+footer{display:flow-root}
+@media(max-width:700px){.save-status{float:none;margin:4px 0 0}.save-status+footer p:first-child{margin-top:2px}}
+
+/* アプリ外枠のみのデザイン。表・用紙・印刷のスタイルは変更しない。 */
+@media screen{
+ body{background:#f5f6f8}
+ .appbar{background:#fff;color:#202b36;border-bottom:1px solid #e5e9ee;box-shadow:0 2px 12px #15283b04}
+ .appbar .brand #store{background:#fff;color:#202b36;border-color:transparent;border-radius:10px;font-size:19px;letter-spacing:.02em}
+ .appbar .brand #store:hover{background:#f3f5f7;border-color:#e5e9ee}
+ .appbar nav{gap:10px}
+ .appbar button,.controls button,.preview-bar button,#settings-page button,dialog button{border:1px solid #dde3e9;border-radius:10px;background:#fff;color:#334155;box-shadow:0 1px 2px #13294005;transition:background .15s,border-color .15s,box-shadow .15s}
+ .appbar button:hover,.controls button:hover,#settings-page button:hover,dialog button:hover{background:#f0f4f8;border-color:#b9c8d6}
+ .appbar #preview{background:#273d52;color:#fff;border-color:#273d52;font-weight:600}
+ .appbar #preview:hover{background:#344f69}
+ .appbar #settings{background:#f5f7f9;border-color:transparent;color:#64748b}
+ .controls{color:#334155}
+ .week-nav{gap:10px}
+ #week-label{font-size:15px;font-weight:600;letter-spacing:.02em;padding:0 6px;font-variant-numeric:tabular-nums}
+ #prev,#next{border-color:transparent;background:transparent;color:#64748b}
+ #today{font-size:14px}
+ .controls .undo-button{color:#64748b;background:#fff}
+ #saved{color:#758577;font-size:11px}
+ footer{color:#7a8794;font-size:11px}
+ #settings-page{padding-top:36px;padding-bottom:40px}
+ .settings-heading h1{font-size:28px;letter-spacing:.04em;color:#253545}
+ #settings-store{margin:24px 0 10px;font-size:15px;color:#526579}
+ #backup-date{color:#7b8794;font-size:13px}
+ #settings-page>.hint{font-size:12px;color:#7b8794}
+ .settings-menu{gap:14px;margin-top:28px}
+ .settings-menu button{position:relative;min-height:100px;padding:24px 48px 24px 24px;font-size:16px;font-weight:600;border-color:#e5e9ee;border-radius:14px;box-shadow:0 3px 14px #1e354905}
+ .settings-menu button::after{content:'›';position:absolute;right:24px;top:50%;transform:translateY(-50%);font-size:25px;font-weight:400;color:#94a3b8}
+ .settings-menu button:hover{box-shadow:0 5px 20px #1e35490b;background:#fff}
+ dialog{border:1px solid #e7ebf0;border-radius:20px;padding:28px;box-shadow:0 24px 80px #152a4526;color:#334155}
+ dialog::backdrop{background:#1c2d4559;backdrop-filter:blur(3px)}
+ .dialog-top{margin-bottom:20px}
+ .dialog-top h2{font-size:20px;font-weight:600;color:#253545}
+ .dialog-top button{border:0;background:#f3f5f8;color:#718096}
+ dialog .hint{font-size:13px;color:#718096}
+ dialog input,dialog textarea,dialog select{border-color:#dce3eb;border-radius:9px;background:#fafbfd;color:#334155;min-height:44px}
+ dialog .field{font-size:14px;color:#526579;gap:8px}
+ dialog button.primary,.preview-bar button.primary{background:#273d52;color:#fff;border-color:#273d52}
+ dialog button.primary:hover,.preview-bar button.primary:hover{background:#344f69}
+ dialog button.danger{color:#b94b4b}
+ dialog .choices{gap:10px}
+ dialog .choices button{min-height:52px;padding:12px 16px}
+ dialog .employee-row{border-color:#edf0f4;padding:12px 0}
+ dialog .employee-row .handle{border:0;background:#f5f7fa;color:#94a3b8}
+ dialog .fixed-setting{border-color:#e5e9ee;border-radius:12px;background:#fafbfd;padding:16px;margin:18px 0}
+ dialog .fixed-setting legend{font-size:14px;color:#526579}
+ dialog .weekday-options label{background:white;border-color:#e1e7ee;border-radius:8px;color:#64748b}
+ dialog .weekday-options label:has(input:checked){background:#eaf1f7;border-color:#b8cddd;color:#294b67}
+ dialog .weekday-options input{min-height:0;accent-color:#426b8a}
+ dialog hr{border:0;border-top:1px solid #edf0f4;margin:24px 0}
+ .preview-bar{align-items:center}
+ @media(prefers-reduced-motion:reduce){.appbar button,.controls button,.preview-bar button,#settings-page button,dialog button{transition:none}}
+}
+
+@media screen{
+ .appbar .brand #store{background:#e7eff6;border-color:#b8cbdc;color:#233e55}
+ .appbar .brand #store:hover{background:#dce8f2;border-color:#94b2cb}
+}
+
+/* 表の外の操作ボタンを店舗選択欄と同じ配色に統一する。 */
+@media screen{
+ .appbar button,.appbar #preview,.appbar #settings,
+ .controls button,.controls #prev,.controls #next,.controls .undo-button,
+ .preview-bar button,.preview-bar button.primary,
+ #settings-page button,.settings-menu button,
+ dialog button,dialog button.primary,dialog button.danger,
+ .dialog-top button,dialog .employee-row .handle{
+  background:#e7eff6;color:#233e55;border:1px solid #b8cbdc;
+ }
+ .appbar button:hover,.appbar #preview:hover,.appbar #settings:hover,
+ .controls button:hover,.controls #prev:hover,.controls #next:hover,.controls .undo-button:hover,
+ .preview-bar button:hover,.preview-bar button.primary:hover,
+ #settings-page button:hover,.settings-menu button:hover,
+ dialog button:hover,dialog button.primary:hover,dialog button.danger:hover,
+ .dialog-top button:hover,dialog .employee-row .handle:hover{
+  background:#dce8f2;color:#233e55;border-color:#94b2cb;
+ }
+ .appbar button:disabled,.controls button:disabled,#settings-page button:disabled,dialog button:disabled{
+  background:#e7eff6;border-color:#b8cbdc;opacity:.4;
+ }
+}
+
+/* シフト表ヘッダーの店名だけを1.5倍にする。 */
+#store-name{font-size:1.5em}
+
+.undo-button{display:inline-flex;align-items:center;justify-content:center}.undo-button svg{display:block;flex-shrink:0}
+
+#birthday-notices{margin-bottom:16px;padding:16px 20px;border:1px solid #b8cbdc;border-radius:12px;background:#e7eff6;color:#233e55}#birthday-notices h2{font-size:16px;margin:0 0 8px}.birthday-notice{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px}.birthday-notice button{flex-shrink:0;background:white;border-color:#b8cbdc;color:#233e55}

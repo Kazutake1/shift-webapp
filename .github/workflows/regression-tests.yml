@@ -12,7 +12,7 @@ permissions:
 jobs:
   test:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -24,3 +24,9 @@ jobs:
         run: npm run check
       - name: Regression tests
         run: npm test
+      - name: Install browser test tools
+        run: |
+          npm install --no-save --ignore-scripts @playwright/test@1.55.0
+          npx playwright install --with-deps chromium webkit
+      - name: Browser operation tests
+        run: npx playwright test --config=playwright.config.mjs

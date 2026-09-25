@@ -2,13 +2,13 @@ import {birthdayNotices} from './birthdays.js';
 import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,initialState,fixedSetting,fixedTextAt} from './model.js';
 import {storageKey,validateRoot,migrate,newStore,backupText,parseBackup} from './stores.js';
 import {encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText} from './crypto-backup.js';
-const $=s=>document.querySelector(s);let root,state,storageError='',preview=false,activeCell=null;
+const $=s=>document.querySelector(s);let root,state,storageError='',externalChangeDetected=false,preview=false,activeCell=null;
 try{const raw=localStorage.getItem(storageKey);const old=localStorage.getItem('shift-ipad-step1-v1');root=raw?validateRoot(JSON.parse(raw)):migrate(old?JSON.parse(old):initialState());}catch(e){storageError='保存データを読み込めません。既存データを上書きせず一時表示しています。';root=migrate();}
 state=root.stores.find(s=>s.id===root.activeStoreId);
 let undoData=null,baseline=JSON.stringify(root),backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
 function updateTools(){document.querySelectorAll('[data-undo]').forEach(b=>b.disabled=!undoData);const date=new Date(backupAt);$('#backup-date').textContent=backupAt&&!isNaN(date)?`最終バックアップ書き出し：${date.toLocaleString('ja-JP')}`:'バックアップはまだ書き出していません';}
-function save(edit=true){if(storageError){$('#saved').textContent=storageError;return false;}try{const next=JSON.stringify(root);localStorage.setItem(storageKey,next);if(edit&&next!==baseline)undoData=baseline;if(!edit)undoData=null;baseline=next;updateTools();$('#saved').textContent='この端末に保存しました';return true;}catch(e){$('#saved').textContent='保存できません。今回の変更は反映していません。空き容量を確認してください。';alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。');return false;}}
+function save(edit=true){if(storageError){$('#saved').textContent=storageError;return false;}if(externalChangeDetected){$('#saved').textContent='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';return false;}try{const next=JSON.stringify(root);localStorage.setItem(storageKey,next);if(edit&&next!==baseline)undoData=baseline;if(!edit)undoData=null;baseline=next;updateTools();$('#saved').textContent='この端末に保存しました';return true;}catch(e){$('#saved').textContent='保存できません。今回の変更は反映していません。空き容量を確認してください。';alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。');return false;}}
 function persistChange(fn,edit=true){
  const before=JSON.stringify(root),beforeBaseline=baseline,beforeUndo=undoData;
  try{fn();}catch(e){
@@ -79,6 +79,12 @@ window.addEventListener('afterprint',finishPrint);
 window.addEventListener('focus',()=>{if(printRequested)schedulePrintRecovery(300);});
 window.addEventListener('pageshow',()=>{if(printRequested)schedulePrintRecovery(300);});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden&&printRequested)schedulePrintRecovery(300);});
+window.addEventListener('storage',event=>{
+ if(event.key!==storageKey)return;
+ externalChangeDetected=true;
+ $('#saved').textContent='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';
+ alert('別のタブまたはウインドウでシフトデータが変更されました。上書きを防ぐため、この画面からの保存を停止しました。アプリを開き直してください。');
+});
 
 function drawRules(){
   const table=$('#schedule'),host=table.parentElement;

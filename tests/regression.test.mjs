@@ -249,3 +249,10 @@ test('シフトデータを外部の実験的ブラウザー機能へ公開し�
  assert.equal(app.includes('document.modelContext'),false);
  assert.equal(app.includes('read_visible_shift_week'),false);
 });
+
+test('別タブ更新を検知したら保存を停止する',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(app,/addEventListener\('storage'/);
+ assert.match(app,/externalChangeDetected/);
+ assert.match(app,/安全のため保存を停止しています/);
+});

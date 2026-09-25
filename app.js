@@ -8,7 +8,17 @@ state=root.stores.find(s=>s.id===root.activeStoreId);
 let undoData=null,baseline=JSON.stringify(root),backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
 function updateTools(){document.querySelectorAll('[data-undo]').forEach(b=>b.disabled=!undoData);const date=new Date(backupAt);$('#backup-date').textContent=backupAt&&!isNaN(date)?`最終バックアップ書き出し：${date.toLocaleString('ja-JP')}`:'バックアップはまだ書き出していません';}
-function save(edit=true){if(storageError){$('#saved').textContent=storageError;return false;}try{const next=JSON.stringify(root);localStorage.setItem(storageKey,next);if(edit&&next!==baseline)undoData=baseline;if(!edit)undoData=null;baseline=next;updateTools();$('#saved').textContent='この端末に保存しました';return true;}catch(e){$('#saved').textContent='保存できません。バックアップを保存し、空き容量を確認してください。';alert('変更を端末に保存できませんでした。この画面を閉じずにバックアップを保存してください。');return false;}}
+function save(edit=true){if(storageError){$('#saved').textContent=storageError;return false;}try{const next=JSON.stringify(root);localStorage.setItem(storageKey,next);if(edit&&next!==baseline)undoData=baseline;if(!edit)undoData=null;baseline=next;updateTools();$('#saved').textContent='この端末に保存しました';return true;}catch(e){$('#saved').textContent='保存できません。今回の変更は反映していません。空き容量を確認してください。';alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。');return false;}}
+function persistChange(fn,edit=true){
+ const before=JSON.stringify(root),beforeBaseline=baseline,beforeUndo=undoData;
+ try{fn();}catch(e){
+  root=JSON.parse(before);state=root.stores.find(s=>s.id===root.activeStoreId);baseline=beforeBaseline;undoData=beforeUndo;updateTools();render();
+  throw e;
+ }
+ if(save(edit))return true;
+ root=JSON.parse(before);state=root.stores.find(s=>s.id===root.activeStoreId);baseline=beforeBaseline;undoData=beforeUndo;updateTools();render();
+ return false;
+}
 function undo(){
  if(!undoData)return;
  const body=openDialog('直前の操作を取り消しますか？');
@@ -135,7 +145,7 @@ $('#close').onclick=close;
 function field(label,input){const wrapper=el('label',{class:'field'},label);wrapper.append(input);return wrapper;}
 function hint(parent,text){parent.append(el('p',{class:'hint'},text));}
 function confirmChange(existing){return !existing||confirm('登録済みの内容を変更しますか？');}
-function commit(fn){fn();save();render();close();}
+function commit(fn){if(!persistChange(fn))return false;render();close();return true;}
 function employeesList(parent,choose,currentId,filter){const choices=el('div',{class:'choices'});state.employees.forEach(e=>{if(filter&&!filter(e))return;if(e.hidden&&e.id!==currentId)return;const shiftName=employeeShiftName(e),label=e.name===shiftName?e.name:`${e.name}（シフト：${shiftName}）`;const b=button(label+(e.hidden?'（非表示）':''),()=>choose(e));choices.append(b);});parent.append(choices);if(!choices.children.length)hint(parent,'選択できる従業員がいません。従業員管理から追加してください。');}
 function withinFirstMonth(employee,date){if(!employee?.hireDate)return false;const hire=new Date(employee.hireDate+'T12:00:00Z'),target=new Date(date+'T12:00:00Z');if(Number.isNaN(hire.getTime())||Number.isNaN(target.getTime())||target<hire)return false;const y=hire.getUTCFullYear(),m=hire.getUTCMonth()+1,day=hire.getUTCDate(),last=new Date(Date.UTC(y,m+1,0,12)).getUTCDate(),limit=new Date(Date.UTC(y,m,Math.min(day,last),12));return target<=limit;}
 function openCell(d,row,b){activeCell={d,row,b};if(row===0)return openFixed();if(row===4)return openExtra(d,b);const existing=week().days[d].shifts[row-1][b];if(existing)return editShift(d,row,b,structuredClone(existing));const body=openDialog('従業員を選択');hint(body,`${week().days[d].date}　${timeLabel(bands[b].start)}〜${timeLabel(bands[b].end)} ／ 時間帯に関係なく全従業員を表示`);employeesList(body,e=>commit(()=>week().days[d].shifts[row-1][b]=makeShift(e,b)));}
@@ -215,8 +225,8 @@ function openFixed(){
     if(confirm('固定作業の設定を変更しますか？選択した曜日に、過去を含む全週で反映します。'))commit(()=>state.fixed=values);
   },'primary'));
 }
-function openEmployees(){const body=openDialog('従業員管理');hint(body,'≡をドラッグして並べ替え。非表示の従業員は選択一覧から除外され、登録済みの名前は残ります。');const list=el('div');body.append(list);state.employees.forEach((e,index)=>{const row=el('div',{class:'employee-row','data-employee':e.id});const handle=button('≡',()=>{} ,'handle');handle.setAttribute('aria-label',`${e.name}をドラッグして並べ替え`);let target=null;handle.onpointerdown=ev=>{ev.preventDefault();handle.setPointerCapture(ev.pointerId);row.classList.add('dragging');};handle.onpointermove=ev=>{if(!handle.hasPointerCapture(ev.pointerId))return;const hit=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('[data-employee]');list.querySelectorAll('.drop-target').forEach(n=>n.classList.remove('drop-target'));target=hit?.dataset.employee||null;if(hit&&hit!==row)hit.classList.add('drop-target');};handle.onpointerup=ev=>{if(handle.hasPointerCapture(ev.pointerId))handle.releasePointerCapture(ev.pointerId);if(target&&target!==e.id){const to=state.employees.findIndex(x=>x.id===target);moveEmployee(index,to);}else{row.classList.remove('dragging');list.querySelectorAll('.drop-target').forEach(n=>n.classList.remove('drop-target'));}};handle.onpointercancel=()=>openEmployees();const name=el('span',{class:'name'},e.name);const shiftName=employeeShiftName(e);if(shiftName!==e.name)name.append(el('span',{class:'muted'},`　シフト：${shiftName}`));if(e.hidden)name.append(el('span',{class:'muted'},'　非表示'));row.append(handle,name,button('編集',()=>employeeForm(e)),button(e.hidden?'表示':'非表示',()=>{e.hidden=!e.hidden;save();renderBirthdays();openEmployees();}),button('削除',()=>{if(confirm(`${e.name}を削除しますか？既存シフト・トレーニングの名前は保持されます。`)){state.employees=state.employees.filter(x=>x.id!==e.id);save();renderBirthdays();openEmployees();}},'danger'));list.append(row);});body.append(button('＋ 従業員を追加',()=>employeeForm(null),'primary'));}
-function moveEmployee(from,to){const [employee]=state.employees.splice(from,1);state.employees.splice(to,0,employee);save();renderBirthdays();openEmployees();}
+function openEmployees(){const body=openDialog('従業員管理');hint(body,'≡をドラッグして並べ替え。非表示の従業員は選択一覧から除外され、登録済みの名前は残ります。');const list=el('div');body.append(list);state.employees.forEach((e,index)=>{const row=el('div',{class:'employee-row','data-employee':e.id});const handle=button('≡',()=>{} ,'handle');handle.setAttribute('aria-label',`${e.name}をドラッグして並べ替え`);let target=null;handle.onpointerdown=ev=>{ev.preventDefault();handle.setPointerCapture(ev.pointerId);row.classList.add('dragging');};handle.onpointermove=ev=>{if(!handle.hasPointerCapture(ev.pointerId))return;const hit=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('[data-employee]');list.querySelectorAll('.drop-target').forEach(n=>n.classList.remove('drop-target'));target=hit?.dataset.employee||null;if(hit&&hit!==row)hit.classList.add('drop-target');};handle.onpointerup=ev=>{if(handle.hasPointerCapture(ev.pointerId))handle.releasePointerCapture(ev.pointerId);if(target&&target!==e.id){const to=state.employees.findIndex(x=>x.id===target);moveEmployee(index,to);}else{row.classList.remove('dragging');list.querySelectorAll('.drop-target').forEach(n=>n.classList.remove('drop-target'));}};handle.onpointercancel=()=>openEmployees();const name=el('span',{class:'name'},e.name);const shiftName=employeeShiftName(e);if(shiftName!==e.name)name.append(el('span',{class:'muted'},`　シフト：${shiftName}`));if(e.hidden)name.append(el('span',{class:'muted'},'　非表示'));row.append(handle,name,button('編集',()=>employeeForm(e)),button(e.hidden?'表示':'非表示',()=>{persistChange(()=>e.hidden=!e.hidden);renderBirthdays();openEmployees();}),button('削除',()=>{if(confirm(`${e.name}を削除しますか？既存シフト・トレーニングの名前は保持されます。`)){persistChange(()=>state.employees=state.employees.filter(x=>x.id!==e.id));renderBirthdays();openEmployees();}},'danger'));list.append(row);});body.append(button('＋ 従業員を追加',()=>employeeForm(null),'primary'));}
+function moveEmployee(from,to){persistChange(()=>{const [employee]=state.employees.splice(from,1);state.employees.splice(to,0,employee);});renderBirthdays();openEmployees();}
 function employeeForm(employee){
  const body=openDialog(employee?'従業員を編集':'従業員を追加');
  const fullName=el('input',{maxlength:20,value:employee?.name||'',placeholder:'例：山田 太郎',autocomplete:'name'});
@@ -237,11 +247,12 @@ function employeeForm(employee){
   if(details.birthDate&&details.hireDate&&details.birthDate>details.hireDate){err.textContent='入社年月日は生年月日以降の日付を入力してください。';return;}
   if(details.employeeNumber&&state.employees.some(e=>e.id!==employee?.id&&e.employeeNumber===details.employeeNumber)){err.textContent='この店舗では同じ従業員番号が使われています。';return;}
   if(employee&&!confirmChange(Object.entries(details).some(([k,v])=>(employee[k]||'')!==v)))return;
-  if(employee)Object.assign(employee,details);else state.employees.push({id:crypto.randomUUID(),...details,hidden:false});
-  save();renderBirthdays();openEmployees();
+  const employeeId=employee?.id||null;
+  if(persistChange(()=>{if(employee)Object.assign(employee,details);else state.employees.push({id:crypto.randomUUID(),...details,hidden:false});})){renderBirthdays();openEmployees();}
+  else if(employeeId)employeeForm(state.employees.find(e=>e.id===employeeId));
  },'primary'),button('戻る',openEmployees));
 }
-function navigate(delta,target){const next=target||addDays(state.current,delta);const existed=!!state.weeks[next],copied=ensureWeek(state,next);state.current=next;save(false);render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
+function navigate(delta,target){const next=target||addDays(state.current,delta),existed=!!state.weeks[next];let copied=false;if(!persistChange(()=>{copied=ensureWeek(state,next);state.current=next;},false))return;render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
 function openStores(){
  const body=openDialog('店舗管理');
  hint(body,'従業員・固定作業・シフト・備考は店舗ごとに保存します。新しい店舗は空の状態で作成します。');
@@ -317,7 +328,7 @@ $('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#prev').o
 $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;navigate(0,monday(key));};
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
-$('#store').onchange=e=>{root.activeStoreId=e.target.value;state=root.stores.find(s=>s.id===root.activeStoreId);save(false);render();};
+$('#store').onchange=e=>{const id=e.target.value;if(persistChange(()=>{root.activeStoreId=id;state=root.stores.find(s=>s.id===root.activeStoreId);},false))render();};
 let previewObserver=null;
 function closePreview(){
  previewObserver?.disconnect();previewObserver=null;

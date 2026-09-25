@@ -212,7 +212,46 @@ $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${Stri
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
 $('#store').onchange=e=>{root.activeStoreId=e.target.value;state=root.stores.find(s=>s.id===root.activeStoreId);save(false);render();};
-$('#preview').onclick=()=>{preview=!preview;document.body.classList.toggle('print-mode',preview);$('#preview').textContent=preview?'編集に戻る':'印刷プレビュー';if(preview){const bar=el('div',{class:'preview-bar no-print',id:'print-actions'});bar.append(button('印刷する',printSchedule,'primary'),el('span',{class:'hint'},'A4横向き ／ 1週間を1枚に印刷'));$('#paper').before(bar);}else $('#print-actions')?.remove();};
+let previewObserver=null;
+function closePreview(){
+ previewObserver?.disconnect();previewObserver=null;
+ preview=false;document.body.classList.remove('print-mode');
+ $('#print-actions')?.remove();
+ requestAnimationFrame(()=>{fitText();$('#preview').focus();});
+}
+function openPreview(){
+ if(preview)return;
+ // v25と同じ組版を複製する。表示専用の用紙は印刷対象に含めない。
+ let paper,css;
+ try{
+  preparePrint();
+  paper=$('#paper').cloneNode(true);
+  css=[...document.styleSheets].flatMap(sheet=>[...sheet.cssRules].map(rule=>rule.cssText)).join('\n');
+ }finally{finishPrint();}
+ const doc=document.implementation.createHTMLDocument('週間シフト表の印刷プレビュー');
+ const style=doc.createElement('style');
+ style.textContent=css+'\nhtml{width:297mm;height:210mm;padding:8mm;overflow:hidden;background:white}body.print-layout{width:281mm}';
+ doc.head.append(style);doc.body.className='print-layout';
+ const main=doc.createElement('main');main.append(paper);doc.body.append(main);
+ paper.querySelectorAll('button').forEach(n=>n.tabIndex=-1);
+ const bar=el('section',{class:'preview-bar no-print',id:'print-actions','aria-label':'印刷プレビュー'});
+ const toolbar=el('div',{class:'preview-toolbar'});
+ toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'),button('印刷する',printSchedule,'primary'));
+ const meta=el('div',{class:'preview-meta'});
+ meta.append(el('div',{},`${state.store} ｜ ${period()}`),el('small',{},'A4横・1週間1枚'));
+ const stage=el('div',{class:'preview-stage'});
+ const frame=el('iframe',{class:'preview-sheet',title:'週間シフト表の印刷イメージ',sandbox:'',tabindex:'-1'});
+ frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;
+ stage.append(frame);bar.append(toolbar,meta,stage);
+ preview=true;document.body.classList.add('print-mode');$('#paper').before(bar);
+ const fitPreview=()=>{
+  const scale=Math.min(stage.clientWidth/frame.offsetWidth,stage.clientHeight/frame.offsetHeight,1);
+  frame.style.setProperty('--preview-scale',Math.max(.1,scale));
+ };
+ previewObserver=new ResizeObserver(fitPreview);previewObserver.observe(stage);
+ fitPreview();toolbar.firstElementChild.focus();
+}
+$('#preview').onclick=openPreview;
 render();save(false);showSettings();
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
  navigator.serviceWorker.register('./sw.js').then(reg=>{

@@ -360,10 +360,25 @@ function openPreview(){
 $('#preview').onclick=openPreview;
 render();save(false);showSettings();
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
- navigator.serviceWorker.register('./sw.js').then(reg=>{
-  const update=()=>{if(reg.waiting)$('#offline-status').textContent='新しい版があります。アプリの画面をすべて閉じて、開き直すと反映されます。';};
-  update();reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',update));
-  navigator.serviceWorker.ready.then(()=>{if(!reg.waiting)$('#offline-status').textContent='通信がないときの起動準備ができています。';});
+ const hadController=!!navigator.serviceWorker.controller;
+ let reloadingForUpdate=false;
+ navigator.serviceWorker.addEventListener('controllerchange',()=>{
+  if(!hadController||reloadingForUpdate)return;
+  if($('#editor')?.open){
+   $('#offline-status').textContent='新しい版の準備ができました。入力中の内容を保存または閉じたあと、アプリを開き直してください。';
+   return;
+  }
+  reloadingForUpdate=true;
+  location.reload();
+ });
+ navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
+  const update=()=>{
+   if(reg.waiting)$('#offline-status').textContent='新しい版の準備ができています。まもなく最新版へ切り替わります。';
+  };
+  update();
+  reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',update));
+  navigator.serviceWorker.ready.then(()=>{$('#offline-status').textContent='通信がないときの起動準備ができています。';});
+  reg.update().catch(()=>{});
  }).catch(()=>{$('#offline-status').textContent='通信がないときの起動準備に失敗しました。接続中に開き直してください。';});
 }else $('#offline-status').textContent='この接続ではホーム画面・通信なし起動の準備を利用できません。';
 if(document.modelContext?.registerTool){try{Promise.resolve(document.modelContext.registerTool({name:'read_visible_shift_week',title:'表示中のシフトを読む',description:'表示中の週の登録内容を読み取ります。変更はしません。',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true,untrustedContentHint:true},execute(input){if(!input||typeof input!=='object'||Object.keys(input).length)throw Error('入力は空のオブジェクトにしてください');return structuredClone({store:state.store,fixed:state.fixed,week:week()});}})).catch(()=>{});}catch{}}

@@ -1,6 +1,7 @@
 import {birthdayNotices} from './birthdays.js';
 import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,initialState,fixedSetting,fixedTextAt} from './model.js';
 import {storageKey,validateRoot,migrate,newStore,backupText,parseBackup} from './stores.js';
+import {encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText} from './crypto-backup.js';
 const $=s=>document.querySelector(s);let root,state,storageError='',preview=false,activeCell=null;
 try{const raw=localStorage.getItem(storageKey);const old=localStorage.getItem('shift-ipad-step1-v1');root=raw?validateRoot(JSON.parse(raw)):migrate(old?JSON.parse(old):initialState());}catch(e){storageError='保存データを読み込めません。既存データを上書きせず一時表示しています。';root=migrate();}
 state=root.stores.find(s=>s.id===root.activeStoreId);
@@ -192,18 +193,59 @@ function openStores(){
 }
 function openBackup(){
  const body=openDialog('バックアップ・復元');
- hint(body,'書き出し日時はダウンロードを開始した日時です。ファイルが保存されたことは保存先で確認してください。');
- hint(body,'全店舗の内容を1つのファイルに保存します。iPadの故障やブラウザーのデータ消去に備え、定期的に保存してください。');
- body.append(button('全店舗のバックアップを保存',()=>{try{const url=URL.createObjectURL(new Blob([backupText(root)],{type:'application/json'}));const link=el('a',{href:url,download:`シフト全店舗_${new Date().toISOString().replaceAll(':','-')}.json`});document.body.append(link);link.click();link.remove();backupAt=new Date().toISOString();try{localStorage.setItem('shift-last-backup',backupAt);}catch{}updateTools();setTimeout(()=>URL.revokeObjectURL(url),60000);}catch(e){error.textContent=e.message;}},'primary'),el('hr'));
- const file=el('input',{type:'file',accept:'.json,application/json'}),summary=el('p'),error=el('p',{class:'error',role:'alert'});
- let candidate=null;
+ hint(body,'通常データはこの端末内だけに保存します。新しいバックアップは、端末上で暗号化してから保存・共有します。');
+ hint(body,'バックアップ用パスワードは保存されません。忘れると復元できません。12文字以上で設定してください。');
+ const password=el('input',{type:'password',minlength:12,autocomplete:'new-password'}),confirmPassword=el('input',{type:'password',minlength:12,autocomplete:'new-password'});
+ const exportError=el('p',{class:'error',role:'alert'});
+ const exportButton=button('暗号化バックアップを作成',async()=>{
+  exportError.textContent='';
+  if(password.value.length<12){exportError.textContent='バックアップ用パスワードは12文字以上にしてください。';password.focus();return;}
+  if(password.value!==confirmPassword.value){exportError.textContent='確認用パスワードが一致しません。';confirmPassword.focus();return;}
+  exportButton.disabled=true;
+  try{
+   const exportedAt=new Date().toISOString(),encrypted=await encryptBackupText(backupText(root),password.value,exportedAt);
+   const filename=`シフト全店舗_${exportedAt.replaceAll(':','-')}.shiftbackup`,file=new File([encrypted],filename,{type:'application/json'});
+   if(navigator.share&&navigator.canShare?.({files:[file]}))await navigator.share({files:[file],title:'シフト暗号化バックアップ'});
+   else{const url=URL.createObjectURL(file),link=el('a',{href:url,download:filename});document.body.append(link);link.click();link.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+   backupAt=exportedAt;try{localStorage.setItem('shift-last-backup',backupAt);}catch{}updateTools();
+   password.value='';confirmPassword.value='';
+  }catch(e){if(e?.name!=='AbortError')exportError.textContent=e.message||'暗号化バックアップを作成できませんでした。';}
+  finally{exportButton.disabled=false;}
+ },'primary');
+ body.append(field('バックアップ用パスワード（12文字以上）',password),field('パスワードをもう一度入力',confirmPassword),exportError,exportButton,el('hr'));
+ hint(body,'復元は新しい暗号化バックアップ（.shiftbackup）に加えて、以前の暗号化されていないJSONバックアップにも対応します。');
+ const file=el('input',{type:'file',accept:'.shiftbackup,.json,application/json'}),restorePassword=el('input',{type:'password',autocomplete:'current-password'}),summary=el('p'),error=el('p',{class:'error',role:'alert'});
+ let candidate=null,selectedText='',encrypted=false;
  const restore=button('このバックアップで全店舗を復元',()=>{
   if(!candidate)return;
   if(!confirm(`現在の全店舗データを、選択したバックアップの${candidate.stores.length}店舗に置き換えます。現在の内容は先にバックアップしてください。復元しますか？`))return;
   try{localStorage.setItem(storageKey,JSON.stringify(candidate));root=candidate;state=root.stores.find(s=>s.id===root.activeStoreId);storageError='';baseline=JSON.stringify(root);undoData=null;updateTools();render();$('#saved').textContent='全店舗を復元しました';close();}catch(e){error.textContent='保存できないため復元しませんでした。空き容量を確認してください。';}
  },'danger');restore.disabled=true;
- file.onchange=async()=>{candidate=null;restore.disabled=true;summary.textContent='';error.textContent='';const selected=file.files[0];if(!selected)return;try{if(selected.size>10000000)throw Error('10MB以下のバックアップを選んでください。');const parsed=parseBackup(await selected.text());if(file.files[0]!==selected)return;candidate=parsed;summary.textContent=`復元対象：${candidate.stores.map(s=>s.store).join('、')}（合計${candidate.stores.length}店舗）。現在の全店舗を置き換えます。`;restore.disabled=false;}catch(e){error.textContent=e.message;}};
- body.append(field('復元するファイル',file),summary,error,restore);
+ const unlock=button('バックアップを確認',async()=>{
+  candidate=null;restore.disabled=true;error.textContent='';summary.textContent='';
+  if(!selectedText)return;
+  unlock.disabled=true;
+  try{
+   const plain=encrypted?await decryptBackupText(selectedText,restorePassword.value):selectedText;
+   candidate=parseBackup(plain);
+   summary.textContent=`復元対象：${candidate.stores.map(s=>s.store).join('、')}（合計${candidate.stores.length}店舗）${encrypted?'／暗号化バックアップ':'／旧形式・暗号化なし'}`;
+   restore.disabled=false;
+  }catch(e){error.textContent=e.message;}
+  finally{unlock.disabled=false;}
+ },'primary');unlock.disabled=true;
+ file.onchange=async()=>{
+  candidate=null;selectedText='';encrypted=false;restore.disabled=true;unlock.disabled=true;restorePassword.value='';summary.textContent='';error.textContent='';
+  const selected=file.files[0];if(!selected)return;
+  try{
+   if(selected.size>15000000)throw Error('15MB以下のバックアップを選んでください。');
+   selectedText=await selected.text();if(file.files[0]!==selected)return;
+   encrypted=isEncryptedBackupText(selectedText);
+   if(encrypted){const info=encryptedBackupInfo(selectedText),date=new Date(info.exportedAt);summary.textContent=`暗号化バックアップを選択しました${!isNaN(date)?`（${date.toLocaleString('ja-JP')}）`:''}。パスワードを入力して確認してください。`;unlock.disabled=false;restorePassword.disabled=false;restorePassword.focus();}
+   else{restorePassword.disabled=true;unlock.disabled=false;summary.textContent='旧形式の暗号化されていないバックアップを選択しました。「バックアップを確認」を押してください。';}
+  }catch(e){error.textContent=e.message;}
+ };
+ restorePassword.disabled=true;
+ body.append(field('復元するファイル',file),field('バックアップ用パスワード',restorePassword),unlock,summary,error,restore);
 }
 function showSettings(){const settings=location.hash==='#settings';$('#shift-page').hidden=settings;$('#settings-page').hidden=!settings;$('#preview').hidden=settings;$('#settings').hidden=settings;if(settings)$('#settings-back').focus();else requestAnimationFrame(fitText);}
 $('#settings').onclick=()=>{location.hash='settings';};

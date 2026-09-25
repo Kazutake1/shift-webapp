@@ -1,5 +1,5 @@
-const CACHE='shift-ipad-step1-shell-v29';
-const FILES=['./','./index.html','./style.css','./app.js','./model.js','./stores.js','./birthdays.js','./holidays.js','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
+const CACHE='shift-ipad-step1-shell-v30';
+const FILES=['./','./index.html','./style.css','./app.js','./model.js','./stores.js','./crypto-backup.js','./birthdays.js','./holidays.js','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));
 // 同じ版の画面と処理をまとめて使い、通信切断や更新途中の混在を防ぐ。

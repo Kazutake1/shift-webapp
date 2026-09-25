@@ -131,6 +131,7 @@ footer{display:flow-root}
 @media print{
  html,body{margin:0;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}
  .no-print,dialog{display:none!important}
+ body.print-layout{width:281mm;height:194mm;display:flex;flex-direction:column;justify-content:center}
  main{padding:0;margin:0;max-width:none}
  #paper,.print-mode #paper{width:281mm;border:0;padding:0;margin:0;box-shadow:none}
 }

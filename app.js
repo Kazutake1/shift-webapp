@@ -1,5 +1,5 @@
 import {birthdayNotices} from './birthdays.js';
-import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,initialState,fixedSetting,fixedTextAt} from './model.js';
+import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,initialState,fixedSetting,fixedTextAt} from './model.js';
 import {storageKey,validateRoot,migrate,newStore,backupText,parseBackup} from './stores.js';
 import {encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText} from './crypto-backup.js';
 const $=s=>document.querySelector(s);let root,state,storageError='',preview=false,activeCell=null;
@@ -114,7 +114,7 @@ function renderBirthdays(){
 window.addEventListener('focus',()=>renderBirthdays());
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderBirthdays();});
 setInterval(()=>{if(!document.hidden)renderBirthdays();},60000);
-function render(){renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else label=extra?.type==='task'?extra.text:'';}else label=shiftLabel(day.shifts[row-1][b],b);const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:'notes-cell'}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?'この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：2026・2027年）。':'');requestAnimationFrame(fitText);}
+function render(){renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date,b);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else if(extra?.type==='task'){const start=Number.isInteger(extra.start)?extra.start:band.start,end=Number.isInteger(extra.end)?extra.end:band.end;label=timedTextLabel(extra.text,start,end,b);}}else label=shiftLabel(day.shifts[row-1][b],b);const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:'notes-cell'}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?'この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：2026・2027年）。':'');requestAnimationFrame(fitText);}
 function openDialog(title){$('#dialog-title').textContent=title;$('#dialog-body').replaceChildren();if(!$('#editor').open)$('#editor').showModal();return $('#dialog-body');}
 function close(){ $('#editor').close();activeCell=null;}
 $('#close').onclick=close;
@@ -152,21 +152,35 @@ function openExtra(d,b){
   content.replaceChildren();
   employeesList(content,e=>trainingEditor({type:'training',employeeId:e.id,name:employeeShiftName(e),start:band.start,end:band.end}));
  };
- const task=()=>{content.replaceChildren();const input=el('input',{maxlength:40,placeholder:'作業内容'});input.value=existing?.type==='task'?existing.text:'';content.append(field('不定期作業',input),button('登録',()=>{if(!input.value.trim()){input.focus();return;}if(confirmChange(existing))commit(()=>week().days[d].extras[b]={type:'task',text:input.value.trim()});},'primary'));};
+ const task=()=>{
+  content.replaceChildren();
+  const input=el('input',{maxlength:40,placeholder:'作業内容'});input.value=existing?.type==='task'?existing.text:'';
+  const start=el('input',{type:'time',required:'',value:timeValue(existing?.type==='task'&&Number.isInteger(existing.start)?existing.start:band.start)});
+  const end=el('input',{type:'time',required:'',value:timeValue(existing?.type==='task'&&Number.isInteger(existing.end)?existing.end:band.end)});
+  const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));
+  const error=el('p',{class:'error',role:'alert'});
+  content.append(field('不定期作業',input),rowEl);
+  hint(content,'6:00から翌朝6:00までの時間を入力できます。0:00〜5:59は翌日として扱います。');
+  content.append(error,button('登録',()=>{if(!input.value.trim()){input.focus();return;}try{const times=workingTimes(start.value,end.value);if(confirmChange(existing))commit(()=>week().days[d].extras[b]={type:'task',text:input.value.trim(),...times});}catch(e){error.textContent=e.message;}},'primary'));
+ };
  tabs.append(button('トレーニング',training),button('不定期作業',task));
  if(existing?.type==='task')task();else training();
  if(existing)body.append(button('削除',()=>{if(confirm('この登録を削除しますか？'))commit(()=>week().days[d].extras[b]=null);},'danger'));
 }
 function openFixed(){
   const body=openDialog('固定作業設定');
-  hint(body,'各時間帯に1件。表示する曜日を選んでください。設定は毎週自動で反映されます。');
+  hint(body,'各時間帯に1件。表示する曜日と開始・終了時刻を設定できます。設定は毎週自動で反映されます。');
   const grid=el('div',{class:'fixed-settings'}),inputs=[];
   bands.forEach((band,b)=>{
-    const setting=fixedSetting(state.fixed[b]);
+    const setting=fixedSetting(state.fixed[b],b);
     const group=el('fieldset',{class:'fixed-setting'});
     group.append(el('legend',{},`${timeLabel(band.start)}〜${timeLabel(band.end)}`));
     const input=el('input',{maxlength:40,value:setting.text});
     group.append(field('作業名',input));
+    const timeRow=el('div',{class:'row'});
+    const start=el('input',{type:'time',required:'',value:timeValue(setting.start)});
+    const end=el('input',{type:'time',required:'',value:timeValue(setting.end)});
+    timeRow.append(field('開始時刻',start),field('終了時刻',end));group.append(timeRow);
     const days=el('div',{class:'weekday-options'}),checks=[];
     [1,2,3,4,5,6,0].forEach(day=>{
       const check=el('input',{type:'checkbox',value:day});check.checked=setting.days.includes(day);
@@ -174,11 +188,13 @@ function openFixed(){
       check.setAttribute('aria-label',`${timeLabel(band.start)}〜${timeLabel(band.end)} ${'日月火水木金土'[day]}曜日`);
       days.append(label);checks.push(check);
     });
-    group.append(days);grid.append(group);inputs.push({input,checks});
+    group.append(days);grid.append(group);inputs.push({input,start,end,checks});
   });
   const error=el('p',{class:'error',role:'alert'});
   body.append(grid,error,button('設定を保存',()=>{
-    const values=inputs.map(({input,checks})=>({text:input.value.trim(),days:checks.filter(c=>c.checked).map(c=>Number(c.value))}));
+    let values;
+    try{values=inputs.map(({input,start,end,checks})=>({text:input.value.trim(),days:checks.filter(c=>c.checked).map(c=>Number(c.value)),...workingTimes(start.value,end.value)}));}
+    catch(e){error.textContent=e.message;return;}
     if(values.some(v=>v.text&&!v.days.length)){error.textContent='作業名を入力した時間帯には、曜日を1つ以上選んでください。';return;}
     if(confirm('固定作業の設定を変更しますか？選択した曜日に、過去を含む全週で反映します。'))commit(()=>state.fixed=values);
   },'primary'));

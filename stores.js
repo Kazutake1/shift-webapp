@@ -13,14 +13,14 @@ export function validateRoot(root){
   check(str(s.store,40)&&Array.isArray(s.employees)&&Array.isArray(s.fixed)&&s.fixed.length===5);
   const employeeIds=new Set();
   for(const e of s.employees){check(e&&str(e.id)&&e.id&&!employeeIds.has(e.id)&&str(e.name,20)&&e.name.trim()&&typeof e.hidden==='boolean');check(e.shiftName===undefined||str(e.shiftName,20)&&e.shiftName.trim());check(e.employeeNumber===undefined||str(e.employeeNumber,40));for(const key of ['hireDate','birthDate'])check(e[key]===undefined||e[key]===''||date(e[key]));employeeIds.add(e.id);}
-  for(const f of s.fixed)check(typeof f==='string'?str(f,40):f&&str(f.text,40)&&Array.isArray(f.days)&&f.days.every(d=>Number.isInteger(d)&&d>=0&&d<=6));
+  for(const f of s.fixed)check(typeof f==='string'?str(f,40):f&&str(f.text,40)&&Array.isArray(f.days)&&f.days.every(d=>Number.isInteger(d)&&d>=0&&d<=6)&&((f.start===undefined&&f.end===undefined)||(Number.isInteger(f.start)&&Number.isInteger(f.end)&&f.start>=360&&f.end<=1800&&f.end>f.start)));
   check(date(s.current)&&monday(s.current)===s.current&&s.weeks&&typeof s.weeks==='object'&&!Array.isArray(s.weeks)&&Object.hasOwn(s.weeks,s.current));
   for(const [key,w] of Object.entries(s.weeks)){
    check(date(key)&&monday(key)===key&&w?.start===key&&Array.isArray(w.days)&&w.days.length===7);
    w.days.forEach((d,i)=>{
     check(d?.date===addDays(key,i)&&str(d.notes,180)&&Array.isArray(d.shifts)&&d.shifts.length===3&&Array.isArray(d.extras)&&d.extras.length===5);
     for(const row of d.shifts){check(Array.isArray(row)&&row.length===5);for(const shift of row)check(shift===null||person(shift)&&Number.isInteger(shift.start)&&Number.isInteger(shift.end)&&shift.start>=360&&shift.end<=1800&&shift.end>shift.start);}
-    for(const e of d.extras)check(e===null||e?.type==='training'&&person(e)&&((e.start===undefined&&e.end===undefined)||(Number.isInteger(e.start)&&Number.isInteger(e.end)&&e.start>=360&&e.end<=1800&&e.end>e.start))||e?.type==='task'&&str(e.text,40));
+    for(const e of d.extras)check(e===null||e?.type==='training'&&person(e)&&((e.start===undefined&&e.end===undefined)||(Number.isInteger(e.start)&&Number.isInteger(e.end)&&e.start>=360&&e.end<=1800&&e.end>e.start))||e?.type==='task'&&str(e.text,40)&&((e.start===undefined&&e.end===undefined)||(Number.isInteger(e.start)&&Number.isInteger(e.end)&&e.start>=360&&e.end<=1800&&e.end>e.start)));
    });
   }
  }

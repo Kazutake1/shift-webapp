@@ -20,7 +20,7 @@ export function validateRoot(root){
    w.days.forEach((d,i)=>{
     check(d?.date===addDays(key,i)&&str(d.notes,180)&&Array.isArray(d.shifts)&&d.shifts.length===3&&Array.isArray(d.extras)&&d.extras.length===5);
     for(const row of d.shifts){check(Array.isArray(row)&&row.length===5);for(const shift of row)check(shift===null||person(shift)&&Number.isInteger(shift.start)&&Number.isInteger(shift.end)&&shift.start>=360&&shift.end<=1800&&shift.end>shift.start);}
-    for(const e of d.extras)check(e===null||e?.type==='training'&&person(e)||e?.type==='task'&&str(e.text,40));
+    for(const e of d.extras)check(e===null||e?.type==='training'&&person(e)&&((e.start===undefined&&e.end===undefined)||(Number.isInteger(e.start)&&Number.isInteger(e.end)&&e.start>=360&&e.end<=1800&&e.end>e.start))||e?.type==='task'&&str(e.text,40));
    });
   }
  }

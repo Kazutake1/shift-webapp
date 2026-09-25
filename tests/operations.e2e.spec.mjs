@@ -173,3 +173,63 @@ test('バックアップ画面は作成と復元を分け、復元時の注意�
  await expect(page.locator('#editor')).toContainText('作成したファイルが保存先に残っているかまでは確認できません');
  await expect(page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'})).toBeDisabled();
 });
+
+
+test('従業員検索は名前・シフト表名・従業員番号で絞り込み、表示順と対象条件を維持する',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(s=>s.id===root.activeStoreId);
+  Object.assign(store.employees[0],{name:'山田 太郎',shiftName:'山田',employeeNumber:'0012'});
+  Object.assign(store.employees[1],{name:'佐藤 花子',shiftName:'さとう',employeeNumber:'0099'});
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+ await expect(page.locator('#schedule')).toBeVisible();
+
+ await page.getByRole('button',{name:/予備従業員 6:00〜9:00 空欄/}).first().click();
+ const search=page.getByRole('searchbox',{name:'従業員を検索'});
+ await expect(search).toBeVisible();
+
+ await search.fill('0012');
+ await expect(page.locator('#dialog-body .choices button')).toHaveCount(1);
+ await expect(page.locator('#dialog-body .choices button').first()).toContainText('山田 太郎');
+
+ await search.fill('さとう');
+ await expect(page.locator('#dialog-body .choices button')).toHaveCount(1);
+ await expect(page.locator('#dialog-body .choices button').first()).toContainText('佐藤 花子');
+
+ await search.fill('該当なし');
+ await expect(page.locator('#dialog-body .choices button')).toHaveCount(0);
+ await expect(page.locator('#dialog-body')).toContainText('検索条件に一致する従業員がいません');
+});
+
+test('同じ従業員の勤務時間が重なる登録は警告し、利用者が中止または続行できる',async({page})=>{
+ await openApp(page);
+ const before=await savedRoot(page);
+ const store=before.stores.find(s=>s.id===before.activeStoreId);
+ const employee=store.employees[0];
+
+ await page.getByRole('button',{name:/予備従業員 6:00〜9:00 空欄/}).first().click();
+ const search=page.getByRole('searchbox',{name:'従業員を検索'});
+ await search.fill(employee.name);
+
+ let warning='';
+ page.once('dialog',async dialog=>{warning=dialog.message();await dialog.dismiss();});
+ await page.locator('#dialog-body .choices button').filter({hasText:employee.name}).first().click();
+ await expect.poll(()=>warning).toContain('勤務時間が重複しています');
+ expect(warning).toContain('登録済み：6:00〜9:00');
+ expect(warning).toContain('今回：6:00〜9:00');
+
+ let after=await savedRoot(page);
+ let afterStore=after.stores.find(s=>s.id===after.activeStoreId);
+ expect(afterStore.weeks[afterStore.current].days[0].shifts[2][0]).toBeNull();
+
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#dialog-body .choices button').filter({hasText:employee.name}).first().click();
+ await expect(page.locator('#editor')).not.toBeVisible();
+
+ after=await savedRoot(page);
+ afterStore=after.stores.find(s=>s.id===after.activeStoreId);
+ expect(afterStore.weeks[afterStore.current].days[0].shifts[2][0].employeeId).toBe(employee.id);
+});

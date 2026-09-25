@@ -9,7 +9,7 @@ if(!globalThis.atob)globalThis.atob=value=>Buffer.from(value,'base64').toString(
 
 import {
   initialState,ensureWeek,addDays,monday,shiftLabel,workingTimes,dayInfo,makeShift,
-  employeeShiftName,fixedSetting,fixedTextAt,timedTextLabel,bands
+  employeeShiftName,employeeShiftConflicts,fixedSetting,fixedTextAt,timedTextLabel,bands
 } from '../model.js';
 import {migrate,newStore,validateRoot,backupText,parseBackup} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
@@ -61,6 +61,18 @@ test('登録済みシフトは従業員の改名・削除後も名前を保持',
  s.employees[0].name='変更後';
  s.employees.splice(0,1);
  assert.equal(s.weeks[s.current].days[0].shifts[0][0].name,'従業員A');
+});
+
+test('同じ従業員の勤務時間重複だけを検出し、隣接時間と編集中セルは除外する',()=>{
+ const s=initialState(),day=s.weeks[s.current].days[0],employee=s.employees[0];
+ const overlapping=makeShift(employee,0,480,600);
+ assert.equal(employeeShiftConflicts(day,overlapping).length,1);
+ const adjacent=makeShift(employee,0,540,600);
+ assert.equal(employeeShiftConflicts(day,adjacent).length,0);
+ const other=makeShift(s.employees[1],0,480,600);
+ assert.equal(employeeShiftConflicts(day,other).length,0);
+ const editing=makeShift(employee,0,360,540);
+ assert.equal(employeeShiftConflicts(day,editing,{row:0,band:0}).length,0);
 });
 
 test('週・月・年境界とうるう年を正しく扱う',()=>{

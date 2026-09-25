@@ -13,6 +13,16 @@ export function emptyWeek(key){return {start:key,days:Array.from({length:7},(_,i
 export function ensureWeek(state,key){if(state.weeks[key])return false;const w=emptyWeek(key),prev=state.weeks[addDays(key,-7)];if(prev)w.days.forEach((d,i)=>d.shifts=structuredClone(prev.days[i].shifts));state.weeks[key]=w;return !!prev;}
 export function employeeShiftName(employee){return employee?.shiftName?.trim()||employee?.name||'';}
 export function makeShift(employee,b,start=bands[b].start,end=bands[b].end){return {employeeId:employee.id,name:employeeShiftName(employee),start,end};}
+export function employeeShiftConflicts(day,candidate,exclude=null){
+ const conflicts=[];
+ if(!day?.shifts||!candidate?.employeeId||!Number.isInteger(candidate.start)||!Number.isInteger(candidate.end))return conflicts;
+ day.shifts.forEach((row,rowIndex)=>row.forEach((shift,bandIndex)=>{
+  if(!shift||shift.employeeId!==candidate.employeeId)return;
+  if(exclude&&exclude.row===rowIndex&&exclude.band===bandIndex)return;
+  if(candidate.start<shift.end&&shift.start<candidate.end)conflicts.push({row:rowIndex,band:bandIndex,shift});
+ }));
+ return conflicts;
+}
 export function initialState(){const employees=Array.from({length:10},(_,i)=>({id:`sample-${i}`,name:`従業員${String.fromCharCode(65+i)}`,hidden:false}));const key='2026-09-21',w=emptyWeek(key);w.days.forEach(d=>bands.forEach((_,b)=>{d.shifts[0][b]=makeShift(employees[b*2],b);d.shifts[1][b]=makeShift(employees[b*2+1],b);}));return {version:1,store:'サンプル店',employees,fixed:['','売上日報','','',''],current:key,weeks:{[key]:w}};}
 
 export function timedTextLabel(text,start,end,b){if(!text)return '';const band=bands[b];let suffix='';if(start!==band.start&&end!==band.end)suffix=`${timeLabel(start)}〜${timeLabel(end)}`;else if(start!==band.start)suffix=`${timeLabel(start)}〜`;else if(end!==band.end)suffix=`〜${timeLabel(end)}`;return text+(suffix?`（${suffix}）`:'');}

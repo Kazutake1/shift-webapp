@@ -27,17 +27,26 @@ function week(){return state.weeks[state.current];}
 function period(){return `${state.current.replaceAll('-','/')} — ${addDays(state.current,6).replaceAll('-','/')}`;}
 function fitText(){document.querySelectorAll('td.slot button,td.notes-cell button').forEach(n=>{n.style.removeProperty('font-size');if(!n.textContent)return;let size=parseFloat(getComputedStyle(n).fontSize);while(size>6&&(n.scrollHeight>n.clientHeight+1||n.scrollWidth>n.clientWidth+1)){size-=.5;n.style.setProperty('font-size',size+'px','important');}});drawRules();}
 // 用紙幅を先に確定してから文字と罫線を計測する。印刷中の再計測は抑える。
-let printLayoutActive=false,printRequested=false;
+let printLayoutActive=false,printRequested=false,printRecoveryTimer=0;
+const printMedia=window.matchMedia('print');
 function preparePrint(){
+ clearTimeout(printRecoveryTimer);
  printLayoutActive=true;
  document.body.classList.add('print-layout');
  fitText();
 }
 function finishPrint(){
- if(!printLayoutActive)return;
+ clearTimeout(printRecoveryTimer);printRecoveryTimer=0;
+ if(!printLayoutActive){printRequested=false;return;}
  document.body.classList.remove('print-layout');
  printLayoutActive=false;printRequested=false;
  requestAnimationFrame(fitText);
+}
+function schedulePrintRecovery(delay=1200){
+ clearTimeout(printRecoveryTimer);
+ printRecoveryTimer=setTimeout(()=>{
+  if(printRequested&&!printMedia.matches&&!document.hidden)finishPrint();
+ },delay);
 }
 async function printSchedule(){
  if(printRequested)return;
@@ -48,13 +57,18 @@ async function printSchedule(){
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   fitText();
   window.print();
+  // iPhone / iPadではafterprintが戻らない場合があるため、通常画面へ戻す保険を入れる。
+  schedulePrintRecovery();
  }catch(error){finishPrint();throw error;}
 }
 if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(!printLayoutActive)drawRules();}).observe($('#schedule'));
-window.matchMedia('print').addEventListener('change',event=>{if(event.matches)preparePrint();else finishPrint();});
+printMedia.addEventListener('change',event=>{if(event.matches)preparePrint();else finishPrint();});
 window.addEventListener('resize',()=>{if(!printLayoutActive)fitText();});
 window.addEventListener('beforeprint',preparePrint);
 window.addEventListener('afterprint',finishPrint);
+window.addEventListener('focus',()=>{if(printRequested)schedulePrintRecovery(300);});
+window.addEventListener('pageshow',()=>{if(printRequested)schedulePrintRecovery(300);});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&printRequested)schedulePrintRecovery(300);});
 
 function drawRules(){
   const table=$('#schedule'),host=table.parentElement;

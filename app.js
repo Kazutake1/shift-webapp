@@ -25,6 +25,9 @@ function button(text,fn,cls=''){const n=el('button',{type:'button',class:cls},te
 function week(){return state.weeks[state.current];}
 function period(){return `${state.current.replaceAll('-','/')} — ${addDays(state.current,6).replaceAll('-','/')}`;}
 function fitText(){document.querySelectorAll('td.slot button,td.notes-cell button').forEach(n=>{n.style.removeProperty('font-size');if(!n.textContent)return;let size=parseFloat(getComputedStyle(n).fontSize);while(size>6&&(n.scrollHeight>n.clientHeight+1||n.scrollWidth>n.clientWidth+1)){size-=.5;n.style.setProperty('font-size',size+'px','important');}});drawRules();}
+// 印刷への切り替えで表の実寸が変わった後にも罫線座標を更新する。
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>drawRules()).observe($('#schedule'));
+window.matchMedia('print').addEventListener('change',()=>fitText());
 window.addEventListener('resize',fitText);window.addEventListener('beforeprint',fitText);window.addEventListener('afterprint',fitText);
 
 function drawRules(){

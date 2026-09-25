@@ -25,10 +25,35 @@ function button(text,fn,cls=''){const n=el('button',{type:'button',class:cls},te
 function week(){return state.weeks[state.current];}
 function period(){return `${state.current.replaceAll('-','/')} — ${addDays(state.current,6).replaceAll('-','/')}`;}
 function fitText(){document.querySelectorAll('td.slot button,td.notes-cell button').forEach(n=>{n.style.removeProperty('font-size');if(!n.textContent)return;let size=parseFloat(getComputedStyle(n).fontSize);while(size>6&&(n.scrollHeight>n.clientHeight+1||n.scrollWidth>n.clientWidth+1)){size-=.5;n.style.setProperty('font-size',size+'px','important');}});drawRules();}
-// 印刷への切り替えで表の実寸が変わった後にも罫線座標を更新する。
-if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>drawRules()).observe($('#schedule'));
-window.matchMedia('print').addEventListener('change',()=>fitText());
-window.addEventListener('resize',fitText);window.addEventListener('beforeprint',fitText);window.addEventListener('afterprint',fitText);
+// 用紙幅を先に確定してから文字と罫線を計測する。印刷中の再計測は抑える。
+let printLayoutActive=false,printRequested=false;
+function preparePrint(){
+ printLayoutActive=true;
+ document.body.classList.add('print-layout');
+ fitText();
+}
+function finishPrint(){
+ if(!printLayoutActive)return;
+ document.body.classList.remove('print-layout');
+ printLayoutActive=false;printRequested=false;
+ requestAnimationFrame(fitText);
+}
+async function printSchedule(){
+ if(printRequested)return;
+ printRequested=true;
+ try{
+  preparePrint();
+  await document.fonts.ready;
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  fitText();
+  window.print();
+ }catch(error){finishPrint();throw error;}
+}
+if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(!printLayoutActive)drawRules();}).observe($('#schedule'));
+window.matchMedia('print').addEventListener('change',event=>{if(event.matches)preparePrint();else finishPrint();});
+window.addEventListener('resize',()=>{if(!printLayoutActive)fitText();});
+window.addEventListener('beforeprint',preparePrint);
+window.addEventListener('afterprint',finishPrint);
 
 function drawRules(){
   const table=$('#schedule'),host=table.parentElement;
@@ -187,7 +212,7 @@ $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${Stri
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
 $('#store').onchange=e=>{root.activeStoreId=e.target.value;state=root.stores.find(s=>s.id===root.activeStoreId);save(false);render();};
-$('#preview').onclick=()=>{preview=!preview;document.body.classList.toggle('print-mode',preview);$('#preview').textContent=preview?'編集に戻る':'印刷プレビュー';if(preview){const bar=el('div',{class:'preview-bar no-print',id:'print-actions'});bar.append(button('印刷する',()=>window.print(),'primary'),el('span',{class:'hint'},'A4横向き ／ 1週間を1枚に印刷'));$('#paper').before(bar);}else $('#print-actions')?.remove();};
+$('#preview').onclick=()=>{preview=!preview;document.body.classList.toggle('print-mode',preview);$('#preview').textContent=preview?'編集に戻る':'印刷プレビュー';if(preview){const bar=el('div',{class:'preview-bar no-print',id:'print-actions'});bar.append(button('印刷する',printSchedule,'primary'),el('span',{class:'hint'},'A4横向き ／ 1週間を1枚に印刷'));$('#paper').before(bar);}else $('#print-actions')?.remove();};
 render();save(false);showSettings();
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
  navigator.serviceWorker.register('./sw.js').then(reg=>{

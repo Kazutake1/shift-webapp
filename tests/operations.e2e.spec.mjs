@@ -99,9 +99,9 @@ test('複数画面の競合後は誕生日確認・Undo・復元で古いデー�
  await stale.locator('#settings').click();
  await stale.locator('#backup').click();
  await stale.locator('#editor input[type=file]').setInputFiles(backupFile(restoreCandidate,'conflict-restore.json'));
- await stale.locator('#editor').getByRole('button',{name:'バックアップを確認'}).click();
+ await stale.locator('#editor').getByRole('button',{name:'バックアップ内容を確認'}).click();
  await expect(stale.locator('#editor')).toContainText('復元対象');
- await stale.locator('#editor').getByRole('button',{name:'このバックアップで全店舗を復元'}).click();
+ await stale.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'}).click();
  await expect(stale.locator('#dialog-body .error').filter({hasText:'安全のため復元を停止しました'})).toHaveCount(1);
  root=await savedRoot(latest);
  store=root.stores.find(s=>s.id===root.activeStoreId);
@@ -148,14 +148,28 @@ test('バックアップ復元は実際の画面とlocalStorageを復元デー�
  await page.locator('#settings').click();
  await page.locator('#backup').click();
  await page.locator('#editor input[type=file]').setInputFiles(backupFile(candidate));
- await page.locator('#editor').getByRole('button',{name:'バックアップを確認'}).click();
+ await page.locator('#editor').getByRole('button',{name:'バックアップ内容を確認'}).click();
  await expect(page.locator('#editor')).toContainText('復元対象：復元確認店');
 
  page.on('dialog',dialog=>dialog.accept());
- await page.locator('#editor').getByRole('button',{name:'このバックアップで全店舗を復元'}).click();
+ await page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'}).click();
  await page.locator('#settings-back').click();
 
  await expect(page.locator('#store-name')).toHaveText('復元確認店');
  await expect(page.locator('td.notes-cell button').first()).toHaveText('復元テスト成功');
  expect(await savedRoot(page)).toEqual(candidate);
+});
+
+
+test('バックアップ画面は作成と復元を分け、復元時の注意を明示する',async({page})=>{
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#backup').click();
+
+ await expect(page.locator('#editor')).toContainText('1. バックアップを作成');
+ await expect(page.locator('#editor')).toContainText('2. バックアップから復元');
+ await expect(page.locator('#editor')).toContainText('復元すると、現在の全店舗データをバックアップ内の内容で置き換えます');
+ await expect(page.locator('#editor')).toContainText('① ファイルを選択');
+ await expect(page.locator('#editor')).toContainText('作成したファイルが保存先に残っているかまでは確認できません');
+ await expect(page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'})).toBeDisabled();
 });

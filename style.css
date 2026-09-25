@@ -199,3 +199,18 @@ body.print-layout #schedule tr{break-inside:avoid}
   .preview-meta{font-size:12px;padding:12px 12px 0}.preview-stage{margin:12px}
  }
 }
+
+
+/* バックアップと復元の手順を明確に分ける。シフト表には影響しない。 */
+@media screen{
+ .backup-section{margin:18px 0 0;padding:18px;border:1px solid #e1e7ee;border-radius:14px;background:#fafbfd}
+ .backup-section+ .backup-section{margin-top:18px}
+ .backup-section h3{margin:0 0 10px;font-size:16px;color:#253545}
+ .backup-section .field{margin:12px 0}
+ .backup-section .hint{margin:8px 0 14px}
+ .backup-note{margin:12px 0 0;font-size:12px;line-height:1.65;color:#718096}
+ .backup-warning{margin:8px 0 12px;padding:12px 14px;border:1px solid #e5c3c3;border-radius:10px;background:#fff7f7;color:#8f3434;font-size:13px;line-height:1.65}
+ .backup-steps{margin:10px 0 12px;padding:10px 12px;border-radius:9px;background:#eef4f8;color:#35546b;font-size:13px;font-weight:600;line-height:1.6}
+ .backup-status{margin:12px 0 0;color:#456658;font-size:13px;line-height:1.6}
+ .backup-summary{margin:12px 0;color:#35546b;font-size:13px;line-height:1.65;overflow-wrap:anywhere}
+}

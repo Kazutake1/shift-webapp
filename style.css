@@ -140,3 +140,15 @@ footer{display:flow-root}
  }
 }
 
+
+/* 印刷では入力ボタンの固有サイズで行・結合セルが広がらないようにする。 */
+@media print{
+ #schedule td.slot,#schedule td.notes-cell{position:relative}
+ #schedule td.slot{height:4.3mm}
+ #schedule td.slot button,#schedule td.notes-cell button{
+  position:absolute;inset:0;width:100%;height:100%;min-height:0;
+  margin:0;appearance:none;-webkit-appearance:none;box-sizing:border-box;
+ }
+ #schedule td.slot button{padding:0 .3mm}
+ #schedule td.notes-cell button{padding:1mm}
+}

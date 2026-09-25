@@ -12,7 +12,7 @@ export function validateRoot(root){
   check(s&&str(s.id)&&s.id&&!ids.has(s.id));ids.add(s.id);
   check(str(s.store,40)&&Array.isArray(s.employees)&&Array.isArray(s.fixed)&&s.fixed.length===5);
   const employeeIds=new Set();
-  for(const e of s.employees){check(e&&str(e.id)&&e.id&&!employeeIds.has(e.id)&&str(e.name,20)&&e.name.trim()&&typeof e.hidden==='boolean');check(e.employeeNumber===undefined||str(e.employeeNumber,40));for(const key of ['hireDate','birthDate'])check(e[key]===undefined||e[key]===''||date(e[key]));employeeIds.add(e.id);}
+  for(const e of s.employees){check(e&&str(e.id)&&e.id&&!employeeIds.has(e.id)&&str(e.name,20)&&e.name.trim()&&typeof e.hidden==='boolean');check(e.shiftName===undefined||str(e.shiftName,20)&&e.shiftName.trim());check(e.employeeNumber===undefined||str(e.employeeNumber,40));for(const key of ['hireDate','birthDate'])check(e[key]===undefined||e[key]===''||date(e[key]));employeeIds.add(e.id);}
   for(const f of s.fixed)check(typeof f==='string'?str(f,40):f&&str(f.text,40)&&Array.isArray(f.days)&&f.days.every(d=>Number.isInteger(d)&&d>=0&&d<=6));
   check(date(s.current)&&monday(s.current)===s.current&&s.weeks&&typeof s.weeks==='object'&&!Array.isArray(s.weeks)&&Object.hasOwn(s.weeks,s.current));
   for(const [key,w] of Object.entries(s.weeks)){

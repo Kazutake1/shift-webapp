@@ -1,4 +1,4 @@
-const CACHE='shift-ipad-step1-shell-v27';
+const CACHE='shift-ipad-step1-shell-v28';
 const FILES=['./','./index.html','./style.css','./app.js','./model.js','./stores.js','./birthdays.js','./holidays.js','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES))));
 self.addEventListener('activate',e=>e.waitUntil(self.clients.claim()));

@@ -34,7 +34,9 @@ test('設定の戻る操作は店名の右側に表示し、各サブページ�
  const title=await page.locator('.preview-toolbar h1').boundingBox();
  const printAction=await page.getByRole('button',{name:'印刷する'}).boundingBox();
  expect(previewBack.x).toBeLessThan(title.x);
- expect(printAction.y).toBeGreaterThanOrEqual(previewBack.y+previewBack.height);
+ expect(title.x).toBeLessThan(printAction.x);
+ expect(Math.abs(printAction.y-previewBack.y)).toBeLessThan(2);
+ expect(printAction.x+printAction.width).toBeLessThanOrEqual(390);
 });
 
 test('印刷プレビューはChromiumとWebKitでシフト表を表示する',async({page})=>{
@@ -493,6 +495,24 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  await page.locator('#preview').click();
  const openLink=page.getByRole('link',{name:'PDFを開く'});
  await expect(openLink).toBeVisible();
+ if(device==='iPhone'){
+  const bounds=await page.locator('.preview-toolbar').evaluate(toolbar=>
+   [toolbar.children[0],toolbar.children[1],toolbar.children[2].children[0],toolbar.children[2].children[1]]
+    .map(node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,center:(r.top+r.bottom)/2};})
+  );
+  for(const item of bounds)expect(Math.abs(item.center-bounds[0].center)).toBeLessThan(2);
+  for(let i=1;i<bounds.length;i++)expect(bounds[i].left).toBeGreaterThanOrEqual(bounds[i-1].right);
+  expect(bounds.at(-1).right).toBeLessThanOrEqual(390);
+  await page.setViewportSize({width:320,height:700});
+  const narrow=await page.locator('.preview-toolbar').evaluate(toolbar=>{
+   const items=[toolbar.children[0],toolbar.children[1],toolbar.children[2].children[0],toolbar.children[2].children[1]];
+   return items.map(item=>{const r=item.getBoundingClientRect();return {left:r.left,right:r.right,center:(r.top+r.bottom)/2};});
+  });
+  for(const item of narrow)expect(Math.abs(item.center-narrow[0].center)).toBeLessThan(2);
+  for(let i=1;i<narrow.length;i++)expect(narrow[i].left).toBeGreaterThanOrEqual(narrow[i-1].right);
+  expect(narrow.at(-1).right).toBeLessThanOrEqual(320);
+  await page.setViewportSize({width:390,height:844});
+ }
  await expect(page.locator('.preview-meta [role="status"]')).toBeHidden();
  await expect(page.getByRole('link',{name:'PDFを保存'})).toHaveCount(0);
  await page.getByRole('button',{name:'PDFを共有して印刷'}).click();

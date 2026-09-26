@@ -129,12 +129,20 @@ footer{display:flow-root}
 /* 印刷前に同じ寸法で組版し、実測したSVGと表を印刷時も一致させる。 */
 @page{size:A4 landscape;margin:8mm}
 @media print{
+ html{width:281mm;height:194mm;overflow:hidden}
  html,body{margin:0;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}
  .no-print,dialog{display:none!important}
- /* iPadの印刷余白・端数処理で空の2枚目が出ないよう高さに4mmの余裕を持つ。表の寸法は維持。 */
- body.print-layout{width:281mm;height:190mm;display:flex;flex-direction:column;justify-content:center}
- main{padding:0;margin:0;max-width:none}
- #paper,.print-mode #paper{width:281mm;border:0;padding:0;margin:0;box-shadow:none}
+ /* iPad Safariの端数オーバーフローで空の2枚目が生成されないよう、印刷外枠だけを1ページ内へ固定する。表の寸法は変更しない。 */
+ body.print-layout{
+  width:281mm;height:190mm;max-height:190mm;overflow:hidden;
+  display:flex;flex-direction:column;justify-content:center;
+  break-after:avoid;page-break-after:avoid;
+ }
+ main{padding:0;margin:0;max-width:none;break-inside:avoid;page-break-inside:avoid}
+ #paper,.print-mode #paper{
+  width:281mm;border:0;padding:0;margin:0;box-shadow:none;
+  break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid;
+ }
 }
 body.print-layout{
  margin:0;background:white;font-size:10pt;

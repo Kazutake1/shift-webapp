@@ -386,3 +386,20 @@ test('設定画面の従業員誕生日一覧で対象者の渡し済みを年�
  root=await savedRoot(page);
  expect(root.birthdayGiftDelivered).toEqual([]);
 });
+
+
+test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
+ test.skip(browserName!=='chromium','PDFページ数の検査はChromiumで実施');
+ await openApp(page);
+
+ const pdf=await page.pdf({
+  format:'A4',
+  landscape:true,
+  printBackground:true,
+  preferCSSPageSize:true,
+  margin:{top:'8mm',right:'8mm',bottom:'8mm',left:'8mm'}
+ });
+ const text=pdf.toString('latin1');
+ const pages=(text.match(/\/Type\s*\/Page\b/g)||[]).length;
+ expect(pages).toBe(1);
+});

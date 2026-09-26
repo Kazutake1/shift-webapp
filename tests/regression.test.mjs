@@ -443,3 +443,15 @@ test('誕生日管理は設定画面へ直接表示せず従業員リストか�
  assert.match(app,/\$\('#birthday-list'\)\.onclick=\(\)=>\{location\.hash='birthdays';\}/);
  assert.match(app,/\$\('#birthday-back'\)\.onclick=\(\)=>\{location\.hash='settings';\}/);
 });
+
+
+test('iPad印刷の空白2ページ目を防ぐため外枠だけを1ページ内に固定する',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/@media print\{[\s\S]*html\{width:281mm;height:194mm;overflow:hidden\}/);
+ assert.match(css,/body\.print-layout\{[\s\S]*height:190mm;max-height:190mm;overflow:hidden/);
+ assert.match(css,/page-break-after:avoid/);
+ assert.match(css,/page-break-inside:avoid/);
+ // シフト表の印刷寸法は維持。
+ assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
+ assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
+});

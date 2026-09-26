@@ -18,6 +18,8 @@ test('設定の戻る操作は店名の右側に表示し、各サブページ�
  const store=await page.locator('#store').boundingBox();
  const back=await page.locator('#settings-back').boundingBox();
  expect(back.x).toBeGreaterThan(store.x);
+ expect(Math.abs(back.y-store.y)).toBeLessThanOrEqual(1);
+ expect(Math.abs(back.height-store.height)).toBeLessThanOrEqual(1);
 
  await page.locator('#birthday-list').click();
  await expect(page.locator('#birthday-page')).toBeVisible();

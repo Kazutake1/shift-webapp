@@ -531,3 +531,11 @@ test('狭い画面でも設定の戻るボタンは店名右側の同じヘッ�
  assert.match(css,/\.appbar-context\.settings-context\{order:initial;width:auto;overflow:visible/);
  assert.match(app,/classList\.toggle\('settings-context',settings\)/);
 });
+
+
+test('設定ヘッダーの店舗名とシフト表に戻るボタンは同じ44px高で揃える',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/\.appbar \.brand #store\{height:44px;min-height:44px\}/);
+ assert.match(css,/\.appbar-context\.settings-context\{height:44px;align-items:center\}/);
+ assert.match(css,/\.appbar-context\.settings-context #settings-back\{[\s\S]*height:44px;min-height:44px[\s\S]*display:inline-flex[\s\S]*align-items:center/);
+});

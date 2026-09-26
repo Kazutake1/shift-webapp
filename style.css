@@ -444,3 +444,13 @@ body.print-layout #schedule tr{break-inside:avoid}
  .appbar-context :is(#prev,#next,#today){min-height:40px;padding:8px 10px;font-size:12px}
  .appbar-context #settings-back{width:auto;padding-left:10px;padding-right:10px}
 }
+
+
+/* v73: settings header controls share the same vertical position and height. */
+.appbar .brand{display:flex;align-items:center}
+.appbar .brand #store{height:44px;min-height:44px}
+.appbar-context.settings-context{height:44px;align-items:center}
+.appbar-context.settings-context #settings-back{
+ height:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;
+ margin:0;
+}

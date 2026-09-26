@@ -455,3 +455,15 @@ test('iPad印刷の空白2ページ目を防ぐため外枠だけを1ページ�
  assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
  assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
 });
+
+
+test('iPad印刷はブラウザ自動URL・日時用余白をなくしA4横1ページへ配置する',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/@page\{size:A4 landscape;margin:0\}/);
+ assert.match(css,/html,body\{[\s\S]*width:297mm;height:209mm[\s\S]*overflow:hidden/);
+ assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:209mm[\s\S]*align-items:center;justify-content:center/);
+ assert.match(css,/body\.print-layout main\{[^}]*width:281mm/);
+ // シフト表本体の寸法は変更しない。
+ assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
+ assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
+});

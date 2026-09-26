@@ -397,7 +397,7 @@ test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
   landscape:true,
   printBackground:true,
   preferCSSPageSize:true,
-  margin:{top:'8mm',right:'8mm',bottom:'8mm',left:'8mm'}
+  margin:{top:'0',right:'0',bottom:'0',left:'0'}
  });
  const text=pdf.toString('latin1');
  const pages=(text.match(/\/Type\s*\/Page\b/g)||[]).length;

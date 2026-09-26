@@ -127,18 +127,24 @@ footer{display:flow-root}
 #birthday-notices{margin-bottom:16px;padding:16px 20px;border:1px solid #b8cbdc;border-radius:12px;background:#e7eff6;color:#233e55}#birthday-notices h2{font-size:16px;margin:0 0 8px}.birthday-notice{display:flex;gap:16px;justify-content:space-between;align-items:center;padding:6px 0;font-size:14px}.birthday-notice button{flex-shrink:0;background:white;border-color:#b8cbdc;color:#233e55}
 
 /* 印刷前に同じ寸法で組版し、実測したSVGと表を印刷時も一致させる。 */
-@page{size:A4 landscape;margin:8mm}
+@page{size:A4 landscape;margin:0}
 @media print{
- html{width:281mm;height:194mm;overflow:hidden}
- html,body{margin:0;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+ html,body{
+  margin:0;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact;
+  width:297mm;height:209mm;max-width:297mm;max-height:209mm;overflow:hidden;
+ }
  .no-print,dialog{display:none!important}
- /* iPad Safariの端数オーバーフローで空の2枚目が生成されないよう、印刷外枠だけを1ページ内へ固定する。表の寸法は変更しない。 */
+ /* iPad Safariの自動ヘッダー／フッター用余白をなくし、URL・日時・ページ番号を出さない。
+    表そのものは281mmのまま、A4横の中央に配置する。 */
  body.print-layout{
-  width:281mm;height:190mm;max-height:190mm;overflow:hidden;
-  display:flex;flex-direction:column;justify-content:center;
+  width:297mm;height:209mm;max-width:297mm;max-height:209mm;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
   break-after:avoid;page-break-after:avoid;
  }
- main{padding:0;margin:0;max-width:none;break-inside:avoid;page-break-inside:avoid}
+ main{
+  width:281mm;padding:0;margin:0;max-width:none;
+  break-inside:avoid;page-break-inside:avoid;
+ }
  #paper,.print-mode #paper{
   width:281mm;border:0;padding:0;margin:0;box-shadow:none;
   break-inside:avoid;page-break-inside:avoid;break-after:avoid;page-break-after:avoid;
@@ -150,7 +156,7 @@ body.print-layout{
  -webkit-print-color-adjust:exact;print-color-adjust:exact;
 }
 body.print-layout .no-print,body.print-layout dialog{display:none!important}
-body.print-layout main{padding:0;margin:0;max-width:none;width:281mm}
+body.print-layout main{padding:0;margin:0;max-width:none;width:281mm;flex:0 0 auto}
 body.print-layout #paper{width:281mm;max-width:none;border:0;box-shadow:none;padding:0;margin:0}
 body.print-layout .paper-header{font-size:10pt;line-height:1.15;margin:0 0 2mm;min-height:4mm}
 body.print-layout #store-name{min-width:0;overflow-wrap:anywhere}

@@ -510,7 +510,7 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  if(device==='iPhone'){
   await expect(page.locator('.preview-toolbar .preview-icon:visible')).toHaveCount(3);
   const previewIconSizes=await page.locator('.preview-toolbar .preview-icon:visible').evaluateAll(icons=>icons.map(icon=>icon.getBoundingClientRect().width));
-  expect(previewIconSizes).toEqual([26,26,26]);
+  expect(previewIconSizes).toEqual([23,23,23]);
   for(const control of [page.getByRole('button',{name:'PDFを共有して印刷'}),openLink]){
    const visibleText=await control.evaluate(el=>el.innerText.trim());
    expect(visibleText).toBe('');

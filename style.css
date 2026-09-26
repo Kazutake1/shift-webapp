@@ -418,8 +418,11 @@ body.print-layout #schedule tr{break-inside:avoid}
   .preview-toolbar>.preview-actions,.preview-toolbar>button:last-child:not(:first-child){grid-column:3;grid-row:1;justify-self:end}
   .preview-toolbar .preview-actions{flex-wrap:nowrap;gap:4px}
   .preview-toolbar :is(button,.preview-pdf-link){min-height:44px;padding:6px;font-size:11px;white-space:nowrap}
-  .preview-toolbar button .preview-label-full{display:none}
-  .preview-toolbar button .preview-label-compact{display:inline}
+  .preview-toolbar :is(button,.preview-pdf-link) .preview-label-full{display:none}
+  .preview-toolbar :is(button,.preview-pdf-link) .preview-label-compact{display:inline-flex;align-items:center;gap:3px}
+  .preview-toolbar .preview-icon{width:16px;height:16px;flex:none}
+  .preview-toolbar>button:first-child{width:44px;justify-content:center}
+  .preview-toolbar>button:first-child .preview-icon{width:20px;height:20px}
   @media(max-width:360px){
    .preview-toolbar h1 .preview-label-full{display:none}
    .preview-toolbar h1 .preview-label-compact{display:inline}

@@ -421,7 +421,7 @@ body.print-layout #schedule tr{break-inside:avoid}
   .preview-toolbar .preview-actions :is(button,.preview-pdf-link){width:44px}
   .preview-toolbar :is(button,.preview-pdf-link) .preview-label-full{display:none}
   .preview-toolbar :is(button,.preview-pdf-link) .preview-label-compact{display:inline-flex;align-items:center;gap:3px}
-  .preview-toolbar .preview-icon{width:22px;height:22px;flex:none}
+  .preview-toolbar .preview-icon{width:26px;height:26px;flex:none}
   .preview-toolbar>button:first-child{width:44px;justify-content:center}
   @media(max-width:360px){
    .preview-toolbar h1 .preview-label-full{display:none}

@@ -449,7 +449,7 @@ test('iPad印刷の空白2ページ目を防ぐためA4横1ページ内に固定
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(css,/@page\{size:A4 landscape;margin:0\}/);
  assert.match(css,/html\{[\s\S]*width:297mm;height:206mm;overflow:hidden/);
- assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:206mm[\s\S]*padding:8mm[\s\S]*overflow:hidden/);
+ assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:206mm[\s\S]*overflow:hidden[\s\S]*padding:8mm/);
  assert.match(css,/page-break-after:avoid/);
  assert.match(css,/page-break-inside:avoid/);
  // シフト表の印刷寸法は維持。

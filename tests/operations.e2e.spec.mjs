@@ -92,6 +92,11 @@ test('週操作は店名の右側の上部バーへ移動し、スマホでは�
    for(let i=1;i<buttons.length;i++)expect(buttons[i].x).toBeGreaterThanOrEqual(buttons[i-1].x+buttons[i-1].width);
    expect(buttons.at(-1).x+buttons.at(-1).width).toBeLessThanOrEqual(width);
    await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(4);
+   const todayColors=await page.locator('#today').evaluate(el=>{
+    const css=getComputedStyle(el);
+    return {background:css.backgroundColor,color:css.color,border:css.borderTopColor};
+   });
+   expect(todayColors).toEqual({background:'rgb(232, 245, 237)',color:'rgb(28, 98, 65)',border:'rgb(100, 173, 127)'});
   }
  }
  await page.locator('#settings').click();

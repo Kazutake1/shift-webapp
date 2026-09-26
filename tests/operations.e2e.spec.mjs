@@ -46,6 +46,21 @@ test('印刷プレビューはChromiumとWebKitでシフト表を表示する',a
  await expect(preview.locator('#schedule tbody tr').first()).toBeVisible();
 });
 
+test('印刷プレビューは左右に約12mmの余白を表示する',async({page})=>{
+ await openApp(page);
+ await page.locator('#preview').click();
+ const preview=page.frameLocator('.preview-sheet');
+ await expect(preview.locator('#paper')).toBeVisible();
+ const geometry=await preview.locator('#paper').evaluate(el=>{
+  const r=el.getBoundingClientRect();
+  const pageWidth=document.documentElement.getBoundingClientRect().width;
+  return {left:r.left,right:pageWidth-r.right,pageWidth};
+ });
+ expect(geometry.left/geometry.pageWidth).toBeGreaterThan(.035);
+ expect(geometry.right/geometry.pageWidth).toBeGreaterThan(.035);
+ expect(Math.abs(geometry.left-geometry.right)).toBeLessThan(4);
+});
+
 test('iPhone幅では週の操作4つが日付の下で一列に並ぶ',async({page})=>{
  for(const width of [320,390,430]){
   await page.setViewportSize({width,height:844});

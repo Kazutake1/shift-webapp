@@ -1,8 +1,11 @@
 // iPad Safari adds its own footer when printing HTML. Render the existing print
-// layout to a single A4 PDF page so the table dimensions remain unchanged.
+// layout to a single A4 PDF page. Keep the source layout at 281 mm and scale
+// only the final output uniformly so the printed page has clear side margins.
 const PAGE_WIDTH_MM=297;
 const PAGE_HEIGHT_MM=210;
 const TABLE_WIDTH_MM=281;
+const PRINT_MARGIN_X_MM=12;
+const PRINT_WIDTH_MM=PAGE_WIDTH_MM-PRINT_MARGIN_X_MM*2;
 const DPI=240;
 
 function pdfFromJpeg(jpeg,width,height){
@@ -38,15 +41,17 @@ function renderPaper(paper){
  if(!rect.width||!rect.height)throw new Error('シフト表の表示寸法を取得できません。');
  const pixelsPerMm=rect.width/TABLE_WIDTH_MM;
  const heightMm=rect.height/pixelsPerMm;
- if(heightMm>PAGE_HEIGHT_MM-12)throw new Error('シフト表がA4横の印刷範囲を超えています。');
+ const outputScale=PRINT_WIDTH_MM/TABLE_WIDTH_MM;
+ const printedHeightMm=heightMm*outputScale;
+ if(printedHeightMm>PAGE_HEIGHT_MM-12)throw new Error('シフト表がA4横の印刷範囲を超えています。');
  const canvas=document.createElement('canvas');
  canvas.width=Math.round(PAGE_WIDTH_MM/25.4*DPI);
  canvas.height=Math.round(PAGE_HEIGHT_MM/25.4*DPI);
  const ctx=canvas.getContext('2d');
  if(!ctx)throw new Error('印刷用画像を作成できません。');
- const scale=canvas.width/(PAGE_WIDTH_MM*pixelsPerMm);
- const left=8*canvas.width/PAGE_WIDTH_MM;
- const top=(PAGE_HEIGHT_MM-heightMm)/2*canvas.height/PAGE_HEIGHT_MM;
+ const scale=canvas.width/(PAGE_WIDTH_MM*pixelsPerMm)*outputScale;
+ const left=PRINT_MARGIN_X_MM*canvas.width/PAGE_WIDTH_MM;
+ const top=(PAGE_HEIGHT_MM-printedHeightMm)/2*canvas.height/PAGE_HEIGHT_MM;
  const x=value=>left+(value-rect.left)*scale;
  const y=value=>top+(value-rect.top)*scale;
  ctx.fillStyle='#fff';ctx.fillRect(0,0,canvas.width,canvas.height);
@@ -72,20 +77,21 @@ function renderPaper(paper){
   if(!parent||!node.textContent.trim()||parent.closest('svg,[hidden]'))continue;
   const style=getComputedStyle(parent);
   if(style.display==='none'||style.visibility==='hidden')continue;
-  ctx.font=`${style.fontStyle} ${style.fontWeight} ${parseFloat(style.fontSize)*scale}px ${style.fontFamily}`;
+  const fontSizePx=parseFloat(style.fontSize)*scale;
+  ctx.font=`${style.fontStyle} ${style.fontWeight} ${fontSizePx}px ${style.fontFamily}`;
   ctx.textBaseline='alphabetic';ctx.fillStyle=style.color;
+  // Keep one common baseline for the whole text node. Per-glyph centering makes
+  // low-profile glyphs such as ー and 〜 jump upward in the generated PDF.
+  const lineMetrics=ctx.measureText('国Ag');
+  const lineAscent=lineMetrics.fontBoundingBoxAscent||lineMetrics.actualBoundingBoxAscent||fontSizePx*.8;
+  const lineDescent=lineMetrics.fontBoundingBoxDescent||lineMetrics.actualBoundingBoxDescent||fontSizePx*.2;
   let offset=0;
   for(const glyph of node.textContent){
    const end=offset+glyph.length;
    if(!/\s/.test(glyph)){
     range.setStart(node,offset);range.setEnd(node,end);
     const r=range.getBoundingClientRect();
-    if(r.width&&r.height){
-     const metrics=ctx.measureText(glyph);
-     const ascent=metrics.actualBoundingBoxAscent||parseFloat(style.fontSize)*scale*.8;
-     const descent=metrics.actualBoundingBoxDescent||0;
-     ctx.fillText(glyph,x(r.left),y((r.top+r.bottom)/2)+(ascent-descent)/2);
-    }
+    if(r.width&&r.height)ctx.fillText(glyph,x(r.left),y((r.top+r.bottom)/2)+(lineAscent-lineDescent)/2);
    }
    offset=end;
   }

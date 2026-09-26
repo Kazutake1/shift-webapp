@@ -185,6 +185,13 @@ body.print-layout #schedule td.day-cell{font-size:11pt}
 body.print-layout #schedule td.date-cell small{font-size:7pt;bottom:1mm}
 body.print-layout #schedule tr{break-inside:avoid}
 /* SVGのwidth/height/viewBoxはdrawRulesの実測値をそのまま使用する。 */
+@media print{
+ body.print-layout main{
+  margin-left:4mm;
+  transform:scale(.9715302491);
+  transform-origin:top left;
+ }
+}
 
 /* 画面上のプレビュー専用。実際の印刷時はv25の用紙を使用する。 */
 @media screen{

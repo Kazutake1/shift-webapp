@@ -472,3 +472,17 @@ test('iPad印刷は自動URL・日時用のpage余白をなくしつつv54相当
  assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
  assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
 });
+
+
+test('印刷出力は左右12mm余白を取り、記号を文字ごとに上下移動させない',()=>{
+ const pdf=readFileSync(new URL('../print-pdf.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(pdf,/const PRINT_MARGIN_X_MM=12;/);
+ assert.match(pdf,/const PRINT_WIDTH_MM=PAGE_WIDTH_MM-PRINT_MARGIN_X_MM\*2;/);
+ assert.match(pdf,/const left=PRINT_MARGIN_X_MM\*canvas\.width\/PAGE_WIDTH_MM;/);
+ assert.match(pdf,/const lineMetrics=ctx\.measureText\('国Ag'\)/);
+ assert.doesNotMatch(pdf,/ctx\.measureText\(glyph\)/);
+ assert.match(css,/@media print\{[\s\S]*body\.print-layout main\{[\s\S]*margin-left:4mm;[\s\S]*transform:scale\(\.9715302491\)/);
+ assert.match(app,/margin-left:12mm!important;transform:scale\(\.9715302491\)/);
+});

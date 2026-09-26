@@ -597,3 +597,38 @@ test('iPadの従業員日付カレンダーはリセットと決定を見切ら�
  await page.getByRole('button',{name:'キャンセル'}).click();
  await expect(picker).toHaveCount(0);
 });
+
+
+test('従業員名と時間を分け、印刷では収まる名前を9.5ptに保つ',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(s=>s.id===root.activeStoreId);
+  const day=store.weeks[store.current].days[0];
+  const id=store.employees[0].id;
+  day.shifts[0][0]={employeeId:id,name:'山田',start:360,end:540};
+  day.shifts[1][0]={employeeId:id,name:'山田',start:375,end:525};
+  day.shifts[2][0]={employeeId:id,name:'山田佐藤鈴木高橋渡辺',start:375,end:525};
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+ await page.locator('#preview').click();
+ const preview=page.frameLocator('.preview-sheet');
+ await expect(preview.locator('.employee-name').first()).toBeVisible();
+ const result=await preview.locator('td.employee-slot button').evaluateAll(nodes=>{
+  return [nodes[0],nodes[5],nodes[10]].map(button=>{
+   const name=button.querySelector('.employee-name'),time=button.querySelector('.employee-time');
+   const cell=button.getBoundingClientRect(),caption=button.querySelector('.employee-caption').getBoundingClientRect();
+   return {name:parseFloat(getComputedStyle(name).fontSize),time:time?parseFloat(getComputedStyle(time).fontSize):null,
+    fits:caption.left>=cell.left&&caption.right<=cell.right&&caption.top>=cell.top&&caption.bottom<=cell.bottom,
+    text:button.textContent};
+  });
+ });
+ expect(result[0].name).toBeCloseTo(9.5*96/72,1);
+ expect(result[1].name).toBeCloseTo(result[0].name,1);
+ expect(result[1].time).toBeCloseTo(6.7*96/72,1);
+ expect(result[2].name).toBeLessThan(result[1].name);
+ expect(result[2].time).toBeCloseTo(result[1].time,1);
+ expect(result.every(item=>item.fits)).toBe(true);
+ expect(result[1].text).toBe('山田（6:15〜8:45）');
+});

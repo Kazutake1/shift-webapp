@@ -348,7 +348,7 @@ function closePreview(){
  $('#print-actions')?.remove();
  requestAnimationFrame(()=>{fitText();$('#preview').focus();});
 }
-async function preparePreviewPdf(generation,shareButton,openLink,saveLink,status){
+async function preparePreviewPdf(generation,shareButton,openLink,status){
  try{
   preparePrint();
   await document.fonts.ready;
@@ -361,20 +361,17 @@ async function preparePreviewPdf(generation,shareButton,openLink,saveLink,status
   lastPrintPdfUrl=URL.createObjectURL(pdf);
   lastPrintPdfFile=new File([pdf],'シフト表.pdf',{type:'application/pdf'});
   openLink.href=lastPrintPdfUrl;
-  saveLink.href=lastPrintPdfUrl;
   openLink.hidden=false;
-  saveLink.hidden=false;
+  status.hidden=true;
   if(typeof navigator.share==='function'&&navigator.canShare?.({files:[lastPrintPdfFile]})){
    shareButton.disabled=false;
-   status.textContent='準備できました。「PDFを共有して印刷」を押し、共有メニューから「プリント」を選んでください。';
   }else{
    shareButton.hidden=true;
    openLink.classList.add('primary');
-   status.textContent='準備できました。「PDFを開く」を押し、PDFの共有メニューから印刷してください。';
   }
  }catch(error){
   finishPrint();
-  if(generation===previewPdfGeneration&&preview)status.textContent=`PDFを作成できませんでした：${error.message}`;
+  if(generation===previewPdfGeneration&&preview){status.hidden=false;status.textContent=`PDFを作成できませんでした：${error.message}`;}
  }
 }
 function sharePreviewPdf(status){
@@ -383,9 +380,9 @@ function sharePreviewPdf(status){
   // Share must start inside this tap; preparing the PDF here would lose user activation.
   const result=navigator.share({files:[lastPrintPdfFile]});
   Promise.resolve(result).catch(error=>{
-   if(error.name!=='AbortError')status.textContent='共有を開けませんでした。「PDFを開く」か「PDFを保存」をお試しください。';
+   if(error.name!=='AbortError'){status.hidden=false;status.textContent='共有を開けませんでした。「PDFを開く」をお試しください。';}
   });
- }catch(error){status.textContent='共有を開けませんでした。「PDFを開く」か「PDFを保存」をお試しください。';}
+ }catch(error){status.hidden=false;status.textContent='共有を開けませんでした。「PDFを開く」をお試しください。';}
 }
 function openPreview(){
  if(preview)return;
@@ -413,12 +410,11 @@ function openPreview(){
   const shareButton=button('PDFを共有して印刷',()=>sharePreviewPdf(status),'primary');
   shareButton.disabled=true;
   const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:''},'PDFを開く');
-  const saveLink=el('a',{class:'preview-save-link',download:'シフト表.pdf',hidden:''},'PDFを保存');
   actions.append(shareButton,openLink);
   toolbar.append(actions);
-  meta.append(status,saveLink);
+  meta.append(status);
   const generation=++previewPdfGeneration;
-  requestAnimationFrame(()=>{if(preview&&generation===previewPdfGeneration)preparePreviewPdf(generation,shareButton,openLink,saveLink,status);});
+  requestAnimationFrame(()=>{if(preview&&generation===previewPdfGeneration)preparePreviewPdf(generation,shareButton,openLink,status);});
  }else{
   toolbar.append(button('印刷する',printSchedule,'primary'));
   meta.append(el('small',{},'A4横・1週間1枚'));

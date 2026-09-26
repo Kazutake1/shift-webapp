@@ -491,10 +491,10 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
   window.print=()=>{window.htmlPrintCalled=true;};
  },device);
  await page.locator('#preview').click();
- await expect(page.getByRole('status')).toContainText('準備できました');
  const openLink=page.getByRole('link',{name:'PDFを開く'});
  await expect(openLink).toBeVisible();
- await expect(page.getByRole('link',{name:'PDFを保存'})).toBeVisible();
+ await expect(page.locator('.preview-meta [role="status"]')).toBeHidden();
+ await expect(page.getByRole('link',{name:'PDFを保存'})).toHaveCount(0);
  await page.getByRole('button',{name:'PDFを共有して印刷'}).click();
  await expect.poll(()=>page.evaluate(()=>window.sharedPdf?.name)).toBe('シフト表.pdf');
  const result=await page.evaluate(async()=>{
@@ -526,9 +526,9 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  await page.getByRole('button',{name:'← シフト表に戻る'}).click();
  await page.evaluate(()=>{navigator.canShare=()=>false;});
  await page.locator('#preview').click();
- await expect(page.getByRole('status')).toContainText('準備できました');
  await expect(page.getByRole('button',{name:'PDFを共有して印刷'})).toBeHidden();
  await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
+ await expect(page.locator('.preview-meta [role="status"]')).toBeHidden();
 });
 
 test('従業員リストは選択中の店舗ごとに切り替わる',async({page})=>{

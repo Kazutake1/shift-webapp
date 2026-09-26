@@ -232,10 +232,7 @@ body.print-layout #schedule tr{break-inside:avoid}
  .backup-section+ .backup-section{margin-top:18px}
  .backup-section h3{margin:0 0 10px;font-size:16px;color:#253545}
  .backup-section .field{margin:12px 0}
- .backup-section .hint{margin:8px 0 14px}
- .backup-note{margin:12px 0 0;font-size:12px;line-height:1.65;color:#718096}
  .backup-warning{margin:8px 0 12px;padding:12px 14px;border:1px solid #e5c3c3;border-radius:10px;background:#fff7f7;color:#8f3434;font-size:13px;line-height:1.65}
- .backup-steps{margin:10px 0 12px;padding:10px 12px;border-radius:9px;background:#eef4f8;color:#35546b;font-size:13px;font-weight:600;line-height:1.6}
  .backup-status{margin:12px 0 0;color:#456658;font-size:13px;line-height:1.6}
  .backup-summary{margin:12px 0;color:#35546b;font-size:13px;line-height:1.65;overflow-wrap:anywhere}
 }
@@ -355,8 +352,7 @@ body.print-layout #schedule tr{break-inside:avoid}
  dialog .weekday-options input{accent-color:var(--ui-accent);min-height:0}
  dialog .actions{padding-top:18px;border-top:1px solid var(--ui-line);margin-top:24px}
  dialog hr{border-color:var(--ui-line)}
-  .backup-steps{background:var(--ui-wash);color:#365d42}
- .backup-note,.backup-summary{color:var(--ui-muted)}
+ .backup-summary{color:var(--ui-muted)}
   #birthday-notices{background:var(--ui-wash);border-color:#cfe4d5;color:#365d42}
  .birthday-gift-section{border-color:var(--ui-line);border-radius:12px;padding:22px}
  .birthday-gift-heading h2{color:var(--ui-ink)}

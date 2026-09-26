@@ -28,8 +28,6 @@ const field=(labelText,input)=>{
  return wrapper;
 };
 
-const hint=(parent,text)=>parent.append(el('p',{class:'hint'},text));
-
 export function openBackupDialog({
  body,
  getRoot,
@@ -38,11 +36,8 @@ export function openBackupDialog({
  onBackupCreated,
  onRestoreSuccess
 }){
- hint(body,'バックアップには、全店舗のシフト・従業員・固定作業・備考など、このアプリの保存データが入ります。');
-
  const createSection=el('section',{class:'backup-section'});
  createSection.append(el('h3',{},'1. バックアップを作成'));
- hint(createSection,'バックアップは端末上で暗号化してから保存・共有します。バックアップ用パスワードは保存されないため、忘れると復元できません。');
 
  const password=el('input',{type:'password',minlength:8,autocomplete:'new-password'});
  const confirmPassword=el('input',{type:'password',minlength:8,autocomplete:'new-password'});
@@ -100,15 +95,12 @@ export function openBackupDialog({
   field('パスワードをもう一度入力',confirmPassword),
   exportError,
   exportButton,
-  exportStatus,
-  el('p',{class:'backup-note'},'※ このアプリは、作成したファイルが保存先に残っているかまでは確認できません。作成後に「ファイル」アプリなどで確認してください。')
+  exportStatus
  );
 
  const restoreSection=el('section',{class:'backup-section'});
  restoreSection.append(el('h3',{},'2. バックアップから復元'));
  restoreSection.append(el('p',{class:'backup-warning'},'注意：復元すると、現在の全店舗データをバックアップ内の内容で置き換えます。復元前に現在のバックアップを作成してください。'));
- restoreSection.append(el('p',{class:'backup-steps'},'① ファイルを選択　→　② 内容を確認　→　③ 全店舗を復元'));
- hint(restoreSection,'新しい暗号化バックアップ（.shiftbackup）と、以前の暗号化されていないJSONバックアップに対応しています。');
 
  const file=el('input',{type:'file',accept:'.shiftbackup,.json,application/json'});
  const restorePassword=el('input',{type:'password',autocomplete:'current-password'});

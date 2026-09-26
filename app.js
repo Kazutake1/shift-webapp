@@ -290,9 +290,21 @@ function openBackup(){
   }
  });
 }
-function showSettings(){const settings=location.hash==='#settings';$('#shift-page').hidden=settings;$('#settings-page').hidden=!settings;$('#preview').hidden=settings;$('#settings').hidden=settings;if(settings)$('#settings-back').focus();else requestAnimationFrame(fitText);}
+function showSettings(){
+ const settings=location.hash==='#settings',birthdays=location.hash==='#birthdays',subpage=settings||birthdays;
+ $('#shift-page').hidden=subpage;
+ $('#settings-page').hidden=!settings;
+ $('#birthday-page').hidden=!birthdays;
+ $('#preview').hidden=subpage;
+ $('#settings').hidden=subpage;
+ if(settings)$('#settings-back').focus();
+ else if(birthdays)$('#birthday-back').focus();
+ else requestAnimationFrame(fitText);
+}
 $('#settings').onclick=()=>{location.hash='settings';};
 $('#settings-back').onclick=()=>{location.hash='';};
+$('#birthday-list').onclick=()=>{location.hash='birthdays';};
+$('#birthday-back').onclick=()=>{location.hash='settings';};
 window.addEventListener('hashchange',showSettings);
 $('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#prev').onclick=()=>navigate(-7);$('#next').onclick=()=>navigate(7);
 $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;navigate(0,monday(key));};

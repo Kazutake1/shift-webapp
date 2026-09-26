@@ -349,6 +349,13 @@ test('設定画面の従業員誕生日一覧で対象者の渡し済みを年�
  await page.reload();
  await page.locator('#settings').click();
 
+ await expect(page.locator('#settings-page')).toBeVisible();
+ await expect(page.locator('#settings-page #birthday-gifts')).toHaveCount(0);
+ await expect(page.getByRole('button',{name:'従業員リスト',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'従業員リスト',exact:true}).click();
+
+ await expect(page.locator('#birthday-page')).toBeVisible();
+ await expect(page.locator('#birthday-page h1')).toHaveText('従業員誕生日管理');
  await expect(page.locator('#birthday-gifts h2')).toHaveText(`従業員誕生日・プレゼント管理（${year}年）`);
  await expect(page.locator('#birthday-gift-list')).toContainText('プレゼント対象');
  await expect(page.locator('#birthday-gift-list')).toContainText('一年未満');
@@ -367,8 +374,13 @@ test('設定画面の従業員誕生日一覧で対象者の渡し済みを年�
  expect(root.birthdayGiftDelivered).toHaveLength(1);
 
  await page.reload();
- await expect(page.locator('#settings-page')).toBeVisible();
+ await expect(page.locator('#birthday-page')).toBeVisible();
  await expect(page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/})).toBeChecked();
+
+ await page.getByRole('button',{name:'設定に戻る',exact:true}).click();
+ await expect(page.locator('#settings-page')).toBeVisible();
+ await expect(page.getByRole('button',{name:'従業員リスト',exact:true})).toBeVisible();
+ await page.getByRole('button',{name:'従業員リスト',exact:true}).click();
 
  await page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/}).uncheck();
  root=await savedRoot(page);

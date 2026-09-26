@@ -429,3 +429,17 @@ test('誕生日プレゼント渡し済み情報を保存データとして検�
  root.birthdayGiftDelivered=[123];
  assert.throws(()=>validateRoot(root));
 });
+
+
+test('誕生日管理は設定画面へ直接表示せず従業員リストから専用ページを開く',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(html,/<button id="birthday-list">従業員リスト<\/button>/);
+ assert.match(html,/<section id="birthday-page"[^>]*hidden/);
+ const settingsStart=html.indexOf('<section id="settings-page"');
+ const birthdayPageStart=html.indexOf('<section id="birthday-page"');
+ const settingsMarkup=html.slice(settingsStart,birthdayPageStart);
+ assert.equal(settingsMarkup.includes('id="birthday-gifts"'),false);
+ assert.match(app,/\$\('#birthday-list'\)\.onclick=\(\)=>\{location\.hash='birthdays';\}/);
+ assert.match(app,/\$\('#birthday-back'\)\.onclick=\(\)=>\{location\.hash='settings';\}/);
+});

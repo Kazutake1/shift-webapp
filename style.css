@@ -241,3 +241,17 @@ body.print-layout #schedule tr{break-inside:avoid}
   .birthday-gift-status{grid-column:4;grid-row:1}
  }
 }
+
+
+/* 設定画面から開く従業員誕生日管理ページ */
+@media screen{
+ #birthday-page{max-width:900px;margin:0 auto;padding:36px 24px 40px}
+ #birthday-page>.hint{font-size:12px;color:#7b8794}
+ #birthday-page button{
+  border:1px solid #b8cbdc;border-radius:10px;background:#e7eff6;color:#233e55;
+  box-shadow:0 1px 2px #13294005;transition:background .15s,border-color .15s,box-shadow .15s;
+ }
+ #birthday-page button:hover{background:#dce8f2;color:#233e55;border-color:#94b2cb}
+ @media(max-width:600px){#birthday-page{padding:16px}}
+ @media(prefers-reduced-motion:reduce){#birthday-page button{transition:none}}
+}

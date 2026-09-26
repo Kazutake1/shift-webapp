@@ -208,6 +208,7 @@ body.print-layout #schedule tr{break-inside:avoid}
   padding:14px 24px;background:white;border-bottom:1px solid #d9e0e7;
  }
  .preview-toolbar h1{margin:0;font-size:18px;font-weight:700;color:#253545}
+ .preview-label-compact{display:none}
  .preview-toolbar button:first-child{justify-self:start}
  .preview-toolbar button:last-child{justify-self:end}
  .preview-meta{text-align:center;padding:14px 24px 0;color:#475569;font-size:14px;line-height:1.6}
@@ -411,10 +412,18 @@ body.print-layout #schedule tr{break-inside:avoid}
  #settings-page .settings-heading,#birthday-page .settings-heading{justify-content:flex-start}
  #settings-page .settings-heading>button,#birthday-page .settings-heading>button{flex:none;white-space:nowrap}
  @media(max-width:600px){
-  .preview-toolbar{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto}
+  .preview-toolbar{grid-template-columns:auto minmax(0,1fr) auto;grid-template-rows:auto;gap:5px;padding:8px}
   .preview-toolbar>button:first-child{grid-column:1;grid-row:1;white-space:nowrap}
-  .preview-toolbar>h1{grid-column:2;grid-row:1;justify-self:end;white-space:nowrap}
-  .preview-toolbar>.preview-actions,.preview-toolbar>button:last-child:not(:first-child){grid-column:1/-1;grid-row:2;justify-self:end}
+  .preview-toolbar>h1{grid-column:2;grid-row:1;justify-self:center;white-space:nowrap;font-size:13px}
+  .preview-toolbar>.preview-actions,.preview-toolbar>button:last-child:not(:first-child){grid-column:3;grid-row:1;justify-self:end}
+  .preview-toolbar .preview-actions{flex-wrap:nowrap;gap:4px}
+  .preview-toolbar :is(button,.preview-pdf-link){min-height:44px;padding:6px;font-size:11px;white-space:nowrap}
+  .preview-toolbar button .preview-label-full{display:none}
+  .preview-toolbar button .preview-label-compact{display:inline}
+  @media(max-width:360px){
+   .preview-toolbar h1 .preview-label-full{display:none}
+   .preview-toolbar h1 .preview-label-compact{display:inline}
+  }
  }
 }
 

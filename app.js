@@ -400,12 +400,19 @@ function openPreview(){
  const bar=el('section',{class:'preview-bar no-print',id:'print-actions','aria-label':'印刷プレビュー'});
  const toolbar=el('div',{class:'preview-toolbar'});
  const meta=el('div',{class:'preview-meta'});
- toolbar.append(button('← シフト表に戻る',closePreview),el('h1',{},'印刷プレビュー'));
+ const backButton=button('',closePreview);
+ backButton.setAttribute('aria-label','← シフト表に戻る');
+ backButton.append(el('span',{class:'preview-label-full'},'← シフト表に戻る'),el('span',{class:'preview-label-compact','aria-hidden':'true'},'← 戻る'));
+ const heading=el('h1',{'aria-label':'印刷プレビュー'});
+ heading.append(el('span',{class:'preview-label-full'},'印刷プレビュー'),el('span',{class:'preview-label-compact','aria-hidden':'true'},'印刷'));
+ toolbar.append(backButton,heading);
  meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`));
  if(isAppleMobile()){
   const status=el('small',{role:'status','aria-live':'polite'},'印刷用PDFを準備しています…');
   const actions=el('div',{class:'preview-actions'});
-  const shareButton=button('PDFを共有して印刷',()=>sharePreviewPdf(status),'primary');
+  const shareButton=button('',()=>sharePreviewPdf(status),'primary');
+  shareButton.setAttribute('aria-label','PDFを共有して印刷');
+  shareButton.append(el('span',{class:'preview-label-full'},'PDFを共有して印刷'),el('span',{class:'preview-label-compact','aria-hidden':'true'},'共有して印刷'));
   shareButton.disabled=true;
   const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:''},'PDFを開く');
   actions.append(shareButton,openLink);

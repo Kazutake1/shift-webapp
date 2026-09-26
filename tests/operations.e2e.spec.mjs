@@ -8,6 +8,33 @@ async function openApp(page){
  await page.waitForFunction(key=>!!localStorage.getItem(key),STORAGE_KEY);
 }
 
+test('各画面の戻るボタンは左上にあり、行き先を同じ文言で示す',async({page})=>{
+ await page.setViewportSize({width:320,height:844});
+ await openApp(page);
+ await page.locator('#settings').click();
+ await expect(page.locator('#settings-back')).toHaveText('← シフト表に戻る');
+ let back=await page.locator('#settings-back').boundingBox();
+ let title=await page.locator('#settings-page .settings-heading h1').boundingBox();
+ expect(back.x).toBeLessThanOrEqual(title.x);
+ expect(back.y).toBeLessThanOrEqual(title.y);
+
+ await page.locator('#birthday-list').click();
+ await expect(page.locator('#birthday-back')).toHaveText('← 設定に戻る');
+ back=await page.locator('#birthday-back').boundingBox();
+ title=await page.locator('#birthday-page .settings-heading h1').boundingBox();
+ expect(back.x).toBeLessThanOrEqual(title.x);
+ expect(back.y).toBeLessThanOrEqual(title.y);
+
+ await page.locator('#birthday-back').click();
+ await page.locator('#settings-back').click();
+ await page.locator('#preview').click();
+ back=await page.getByRole('button',{name:'← シフト表に戻る'}).boundingBox();
+ title=await page.locator('.preview-toolbar h1').boundingBox();
+ const printAction=await page.getByRole('button',{name:'印刷する'}).boundingBox();
+ expect(back.x).toBeLessThan(title.x);
+ expect(printAction.y).toBeGreaterThanOrEqual(back.y+back.height);
+});
+
 test('iPhone幅では週の操作4つが日付の下で一列に並ぶ',async({page})=>{
  for(const width of [320,390,430]){
   await page.setViewportSize({width,height:844});
@@ -395,7 +422,7 @@ test('設定画面の従業員誕生日一覧で対象者の渡し済みを年�
  await expect(page.locator('#birthday-page')).toBeVisible();
  await expect(page.getByRole('checkbox',{name:/プレゼント対象 誕生日プレゼント渡し済み/})).toBeChecked();
 
- await page.getByRole('button',{name:'設定に戻る',exact:true}).click();
+ await page.getByRole('button',{name:'← 設定に戻る',exact:true}).click();
  await expect(page.locator('#settings-page')).toBeVisible();
  await expect(page.locator('#birthday-list')).toBeVisible();
  await page.locator('#birthday-list').click();
@@ -465,7 +492,7 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  expect(result.ink).toBeGreaterThan(500);
  expect(result.htmlPrintCalled).toBe(false);
  expect(result.sharedType).toBe('application/pdf');
- await page.getByRole('button',{name:'← 編集に戻る'}).click();
+ await page.getByRole('button',{name:'← シフト表に戻る'}).click();
  await page.evaluate(()=>{navigator.canShare=()=>false;});
  await page.locator('#preview').click();
  await expect(page.getByRole('status')).toContainText('準備できました');

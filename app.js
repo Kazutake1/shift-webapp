@@ -379,7 +379,7 @@ function openPreview(){
  const bar=el('section',{class:'preview-bar no-print',id:'print-actions','aria-label':'印刷プレビュー'});
  const toolbar=el('div',{class:'preview-toolbar'});
  const meta=el('div',{class:'preview-meta'});
- toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'));
+ toolbar.append(button('← シフト表に戻る',closePreview),el('h1',{},'印刷プレビュー'));
  meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`));
  if(isAppleMobile()){
   const status=el('small',{role:'status','aria-live':'polite'},'印刷用PDFを準備しています…');

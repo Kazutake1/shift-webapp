@@ -403,3 +403,15 @@ body.print-layout #schedule tr{break-inside:avoid}
  .controls :is(#prev,#next,#today){width:100%;padding:8px 3px;font-size:clamp(11px,3.1vw,13px);white-space:nowrap;text-align:center}
  .controls .undo-button{flex:none;width:44px;height:44px}
 }
+
+/* Keep the return control at the upper left on every subpage. */
+@media screen{
+ #settings-page .settings-heading,#birthday-page .settings-heading{justify-content:flex-start}
+ #settings-page .settings-heading>button,#birthday-page .settings-heading>button{flex:none;white-space:nowrap}
+ @media(max-width:600px){
+  .preview-toolbar{grid-template-columns:minmax(0,1fr) auto;grid-template-rows:auto auto}
+  .preview-toolbar>button:first-child{grid-column:1;grid-row:1;white-space:nowrap}
+  .preview-toolbar>h1{grid-column:2;grid-row:1;justify-self:end;white-space:nowrap}
+  .preview-toolbar>.preview-actions,.preview-toolbar>button:last-child:not(:first-child){grid-column:1/-1;grid-row:2;justify-self:end}
+ }
+}

@@ -438,13 +438,18 @@ function openPreview(){
 }
 $('#preview').onclick=openPreview;
 render();stateManager.save(false);showSettings();
+function showOfflineStatus(message){
+ const status=$('#offline-status');
+ status.textContent=message;
+ status.hidden=!message;
+}
 if('serviceWorker' in navigator&&location.protocol!=='file:'){
  const hadController=!!navigator.serviceWorker.controller;
  let reloadingForUpdate=false;
  navigator.serviceWorker.addEventListener('controllerchange',()=>{
   if(!hadController||reloadingForUpdate)return;
   if($('#editor')?.open){
-   $('#offline-status').textContent='新しい版の準備ができました。入力中の内容を保存または閉じたあと、アプリを開き直してください。';
+   showOfflineStatus('新しい版の準備ができました。入力中の内容を保存または閉じたあと、アプリを開き直してください。');
    return;
   }
   reloadingForUpdate=true;
@@ -452,11 +457,10 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
  });
  navigator.serviceWorker.register('./sw.js',{updateViaCache:'none'}).then(reg=>{
   const update=()=>{
-   if(reg.waiting)$('#offline-status').textContent='新しい版の準備ができています。まもなく最新版へ切り替わります。';
+   if(reg.waiting)showOfflineStatus('新しい版の準備ができています。まもなく最新版へ切り替わります。');
   };
   update();
   reg.addEventListener('updatefound',()=>reg.installing?.addEventListener('statechange',update));
-  navigator.serviceWorker.ready.then(()=>{$('#offline-status').textContent='通信がないときの起動準備ができています。';});
   reg.update().catch(()=>{});
- }).catch(()=>{$('#offline-status').textContent='通信がないときの起動準備に失敗しました。接続中に開き直してください。';});
-}else $('#offline-status').textContent='この接続ではホーム画面・通信なし起動の準備を利用できません。';
+ }).catch(()=>{showOfflineStatus('通信がないときの起動準備に失敗しました。接続中に開き直してください。');});
+}else showOfflineStatus('この接続ではホーム画面・通信なし起動の準備を利用できません。');

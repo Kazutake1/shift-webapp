@@ -406,13 +406,17 @@ test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
 
 test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる',async({page},testInfo)=>{
  await openApp(page);
+ await page.evaluate(()=>{
+  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'});
+  window.open=()=>({location:{replace:url=>{window.printPdfUrl=url;}},close:()=>{}});
+  window.print=()=>{window.htmlPrintCalled=true;};
+ });
+ await page.locator('#preview').click();
+ await page.getByRole('button',{name:'PDFを開いて印刷'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.printPdfUrl)).toMatch(/^blob:/);
  const capture=Boolean(process.env.CAPTURE_PRINT_PDF);
  const result=await page.evaluate(async capture=>{
-  document.body.classList.add('print-layout');
-  await document.fonts.ready;
-  const {createPrintPdf}=await import('/print-pdf.js');
-  const blob=await createPrintPdf(document.querySelector('#paper'));
-  document.body.classList.remove('print-layout');
+  const blob=await (await fetch(window.printPdfUrl)).blob();
   const bytes=new Uint8Array(await blob.arrayBuffer());
   const pdf=new TextDecoder('latin1').decode(bytes);
   const imageObject=pdf.indexOf('4 0 obj');
@@ -428,7 +432,7 @@ test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる'
   for(let i=0;i<pixels.length;i+=4)if(pixels[i]<170&&pixels[i+1]<170&&pixels[i+2]<170)ink++;
   if(capture){image.id='pdf-preview-capture';image.style.width='1400px';document.body.replaceChildren(image);}
   else URL.revokeObjectURL(imageUrl);
-  return {type:blob.type,size:blob.size,header:pdf.slice(0,8),pages:(pdf.match(/\/Type \/Page\b/g)||[]).length,landscape:pdf.includes('/MediaBox [0 0 841.89 595.28]'),ink};
+  return {type:blob.type,size:blob.size,header:pdf.slice(0,8),pages:(pdf.match(/\/Type \/Page\b/g)||[]).length,landscape:pdf.includes('/MediaBox [0 0 841.89 595.28]'),ink,htmlPrintCalled:window.htmlPrintCalled||false};
  },capture);
  expect(result.type).toBe('application/pdf');
  expect(result.header).toBe('%PDF-1.4');
@@ -436,18 +440,6 @@ test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる'
  expect(result.landscape).toBe(true);
  expect(result.size).toBeGreaterThan(15000);
  expect(result.ink).toBeGreaterThan(500);
+ expect(result.htmlPrintCalled).toBe(false);
  if(capture)await page.locator('#pdf-preview-capture').screenshot({path:testInfo.outputPath('ipad-print-preview.png')});
-});
-
-test('iPadの印刷ボタンはWebページ印刷ではなくPDFを開く',async({page})=>{
- await openApp(page);
- await page.evaluate(()=>{
-  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'});
-  window.open=()=>({location:{replace:url=>{window.printPdfUrl=url;}},close:()=>{}});
-  window.print=()=>{window.htmlPrintCalled=true;};
- });
- await page.locator('#preview').click();
- await page.getByRole('button',{name:'PDFを開いて印刷'}).click();
- await expect.poll(()=>page.evaluate(()=>window.printPdfUrl)).toMatch(/^blob:/);
- expect(await page.evaluate(()=>window.htmlPrintCalled||false)).toBe(false);
 });

@@ -567,3 +567,18 @@ test('従業員リストは選択中の店舗の従業員だけを表示する',
  const birthdayUi=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
  assert.match(birthdayUi,/birthdayGiftChecklist\(root,year\)\.filter\(entry=>entry\.storeId===root\.activeStoreId\)/);
 });
+
+
+test('iPadの従業員日付入力だけ独自カレンダーを使い、PC・iPhoneのtype=dateを維持する',()=>{
+ const employee=readFileSync(new URL('../employee-dialog.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(employee,/function isIPadDevice\(\)/);
+ assert.match(employee,/\/iPad\/i\.test\(navigator\.userAgent/);
+ assert.match(employee,/navigator\.platform\|\|''\)===\'MacIntel\'/);
+ assert.match(employee,/const hired=el\('input',\{type:'date'/);
+ assert.match(employee,/const birth=el\('input',\{type:'date'/);
+ assert.match(employee,/const hiredControl=iPad\?ipadDateControl\(hired,'入社年月日'\):hired/);
+ assert.match(employee,/const birthControl=iPad\?ipadDateControl\(birth,'生年月日'\):birth/);
+ assert.match(css,/\.ipad-date-picker\{[\s\S]*grid-template-rows:auto minmax\(0,1fr\) auto/);
+ assert.match(css,/\.ipad-date-picker-actions\{[\s\S]*border-top/);
+});

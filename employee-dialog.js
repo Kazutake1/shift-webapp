@@ -7,6 +7,26 @@ function normalizeEmployeeSearch(value){
   .replace(/\s+/g,'');
 }
 
+function isIPadDevice(){
+ if(typeof navigator==='undefined')return false;
+ return /iPad/i.test(navigator.userAgent||'')||
+  ((navigator.platform||'')==='MacIntel'&&Number(navigator.maxTouchPoints)>1);
+}
+
+function displayDate(value){
+ return /^\d{4}-\d{2}-\d{2}$/.test(value||'')?value.replaceAll('-','/'):'日付を選択';
+}
+
+function dateParts(value){
+ const match=/^(\d{4})-(\d{2})-(\d{2})$/.exec(value||'');
+ if(!match)return null;
+ return {year:Number(match[1]),month:Number(match[2])-1,day:Number(match[3])};
+}
+
+function isoDate(year,month,day){
+ return `${year}-${String(month+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+}
+
 export function withinFirstMonth(employee,date){
  if(!employee?.hireDate)return false;
  const hire=new Date(employee.hireDate+'T12:00:00Z');
@@ -31,6 +51,108 @@ export function createEmployeeUi({
  persistChange,
  renderBirthdays
 }){
+ function openIPadDatePicker(input,trigger,label){
+  const editor=document.querySelector('#editor');
+  if(!editor)return;
+  editor.querySelector('.ipad-date-picker-overlay')?.remove();
+  editor.classList.add('ipad-date-picker-open');
+
+  let selected=input.value;
+  const initial=dateParts(selected);
+  const today=new Date();
+  let year=initial?.year??today.getFullYear();
+  let month=initial?.month??today.getMonth();
+
+  const overlay=el('div',{class:'ipad-date-picker-overlay'});
+  const picker=el('section',{
+   class:'ipad-date-picker',
+   role:'dialog',
+   'aria-modal':'true',
+   'aria-label':`${label}を選択`
+  });
+  const header=el('div',{class:'ipad-date-picker-header'});
+  const previous=button('‹',()=>changeMonth(-1));
+  previous.setAttribute('aria-label','前月');
+  const title=el('strong',{class:'ipad-date-picker-title'});
+  const next=button('›',()=>changeMonth(1));
+  next.setAttribute('aria-label','次月');
+  header.append(previous,title,next);
+
+  const body=el('div',{class:'ipad-date-picker-body'});
+  const weekdays=el('div',{class:'ipad-date-picker-weekdays'});
+  for(const day of ['日','月','火','水','木','金','土'])weekdays.append(el('span',{},day));
+  const grid=el('div',{class:'ipad-date-picker-grid'});
+  body.append(weekdays,grid);
+
+  const actions=el('div',{class:'ipad-date-picker-actions'});
+  const reset=button('リセット',()=>{selected='';renderCalendar();});
+  const cancel=button('キャンセル',closePicker);
+  const confirm=button('✓',()=>{
+   input.value=selected;
+   trigger.textContent=displayDate(selected);
+   trigger.classList.toggle('empty',!selected);
+   input.dispatchEvent(new Event('input',{bubbles:true}));
+   input.dispatchEvent(new Event('change',{bubbles:true}));
+   closePicker();
+  },'primary');
+  confirm.setAttribute('aria-label','決定');
+  actions.append(reset,cancel,confirm);
+  picker.append(header,body,actions);
+  overlay.append(picker);
+  editor.append(overlay);
+
+  function closePicker(){
+   overlay.remove();
+   editor.classList.remove('ipad-date-picker-open');
+   trigger.focus();
+  }
+
+  function changeMonth(delta){
+   const changed=new Date(year,month+delta,1);
+   year=changed.getFullYear();
+   month=changed.getMonth();
+   renderCalendar();
+  }
+
+  function renderCalendar(){
+   title.textContent=`${year}年${month+1}月`;
+   grid.replaceChildren();
+   const firstDay=new Date(year,month,1).getDay();
+   const lastDay=new Date(year,month+1,0).getDate();
+   for(let i=0;i<firstDay;i++)grid.append(el('span',{class:'ipad-date-picker-blank'}));
+   const todayIso=isoDate(today.getFullYear(),today.getMonth(),today.getDate());
+   for(let day=1;day<=lastDay;day++){
+    const value=isoDate(year,month,day);
+    const dayButton=button(String(day),()=>{selected=value;renderCalendar();});
+    dayButton.classList.add('ipad-date-picker-day');
+    if(value===selected)dayButton.classList.add('selected');
+    if(value===todayIso)dayButton.classList.add('today');
+    dayButton.setAttribute('aria-label',`${year}年${month+1}月${day}日`);
+    grid.append(dayButton);
+   }
+  }
+
+  overlay.onclick=event=>{if(event.target===overlay)closePicker();};
+  editor.addEventListener('close',()=>{
+   overlay.remove();
+   editor.classList.remove('ipad-date-picker-open');
+  },{once:true});
+  renderCalendar();
+  confirm.focus();
+ }
+
+ function ipadDateControl(input,label){
+  input.hidden=true;
+  const trigger=button(displayDate(input.value),()=>openIPadDatePicker(input,trigger,label));
+  trigger.classList.add('ipad-date-trigger');
+  trigger.classList.toggle('empty',!input.value);
+  trigger.setAttribute('aria-label',`${label}を選択`);
+  trigger.setAttribute('aria-haspopup','dialog');
+  const wrapper=el('div',{class:'ipad-date-control'});
+  wrapper.append(input,trigger);
+  return wrapper;
+ }
+
  function employeesList(parent,choose,currentId,filter){
   const state=getState();
   const available=state.employees.filter(
@@ -180,14 +302,17 @@ export function createEmployeeUi({
   });
   const hired=el('input',{type:'date',value:employee?.hireDate||''});
   const birth=el('input',{type:'date',value:employee?.birthDate||''});
+  const iPad=isIPadDevice();
+  const hiredControl=iPad?ipadDateControl(hired,'入社年月日'):hired;
+  const birthControl=iPad?ipadDateControl(birth,'生年月日'):birth;
 
   hint(body,'フルネームでは半角・全角スペースを使用できます。登録済みシフトには登録時のシフト表用の名前を保持します。追加情報は未入力でも保存できます。');
   body.append(
    field('フルネーム（20文字まで）',fullName),
    field('シフト表で使う名前（20文字まで）',shiftName),
    field('従業員番号',number),
-   field('入社年月日',hired),
-   field('生年月日',birth)
+   field('入社年月日',hiredControl),
+   field('生年月日',birthControl)
   );
 
   const error=el('p',{class:'error',role:'alert'});

@@ -454,3 +454,43 @@ body.print-layout #schedule tr{break-inside:avoid}
  height:44px;min-height:44px;display:inline-flex;align-items:center;justify-content:center;
  margin:0;
 }
+
+
+/* v79: iPad employee date picker stays inside the employee dialog. */
+.ipad-date-control{display:grid;width:100%}
+.ipad-date-trigger{
+ width:100%;min-height:44px;text-align:center;font-weight:400;
+ background:#fff!important;color:var(--ui-ink,#252c28)!important;border:1px solid var(--ui-line,#d8e4da)!important;
+}
+.ipad-date-trigger.empty{color:#839087!important}
+#editor.ipad-date-picker-open{position:relative;overflow:hidden}
+.ipad-date-picker-overlay{
+ position:absolute;inset:0;z-index:30;display:grid;place-items:center;padding:16px;
+ background:#203a2a66;backdrop-filter:blur(3px);border-radius:inherit;
+}
+.ipad-date-picker{
+ width:min(430px,100%);max-height:100%;display:grid;grid-template-rows:auto minmax(0,1fr) auto;
+ overflow:hidden;background:#fff;border:1px solid var(--ui-line,#d8e4da);border-radius:16px;
+ box-shadow:0 18px 50px #14251a33;
+}
+.ipad-date-picker-header{
+ display:grid;grid-template-columns:48px minmax(0,1fr) 48px;align-items:center;gap:8px;
+ padding:12px 14px;border-bottom:1px solid var(--ui-line,#d8e4da);background:var(--ui-wash,#f3f8f4);
+}
+.ipad-date-picker-header button{min-height:44px;padding:0}
+.ipad-date-picker-title{text-align:center;font-size:18px}
+.ipad-date-picker-body{min-height:0;overflow:auto;padding:12px 14px}
+.ipad-date-picker-weekdays,.ipad-date-picker-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
+.ipad-date-picker-weekdays{margin-bottom:6px;text-align:center;color:#6c7b70;font-size:13px}
+.ipad-date-picker-weekdays span{padding:6px 0}
+.ipad-date-picker-blank{min-height:44px}
+.ipad-date-picker-day{min-width:0;min-height:44px;padding:0;border-color:transparent!important;box-shadow:none!important}
+.ipad-date-picker-day.today{border-color:#a7cbb2!important}
+.ipad-date-picker-day.selected{background:#1d6f49!important;color:#fff!important;border-color:#1d6f49!important}
+.ipad-date-picker-actions{
+ display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:8px;
+ padding:12px 14px;border-top:1px solid var(--ui-line,#d8e4da);background:#fff;
+}
+.ipad-date-picker-actions button{min-height:44px}
+.ipad-date-picker-actions button:nth-child(2){justify-self:end}
+.ipad-date-picker-actions .primary{width:48px;padding:0;font-size:22px}

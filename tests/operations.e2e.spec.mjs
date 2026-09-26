@@ -560,3 +560,40 @@ test('従業員リストは選択中の店舗ごとに切り替わる',async({pa
  await expect(page.locator('#birthday-gift-list')).toContainText('別店舗従業員');
  await expect(page.locator('#birthday-gift-list')).not.toContainText('現在店舗従業員');
 });
+
+
+test('iPadの従業員日付カレンダーはリセットと決定を見切らせない',async({page})=>{
+ await page.setViewportSize({width:1366,height:1024});
+ await page.addInitScript(()=>{
+  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1'});
+  Object.defineProperty(navigator,'platform',{configurable:true,get:()=> 'iPad'});
+  Object.defineProperty(navigator,'maxTouchPoints',{configurable:true,get:()=>5});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#employees').click();
+ await page.getByRole('button',{name:'＋ 従業員を追加'}).click();
+
+ await expect(page.getByRole('button',{name:'入社年月日を選択'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'生年月日を選択'})).toBeVisible();
+ await expect(page.locator('#dialog-body input[type="date"]')).toHaveCount(2);
+ await expect(page.locator('#dialog-body input[type="date"]').first()).toBeHidden();
+
+ await page.getByRole('button',{name:'入社年月日を選択'}).click();
+ const picker=page.locator('.ipad-date-picker');
+ await expect(picker).toBeVisible();
+ const reset=page.getByRole('button',{name:'リセット'});
+ const confirm=page.getByRole('button',{name:'決定'});
+ await expect(reset).toBeVisible();
+ await expect(confirm).toBeVisible();
+
+ const panel=await picker.boundingBox();
+ const resetBox=await reset.boundingBox();
+ const confirmBox=await confirm.boundingBox();
+ expect(resetBox.y).toBeGreaterThanOrEqual(panel.y);
+ expect(confirmBox.y).toBeGreaterThanOrEqual(panel.y);
+ expect(resetBox.y+resetBox.height).toBeLessThanOrEqual(panel.y+panel.height+1);
+ expect(confirmBox.y+confirmBox.height).toBeLessThanOrEqual(panel.y+panel.height+1);
+ await page.getByRole('button',{name:'キャンセル'}).click();
+ await expect(picker).toHaveCount(0);
+});

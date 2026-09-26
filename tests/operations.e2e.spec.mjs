@@ -404,9 +404,10 @@ test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
  expect(pages).toBe(1);
 });
 
-test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる',async({page})=>{
+test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる',async({page},testInfo)=>{
  await openApp(page);
- const result=await page.evaluate(async()=>{
+ const capture=Boolean(process.env.CAPTURE_PRINT_PDF);
+ const result=await page.evaluate(async capture=>{
   document.body.classList.add('print-layout');
   await document.fonts.ready;
   const {createPrintPdf}=await import('/print-pdf.js');
@@ -425,15 +426,17 @@ test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる'
   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
   let ink=0;
   for(let i=0;i<pixels.length;i+=4)if(pixels[i]<170&&pixels[i+1]<170&&pixels[i+2]<170)ink++;
-  URL.revokeObjectURL(imageUrl);
+  if(capture){image.id='pdf-preview-capture';image.style.width='1400px';document.body.replaceChildren(image);}
+  else URL.revokeObjectURL(imageUrl);
   return {type:blob.type,size:blob.size,header:pdf.slice(0,8),pages:(pdf.match(/\/Type \/Page\b/g)||[]).length,landscape:pdf.includes('/MediaBox [0 0 841.89 595.28]'),ink};
- });
+ },capture);
  expect(result.type).toBe('application/pdf');
  expect(result.header).toBe('%PDF-1.4');
  expect(result.pages).toBe(1);
  expect(result.landscape).toBe(true);
  expect(result.size).toBeGreaterThan(15000);
  expect(result.ink).toBeGreaterThan(500);
+ if(capture)await page.locator('#pdf-preview-capture').screenshot({path:testInfo.outputPath('ipad-print-preview.png')});
 });
 
 test('iPadの印刷ボタンはWebページ印刷ではなくPDFを開く',async({page})=>{

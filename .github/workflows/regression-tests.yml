@@ -29,4 +29,12 @@ jobs:
           npm install --no-save --ignore-scripts @playwright/test@1.55.0
           npx playwright install --with-deps chromium webkit
       - name: Browser operation tests
+        env:
+          CAPTURE_PRINT_PDF: ${{ github.event_name == 'pull_request' && '1' || '' }}
         run: npm run test:e2e
+      - name: Upload PDF preview for visual review
+        if: github.event_name == 'pull_request'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ipad-print-preview
+          path: test-results/**/ipad-print-preview.png

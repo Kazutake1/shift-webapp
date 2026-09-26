@@ -75,11 +75,15 @@ jobs:
             -H "Authorization: Bearer $GH_TOKEN" \
             "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds" \
             --output "$RUNNER_TEMP/pages-build.json"
+          expected_commit=$(git rev-parse HEAD)
           for attempt in $(seq 1 30); do
-            status=$(curl --fail --location --show-error --silent \
+            build=$(curl --fail --location --show-error --silent \
               -H 'Accept: application/vnd.github+json' \
               -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds/latest" | jq -r '.status')
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds/latest")
+            status=$(echo "$build" | jq -r '.status')
+            build_commit=$(echo "$build" | jq -r '.commit')
+            if [ "$build_commit" != "$expected_commit" ]; then sleep 10; continue; fi
             if [ "$status" = built ]; then echo 'GitHub Pages build succeeded'; exit 0; fi
             if [ "$status" = errored ]; then echo 'GitHub Pages build failed'; exit 1; fi
             sleep 10

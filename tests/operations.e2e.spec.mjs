@@ -71,19 +71,20 @@ test('印刷プレビューは左25mm・右15mmの綴じ代と整列したヘッ
  expect(result.storeFont).toBeGreaterThan(result.periodFont);
 });
 
-test('iPhone幅では週の操作4つが日付の下で一列に並ぶ',async({page})=>{
+test('iPhone幅では週の操作3つが日付の下で一列に並び、Undoボタンを表示しない',async({page})=>{
  for(const width of [320,390,430]){
   await page.setViewportSize({width,height:844});
   if(width===320)await openApp(page);
-  const boxes=await page.locator('#prev,#next,#today,.controls .undo-button').evaluateAll(nodes=>nodes.map(node=>{
+  await expect(page.locator('[data-undo]')).toHaveCount(0);
+  const boxes=await page.locator('#prev,#next,#today').evaluateAll(nodes=>nodes.map(node=>{
    const {left,right,top,bottom}=node.getBoundingClientRect();
    return {left,right,top,bottom};
   }));
   const date=await page.locator('#week-label').boundingBox();
   expect(date.y+date.height).toBeLessThanOrEqual(boxes[0].top);
-  expect(boxes.map(box=>Math.round(box.top))).toEqual(Array(4).fill(Math.round(boxes[0].top)));
+  expect(boxes.map(box=>Math.round(box.top))).toEqual(Array(3).fill(Math.round(boxes[0].top)));
   for(let i=1;i<boxes.length;i++)expect(boxes[i].left).toBeGreaterThanOrEqual(boxes[i-1].right);
-  expect(boxes[3].right).toBeLessThanOrEqual(width);
+  expect(boxes[2].right).toBeLessThanOrEqual(width);
  }
 });
 
@@ -107,7 +108,7 @@ function backupFile(root,name='restore.json'){
  return {name,mimeType:'application/json',buffer:Buffer.from(text)};
 }
 
-test('複数画面の競合後は誕生日確認・Undo・復元で古いデータを上書きしない',async({browser})=>{
+test('複数画面の競合後は誕生日確認・復元で古いデータを上書きしない',async({browser})=>{
  const context=await browser.newContext({
   serviceWorkers:'block',
   viewport:{width:1180,height:820}
@@ -133,10 +134,10 @@ test('複数画面の競合後は誕生日確認・Undo・復元で古いデー�
  await stale.reload();
  await expect(stale.locator('#birthday-notices')).toBeVisible();
 
- // 古い画面側にUndo履歴を1件作る。
+ // 古い画面側にも変更履歴を1件作る。
  await editFirstNote(stale,'古い画面の変更');
  await expect(stale.locator('td.notes-cell button').first()).toHaveText('古い画面の変更');
- await expect(stale.locator('#shift-page [data-undo]')).toBeEnabled();
+ await expect(stale.locator('[data-undo]')).toHaveCount(0);
 
  // 最新画面は古い画面の保存後に開く。
  const latest=await context.newPage();
@@ -162,15 +163,6 @@ test('複数画面の競合後は誕生日確認・Undo・復元で古いデー�
  let store=root.stores.find(s=>s.id===root.activeStoreId);
  expect(store.weeks[store.current].days[0].notes).toBe('最新画面の変更');
  expect(root.birthdayAcknowledgements||[]).toHaveLength(0);
-
- // Undoも保存されず、最新データを維持する。
- await stale.locator('#shift-page [data-undo]').click();
- await stale.locator('#editor').getByRole('button',{name:'はい',exact:true}).click();
- await expect(stale.locator('#dialog-body .error')).toContainText('別の画面でデータが変更されています');
- root=await savedRoot(latest);
- store=root.stores.find(s=>s.id===root.activeStoreId);
- expect(store.weeks[store.current].days[0].notes).toBe('最新画面の変更');
- await stale.locator('#close').click();
 
  // バックアップ復元も競合中は停止する。
  const restoreCandidate=structuredClone(root);

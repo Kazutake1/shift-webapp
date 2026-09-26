@@ -167,7 +167,7 @@ body.print-layout #paper-period{flex-shrink:0;white-space:nowrap;font-size:10pt;
 body.print-layout .table-scroll{overflow:visible}
 body.print-layout #schedule{min-width:0;width:100%;border-width:.35mm;break-inside:avoid}
 body.print-layout #schedule thead th{height:5mm;font-size:8pt}
-body.print-layout #schedule tbody tr,body.print-layout #schedule td.slot{height:4.7mm}
+body.print-layout #schedule tbody tr,body.print-layout #schedule td.slot{height:5.0mm}
 body.print-layout #schedule td.slot,body.print-layout #schedule td.notes-cell{position:relative}
 body.print-layout #schedule td.slot button,body.print-layout #schedule td.notes-cell button{
  position:absolute;inset:0;width:100%;height:100%;min-height:0;margin:0;
@@ -398,7 +398,7 @@ body.print-layout #schedule tr{break-inside:avoid}
  @media(max-width:600px){.preview-actions{gap:5px}.preview-pdf-link{min-height:40px;padding:8px;font-size:13px}}
 }
 
-/* iPhone: place the date above a single row of navigation and undo controls. */
+/* iPhone: place the date above a single row of week navigation controls. */
 @media screen and (max-width:600px){
  .controls{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1.35fr) 44px;gap:8px 6px;align-items:center}
  .controls .week-nav{display:contents}

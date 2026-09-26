@@ -499,7 +499,7 @@ test('印刷出力は左25mm・右15mmの綴じ代を取り、記号位置とヘ
  assert.doesNotMatch(pdf,/ctx\.measureText\(glyph\)/);
  assert.match(css,/@media print\{[\s\S]*body\.print-layout main\{[\s\S]*margin-left:17mm;[\s\S]*transform:scale\(\.9145907473\)/);
  assert.match(css,/body\.print-layout \.paper-header\{[^}]*align-items:baseline/);
- assert.match(css,/body\.print-layout #store-name\{[^}]*font-size:18pt[^}]*font-weight:700/);
+ assert.match(css,/body\.print-layout #store-name\{[^}]*font-size:22pt[^}]*font-weight:700/);
  assert.match(css,/body\.print-layout #paper-period\{[^}]*font-size:10pt/);
  assert.match(app,/margin-left:25mm!important;transform:scale\(\.9145907473\)/);
 });
@@ -545,4 +545,12 @@ test('スマホ版だけ週の日付表示を非表示にする',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(css,/@media\(max-width:700px\)\{[\s\S]*\.appbar-context #week-label\{display:none\}/);
  assert.match(css,/\.appbar-context #week-label\{white-space:nowrap;font-size:14px;color:var\(--ui-ink\)\}/);
+});
+
+
+test('印刷シフト表左上の店舗名を22ptで強調する',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/body\.print-layout #store-name\{[^}]*font-size:22pt[^}]*font-weight:700[^}]*line-height:1/);
+ assert.match(css,/body\.print-layout #paper-period\{[^}]*font-size:10pt/);
+ assert.match(css,/body\.print-layout \.paper-header\{[^}]*align-items:baseline/);
 });

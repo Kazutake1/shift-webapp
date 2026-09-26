@@ -398,7 +398,7 @@ function openPreview(){
   meta.append(el('small',{},'A4横・1週間1枚'));
  }
  const stage=el('div',{class:'preview-stage'});
- const frame=el('iframe',{class:'preview-sheet',title:'週間シフト表の印刷イメージ',sandbox:'',tabindex:'-1'});
+ const frame=el('iframe',{class:'preview-sheet',title:'週間シフト表の印刷イメージ',tabindex:'-1'});
  frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;
  stage.append(frame);bar.append(toolbar,meta,stage);
  preview=true;document.body.classList.add('print-mode');$('#paper').before(bar);
@@ -406,6 +406,7 @@ function openPreview(){
   const scale=Math.min(stage.clientWidth/frame.offsetWidth,stage.clientHeight/frame.offsetHeight,1);
   frame.style.setProperty('--preview-scale',Math.max(.1,scale));
  };
+ frame.addEventListener('load',fitPreview,{once:true});
  previewObserver=new ResizeObserver(fitPreview);previewObserver.observe(stage);
  fitPreview();toolbar.firstElementChild.focus();
 }

@@ -35,6 +35,14 @@ test('各画面の戻るボタンは左上にあり、行き先を同じ文言�
  expect(printAction.y).toBeGreaterThanOrEqual(back.y+back.height);
 });
 
+test('印刷プレビューはChromiumとWebKitでシフト表を表示する',async({page})=>{
+ await openApp(page);
+ await page.locator('#preview').click();
+ const preview=page.frameLocator('.preview-sheet');
+ await expect(preview.locator('#schedule')).toBeVisible();
+ await expect(preview.locator('#schedule tbody tr').first()).toBeVisible();
+});
+
 test('iPhone幅では週の操作4つが日付の下で一列に並ぶ',async({page})=>{
  for(const width of [320,390,430]){
   await page.setViewportSize({width,height:844});

@@ -424,12 +424,12 @@ function openPreview(){
   const shareButton=button('',()=>sharePreviewPdf(status),'primary');
   shareButton.setAttribute('aria-label','PDFを共有して印刷');
   const compactShare=el('span',{class:'preview-label-compact','aria-hidden':'true'});
-  compactShare.append(previewIcon(['M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2','M6 15h12v6H6zM18 12h.01']),document.createTextNode('共有'));
+  compactShare.append(previewIcon(['M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2','M6 15h12v6H6zM18 12h.01']));
   shareButton.append(el('span',{class:'preview-label-full'},'PDFを共有して印刷'),compactShare);
   shareButton.disabled=true;
   const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:'','aria-label':'PDFを開く'});
   const compactOpen=el('span',{class:'preview-label-compact','aria-hidden':'true'});
-  compactOpen.append(previewIcon(['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z','M14 2v6h6','M8 13h8','M8 17h8']),document.createTextNode('開く'));
+  compactOpen.append(previewIcon(['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z','M14 2v6h6','M8 13h8','M8 17h8']));
   openLink.append(el('span',{class:'preview-label-full'},'PDFを開く'),compactOpen);
   actions.append(shareButton,openLink);
   toolbar.append(actions);

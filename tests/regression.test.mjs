@@ -455,6 +455,10 @@ test('iPad印刷の空白2ページ目を防ぐためA4横1ページ内に固定
  // シフト表の印刷寸法は維持。
  assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
  assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
+ // 印刷時のセル文字は通常画面と同様に縦中央へ置き、長音・波ダッシュが上寄りにならない。
+ assert.match(css,/body\.print-layout #schedule td\.slot button\{[^}]*display:flex[^}]*align-items:center[^}]*justify-content:center/);
+ // 印刷プレビューでは用紙の左右に見た目上の余白を確保する。
+ assert.match(css,/\.preview-stage\{[^}]*margin:18px 36px 24px/);
 });
 
 

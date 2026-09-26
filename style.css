@@ -174,7 +174,7 @@ body.print-layout #schedule td.slot button,body.print-layout #schedule td.notes-
  appearance:none;-webkit-appearance:none;box-sizing:border-box;color:black;
  outline:none!important;background:transparent;
 }
-body.print-layout #schedule td.slot button{padding:0 .3mm;font-size:8pt!important}
+body.print-layout #schedule td.slot button{padding:0 .3mm;font-size:8pt!important;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.1}
 body.print-layout #schedule td.slot .long{font-size:6.7pt!important}
 body.print-layout #schedule td.employee-slot button{font-size:9.5pt!important}
 body.print-layout #schedule td.employee-slot .long{font-size:7.4pt!important}
@@ -205,7 +205,7 @@ body.print-layout #schedule tr{break-inside:avoid}
  .preview-toolbar button:last-child{justify-self:end}
  .preview-meta{text-align:center;padding:14px 24px 0;color:#475569;font-size:14px;line-height:1.6}
  .preview-meta small{font-size:12px;color:#758294}
- .preview-stage{position:relative;min-height:0;margin:18px 24px 24px;overflow:hidden}
+ .preview-stage{position:relative;min-height:0;margin:18px 36px 24px;overflow:hidden}
  .preview-sheet{
   position:absolute;left:50%;top:50%;width:297mm;height:210mm;border:0;background:white;
   transform:translate(-50%,-50%) scale(var(--preview-scale,1));transform-origin:center;
@@ -214,7 +214,7 @@ body.print-layout #schedule tr{break-inside:avoid}
  @media(max-width:600px){
   .preview-toolbar{padding:12px;gap:8px}.preview-toolbar h1{font-size:14px}
   .preview-toolbar button{font-size:13px;padding:8px}
-  .preview-meta{font-size:12px;padding:12px 12px 0}.preview-stage{margin:12px}
+  .preview-meta{font-size:12px;padding:12px 12px 0}.preview-stage{margin:12px 16px}
  }
 }
 

@@ -1,5 +1,5 @@
 const CACHE_PREFIX='shift-ipad-step1-shell-';
-const CACHE=CACHE_PREFIX+'v82';
+const CACHE=CACHE_PREFIX+'v83';
 const FILES=['./','./index.html','./style.css','./app.js','./print-pdf.js','./backup-dialog.js','./employee-dialog.js','./store-dialog.js','./state-manager.js','./model.js','./stores.js','./crypto-backup.js','./birthdays.js','./birthday-ui.js','./holidays.js','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([

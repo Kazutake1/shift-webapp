@@ -477,6 +477,8 @@ body.print-layout #schedule tr{break-inside:avoid}
  .appbar #preview{grid-column:5;grid-row:1}
  .appbar :is(#prev,#next,#today,#preview) .nav-label{display:none}
  .appbar :is(#prev,#next,#today,#preview) .mobile-nav-icon{display:block;width:22px;height:22px;flex:none}
+ .appbar-context #today{background:#e8f5ed;color:#1c6241;border-color:#64ad7f}
+ .appbar-context #today:hover{background:#d8eddf;color:#165c3b;border-color:#4b9868}
  .appbar:has(#header-week-nav[hidden]){display:flex;gap:10px;padding:12px}
  .appbar:has(#header-week-nav[hidden]) .brand{width:auto;flex:none}
  .appbar-context.settings-context{width:auto}

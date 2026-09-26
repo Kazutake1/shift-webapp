@@ -41,7 +41,7 @@ export function createBirthdayUi({
  function renderGiftChecklist(){
   const root=getRoot();
   const year=Number(japanToday().slice(0,4));
-  const entries=birthdayGiftChecklist(root,year);
+  const entries=birthdayGiftChecklist(root,year).filter(entry=>entry.storeId===root.activeStoreId);
 
   giftHost.querySelector('h2').textContent='従業員リスト';
   giftList.replaceChildren();

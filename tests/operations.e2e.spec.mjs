@@ -529,3 +529,34 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  await expect(page.getByRole('button',{name:'PDFを共有して印刷'})).toBeHidden();
  await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
 });
+
+test('従業員リストは選択中の店舗ごとに切り替わる',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const active=root.stores.find(s=>s.id===root.activeStoreId);
+  Object.assign(active.employees[0],{name:'現在店舗従業員',birthDate:'1990-12-01',hireDate:'2020-01-01',hidden:false});
+  let other=root.stores.find(s=>s.id!==root.activeStoreId);
+  if(!other){
+   other=structuredClone(active);
+   other.id='employee-list-other-store';
+   other.store='別店舗';
+   other.employees=structuredClone(active.employees);
+   root.stores.push(other);
+  }
+  Object.assign(other.employees[0],{id:'employee-list-other-worker',name:'別店舗従業員',birthDate:'1990-11-01',hireDate:'2020-01-01',hidden:false});
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+ await page.locator('#settings').click();
+ await page.locator('#birthday-list').click();
+ await expect(page.locator('#birthday-gift-list')).toContainText('現在店舗従業員');
+ await expect(page.locator('#birthday-gift-list')).not.toContainText('別店舗従業員');
+ const otherId=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  return root.stores.find(s=>s.id!==root.activeStoreId&&s.employees.some(e=>e.name==='別店舗従業員')).id;
+ },STORAGE_KEY);
+ await page.locator('#store').selectOption(otherId);
+ await expect(page.locator('#birthday-gift-list')).toContainText('別店舗従業員');
+ await expect(page.locator('#birthday-gift-list')).not.toContainText('現在店舗従業員');
+});

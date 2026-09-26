@@ -562,3 +562,8 @@ test('印刷時の長い従業員表示は8.2ptを基準にし、通常名9.5pt�
  assert.match(css,/body\.print-layout #schedule td\.employee-slot \.long\{font-size:8\.2pt!important\}/);
  assert.doesNotMatch(css,/body\.print-layout #schedule td\.employee-slot \.long\{font-size:7\.4pt!important\}/);
 });
+
+test('従業員リストは選択中の店舗の従業員だけを表示する',()=>{
+ const birthdayUi=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ assert.match(birthdayUi,/birthdayGiftChecklist\(root,year\)\.filter\(entry=>entry\.storeId===root\.activeStoreId\)/);
+});

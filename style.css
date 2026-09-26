@@ -392,9 +392,8 @@ body.print-layout #schedule tr{break-inside:avoid}
  .preview-pdf-link{display:inline-flex;align-items:center;justify-content:center;min-height:44px;padding:10px 15px;border:1px solid var(--ui-line);border-radius:8px;background:#fff;color:var(--ui-ink);font-weight:600;text-decoration:none;white-space:nowrap}
  .preview-pdf-link:hover{background:#f2faf4;border-color:#bad3c1}
  .preview-pdf-link.primary{background:var(--ui-accent);color:#fff;border-color:var(--ui-accent)}
- .preview-save-link{display:block;width:max-content;margin:4px auto 0;font-size:12px;color:#165c3b}
- .preview-pdf-link:focus-visible,.preview-save-link:focus-visible{outline:3px solid #21754e;outline-offset:3px}
- .preview-pdf-link[hidden],.preview-save-link[hidden],.preview-actions button[hidden]{display:none}
+ .preview-pdf-link:focus-visible{outline:3px solid #21754e;outline-offset:3px}
+ .preview-pdf-link[hidden],.preview-actions button[hidden]{display:none}
  @media(max-width:600px){.preview-actions{gap:5px}.preview-pdf-link{min-height:40px;padding:8px;font-size:13px}}
 }
 

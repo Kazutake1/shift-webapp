@@ -1,6 +1,6 @@
 import {birthdayNotices} from './birthdays.js';
 import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,employeeShiftConflicts,fixedSetting,fixedTextAt} from './model.js';
-import {newStore} from './stores.js';
+import {createStoreUi} from './store-dialog.js';
 import {openBackupDialog} from './backup-dialog.js';
 import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
 import {createStateManager} from './state-manager.js';
@@ -183,6 +183,18 @@ const {employeesList,openEmployees}=createEmployeeUi({
  persistChange,
  renderBirthdays
 });
+const {openStores,selectStore}=createStoreUi({
+ getRoot:()=>stateManager.getRoot(),
+ getState:()=>stateManager.getState(),
+ persistChange,
+ openDialog,
+ el,
+ button,
+ field,
+ hint,
+ commit,
+ render
+});
 function confirmShiftOverlap(d,candidate,exclude=null){
  const conflicts=employeeShiftConflicts(week().days[d],candidate,exclude);
  if(!conflicts.length)return true;
@@ -270,18 +282,6 @@ function openFixed(){
   },'primary'));
 }
 function navigate(delta,target){const state=stateManager.getState(),next=target||addDays(state.current,delta),existed=!!state.weeks[next];let copied=false;if(!persistChange(()=>{copied=ensureWeek(state,next);state.current=next;},false))return;render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
-function openStores(){
- const root=stateManager.getRoot(),state=stateManager.getState();
- const body=openDialog('店舗管理');
- hint(body,'従業員・固定作業・シフト・備考は店舗ごとに保存します。新しい店舗は空の状態で作成します。');
- body.append(el('p',{},`選択中：${state.store}`));
- const rename=el('input',{maxlength:40,value:state.store});
- const error=el('p',{class:'error',role:'alert'});
- const validName=input=>{const name=input.value.trim();if(!name){error.textContent='店名を入力してください。';return null;}if(root.stores.some(s=>s.id!==state.id&&s.store===name)){error.textContent='同じ店名が登録されています。';return null;}return name;};
- body.append(field('選択中の店名',rename),button('店名を変更',()=>{const name=validName(rename);if(name&&name!==state.store&&confirm(`「${state.store}」を「${name}」に変更しますか？`))commit(()=>state.store=name);}),el('hr'));
- const input=el('input',{maxlength:40,placeholder:'例：駅前店'});
- body.append(field('新しい店舗の店名',input),error,button('店舗を追加',()=>{const name=input.value.trim();if(!name||root.stores.some(s=>s.store===name)){error.textContent='重複しない店名を入力してください。';return;}const added=newStore(name,state.current,crypto.randomUUID());commit(()=>{root.stores.push(added);root.activeStoreId=added.id;});},'primary'));
-}
 function openBackup(){
  const body=openDialog('バックアップ・復元');
  openBackupDialog({
@@ -309,7 +309,7 @@ $('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#prev').o
 $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;navigate(0,monday(key));};
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
-$('#store').onchange=e=>{const id=e.target.value;if(persistChange(()=>{stateManager.getRoot().activeStoreId=id;},false))render();};
+$('#store').onchange=e=>selectStore(e.target.value);
 let previewObserver=null;
 function closePreview(){
  previewObserver?.disconnect();previewObserver=null;

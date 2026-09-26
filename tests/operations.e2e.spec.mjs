@@ -279,3 +279,42 @@ test('シフト表下の案内文を表示せず、通常保存成功は無表�
  await expect(page.locator('#save-status')).toBeHidden();
  await expect(page.locator('#saved')).toHaveText('');
 });
+
+
+test('店舗管理の追加・店名変更・店舗切り替えを分離後も維持する',async({page})=>{
+ await openApp(page);
+ const before=await savedRoot(page);
+ const originalStore=before.stores.find(store=>store.id===before.activeStoreId);
+ const originalId=originalStore.id;
+ const originalName=originalStore.store;
+
+ await page.locator('#settings').click();
+ await page.locator('#stores').click();
+ await expect(page.locator('#editor')).toContainText('店舗管理');
+ await expect(page.locator('#editor')).toContainText(`選択中：${originalName}`);
+
+ await page.getByLabel('新しい店舗の店名').fill('分離店舗B');
+ await page.getByRole('button',{name:'店舗を追加',exact:true}).click();
+ await expect(page.locator('#editor')).not.toBeVisible();
+
+ let root=await savedRoot(page);
+ let active=root.stores.find(store=>store.id===root.activeStoreId);
+ expect(active.store).toBe('分離店舗B');
+
+ await page.locator('#stores').click();
+ await page.getByLabel('選択中の店名').fill('分離店舗C');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'店名を変更',exact:true}).click();
+ await expect(page.locator('#editor')).not.toBeVisible();
+
+ root=await savedRoot(page);
+ active=root.stores.find(store=>store.id===root.activeStoreId);
+ expect(active.store).toBe('分離店舗C');
+
+ await page.locator('#settings-back').click();
+ await page.locator('#store').selectOption(originalId);
+ await expect(page.locator('#store-name')).toHaveText(originalName);
+
+ root=await savedRoot(page);
+ expect(root.activeStoreId).toBe(originalId);
+});

@@ -368,3 +368,18 @@ test('state-managerはlocalStorage書き込み失敗時に変更前へ戻す',as
  assert.equal(manager.getState().store,before);
  assert.equal(rollbackCount,1);
 });
+
+
+test('店舗管理UIと店舗切り替えをapp.jsから分離する',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const storeUi=readFileSync(new URL('../store-dialog.js',import.meta.url),'utf8');
+ assert.match(app,/import \{createStoreUi\} from '\.\/store-dialog\.js'/);
+ assert.equal(app.includes('function openStores(){'),false);
+ assert.match(app,/const \{openStores,selectStore\}=createStoreUi\(/);
+ assert.match(app,/\$\('#store'\)\.onchange=e=>selectStore\(e\.target\.value\)/);
+ assert.match(storeUi,/export function createStoreUi\(/);
+ assert.match(storeUi,/function openStores\(\)/);
+ assert.match(storeUi,/function selectStore\(id\)/);
+ assert.match(storeUi,/同じ店名が登録されています/);
+ assert.match(storeUi,/重複しない店名を入力してください/);
+});

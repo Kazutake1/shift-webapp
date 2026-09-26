@@ -445,10 +445,11 @@ test('誕生日管理は設定画面へ直接表示せず従業員リストか�
 });
 
 
-test('iPad印刷の空白2ページ目を防ぐため外枠だけを1ページ内に固定する',()=>{
+test('iPad印刷の空白2ページ目を防ぐためA4横1ページ内に固定する',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
- assert.match(css,/@media print\{[\s\S]*html\{width:281mm;height:194mm;overflow:hidden\}/);
- assert.match(css,/body\.print-layout\{[\s\S]*height:190mm;max-height:190mm;overflow:hidden/);
+ assert.match(css,/@page\{size:A4 landscape;margin:0\}/);
+ assert.match(css,/html,body\{[\s\S]*width:297mm;height:209mm[\s\S]*overflow:hidden/);
+ assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:209mm[\s\S]*overflow:hidden/);
  assert.match(css,/page-break-after:avoid/);
  assert.match(css,/page-break-inside:avoid/);
  // シフト表の印刷寸法は維持。

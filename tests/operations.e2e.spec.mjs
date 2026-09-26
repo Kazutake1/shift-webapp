@@ -87,7 +87,7 @@ test('週操作は店名の右側の上部バーへ移動し、スマホでは�
   await expect(page.locator('#next')).toBeVisible();
   await expect(page.locator('#today')).toBeVisible();
   if(width<=600){
-   const buttons=await Promise.all(['#prev','#next','#today','#preview'].map(selector=>page.locator(selector).boundingBox()));
+   const buttons=await Promise.all(['#store','#prev','#next','#today','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
    for(const box of buttons){expect(box.height).toBeGreaterThanOrEqual(44);expect(Math.abs(box.y-buttons[0].y)).toBeLessThan(2);}
    for(let i=1;i<buttons.length;i++)expect(buttons[i].x).toBeGreaterThanOrEqual(buttons[i-1].x+buttons[i-1].width);
    expect(buttons.at(-1).x+buttons.at(-1).width).toBeLessThanOrEqual(width);

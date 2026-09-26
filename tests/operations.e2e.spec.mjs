@@ -504,11 +504,14 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
   navigator.share=data=>{window.sharedPdf=data.files[0];return Promise.resolve();};
   window.print=()=>{window.htmlPrintCalled=true;};
  },device);
+ const shiftIconSize=device==='iPhone'?await page.locator('#preview .mobile-nav-icon').evaluate(el=>el.getBoundingClientRect().width):null;
  await page.locator('#preview').click();
  const openLink=page.getByRole('link',{name:'PDFを開く'});
  await expect(openLink).toBeVisible();
  if(device==='iPhone'){
   await expect(page.locator('.preview-toolbar .preview-icon:visible')).toHaveCount(3);
+  const previewIconSizes=await page.locator('.preview-toolbar .preview-icon:visible').evaluateAll(icons=>icons.map(icon=>icon.getBoundingClientRect().width));
+  expect(previewIconSizes).toEqual([shiftIconSize,shiftIconSize,shiftIconSize]);
   for(const control of [page.getByRole('button',{name:'PDFを共有して印刷'}),openLink]){
    const visibleText=await control.evaluate(el=>el.innerText.trim());
    expect(visibleText).toBe('');

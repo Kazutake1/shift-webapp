@@ -1,8 +1,6 @@
-name: Verify and publish app
+name: Update official Japanese holidays
 
 on:
-  push:
-    branches: [main]
   schedule:
     # 毎月20日 12:27（日本時間）。定時付近の混雑を避ける。
     - cron: '27 3 20 * *'
@@ -11,18 +9,15 @@ on:
 permissions:
   contents: write
   pages: write
-  id-token: write
 
 concurrency:
-  group: shift-webapp-pages
+  group: shift-webapp-holidays
   cancel-in-progress: false
 
 jobs:
-  verify:
+  update:
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      holiday_changed: ${{ steps.holidays.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
       - name: Setup Node.js
@@ -30,14 +25,12 @@ jobs:
         with:
           node-version: '20'
       - name: Fetch published holidays
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           curl --fail --location --show-error --silent --retry 3 --max-time 45 \
             https://www8.cao.go.jp/chosei/shukujitsu/syukujitsu.csv \
             --output "$RUNNER_TEMP/syukujitsu.csv"
       - name: Update published holidays
         id: holidays
-        if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
         run: |
           node scripts/update-holidays.mjs "$RUNNER_TEMP/syukujitsu.csv"
           if git diff --quiet -- holidays.js sw.js; then
@@ -46,14 +39,18 @@ jobs:
             echo 'changed=true' >> "$GITHUB_OUTPUT"
           fi
       - name: Syntax check
+        if: steps.holidays.outputs.changed == 'true'
         run: npm run check
       - name: Regression tests
+        if: steps.holidays.outputs.changed == 'true'
         run: npm test
       - name: Install browser test tools
+        if: steps.holidays.outputs.changed == 'true'
         run: |
           npm install --no-save --ignore-scripts @playwright/test@1.55.0
           npx playwright install --with-deps chromium webkit
       - name: Browser operation tests
+        if: steps.holidays.outputs.changed == 'true'
         run: npm run test:e2e
       - name: Commit verified holiday updates
         if: steps.holidays.outputs.changed == 'true'
@@ -63,25 +60,24 @@ jobs:
           git add holidays.js sw.js
           git commit -m 'Update official Japanese holidays'
           git push origin HEAD:main
-      - name: Prepare Pages files
-        if: github.event_name == 'push' || steps.holidays.outputs.changed == 'true'
+      - name: Request GitHub Pages build
+        if: steps.holidays.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          mkdir site
-          cp index.html style.css *.js *.png *.svg manifest.webmanifest site/
-          touch site/.nojekyll
-      - uses: actions/upload-pages-artifact@v3
-        if: github.event_name == 'push' || steps.holidays.outputs.changed == 'true'
-        with:
-          path: site
-
-  deploy:
-    if: github.event_name == 'push' || needs.verify.outputs.holiday_changed == 'true'
-    needs: verify
-    runs-on: ubuntu-latest
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
-    steps:
-      - name: Publish verified app
-        id: deployment
-        uses: actions/deploy-pages@v4
+          curl --fail --location --show-error --silent --retry 3 \
+            -X POST -H 'Accept: application/vnd.github+json' \
+            -H "Authorization: Bearer $GH_TOKEN" \
+            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds" \
+            --output "$RUNNER_TEMP/pages-build.json"
+          for attempt in $(seq 1 30); do
+            status=$(curl --fail --location --show-error --silent \
+              -H 'Accept: application/vnd.github+json' \
+              -H "Authorization: Bearer $GH_TOKEN" \
+              "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds/latest" | jq -r '.status')
+            if [ "$status" = built ]; then echo 'GitHub Pages build succeeded'; exit 0; fi
+            if [ "$status" = errored ]; then echo 'GitHub Pages build failed'; exit 1; fi
+            sleep 10
+          done
+          echo 'GitHub Pages build timed out'
+          exit 1

@@ -1,6 +1,11 @@
 name: Update official Japanese holidays
 
 on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/publish.yml'
+      - 'scripts/update-holidays.mjs'
   schedule:
     # 毎月20日 12:27（日本時間）。定時付近の混雑を避ける。
     - cron: '27 3 20 * *'

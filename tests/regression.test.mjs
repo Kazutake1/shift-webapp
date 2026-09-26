@@ -266,13 +266,14 @@ test('シフトデータを外部の実験的ブラウザー機能へ公開し�
 
 test('シフトデータの書き込み経路を共通化',()=>{
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
  assert.match(app,/function writeRoot\(/);
  assert.match(app,/function replaceRoot\(/);
  assert.equal((app.match(/localStorage\.setItem\(storageKey,/g)||[]).length,1);
  assert.match(app,/function save\(edit=true\)\{return writeRoot\(root,\{edit\}\);\}/);
  assert.match(app,/replaceRoot\(candidate,\{edit:false,success:'直前の操作を取り消しました'\}\)/);
  assert.match(app,/replaceRoot\(candidate,\{edit:false,success:'誕生日の確認済みを保存しました'\}\)/);
- assert.match(app,/replaceRoot\(candidate,\{edit:false,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
+ assert.match(backup,/replaceRoot\(candidate,\{edit:false,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
 });
 
 test('別タブ更新を検知したら共通保存処理が保存を停止する',()=>{

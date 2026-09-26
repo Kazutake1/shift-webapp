@@ -424,7 +424,7 @@ function openPreview(){
   const shareButton=button('',()=>sharePreviewPdf(status),'primary');
   shareButton.setAttribute('aria-label','PDFを共有して印刷');
   const compactShare=el('span',{class:'preview-label-compact','aria-hidden':'true'});
-  compactShare.append(previewIcon(['M12 16V3','m7 8 5-5 5 5','M5 13v7h14v-7']),document.createTextNode('共有'));
+  compactShare.append(previewIcon(['M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2','M6 15h12v6H6zM18 12h.01']),document.createTextNode('共有'));
   shareButton.append(el('span',{class:'preview-label-full'},'PDFを共有して印刷'),compactShare);
   shareButton.disabled=true;
   const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:'','aria-label':'PDFを開く'});

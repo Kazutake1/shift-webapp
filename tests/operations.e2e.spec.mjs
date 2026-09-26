@@ -70,7 +70,7 @@ test('印刷プレビューは左25mm・右15mmの綴じ代と整列したヘッ
  expect(result.storeFont).toBeGreaterThan(result.periodFont);
 });
 
-test('週操作は店名の右側の上部バーへ移動し、通常ページだけ表示する',async({page})=>{
+test('週操作は店名の右側の上部バーへ移動し、スマホでは日付だけ非表示にする',async({page})=>{
  for(const width of [320,390,1180]){
   await page.setViewportSize({width,height:844});
   if(width===320)await openApp(page);
@@ -80,7 +80,8 @@ test('週操作は店名の右側の上部バーへ移動し、通常ページ�
   const nav=await page.locator('#header-week-nav').boundingBox();
   if(width>=700)expect(nav.x).toBeGreaterThanOrEqual(store.x+store.width);
   await expect(page.locator('#prev')).toBeVisible();
-  await expect(page.locator('#week-label')).toBeVisible();
+  if(width<=700)await expect(page.locator('#week-label')).toBeHidden();
+  else await expect(page.locator('#week-label')).toBeVisible();
   await expect(page.locator('#next')).toBeVisible();
   await expect(page.locator('#today')).toBeVisible();
  }

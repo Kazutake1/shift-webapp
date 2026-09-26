@@ -539,3 +539,10 @@ test('設定ヘッダーの店舗名とシフト表に戻るボタンは同じ44
  assert.match(css,/\.appbar-context\.settings-context\{height:44px;align-items:center\}/);
  assert.match(css,/\.appbar-context\.settings-context #settings-back\{[\s\S]*height:44px;min-height:44px[\s\S]*display:inline-flex[\s\S]*align-items:center/);
 });
+
+
+test('スマホ版だけ週の日付表示を非表示にする',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/@media\(max-width:700px\)\{[\s\S]*\.appbar-context #week-label\{display:none\}/);
+ assert.match(css,/\.appbar-context #week-label\{white-space:nowrap;font-size:14px;color:var\(--ui-ink\)\}/);
+});

@@ -161,7 +161,7 @@ body.print-layout{
 body.print-layout .no-print,body.print-layout dialog{display:none!important}
 body.print-layout main{padding:0;margin:0;max-width:none;width:281mm}
 body.print-layout #paper{width:281mm;max-width:none;border:0;box-shadow:none;padding:0;margin:0}
-body.print-layout .paper-header{font-size:10pt;line-height:1;margin:0 0 2mm;min-height:6.5mm;align-items:baseline}
+body.print-layout .paper-header{font-size:10pt;line-height:1;margin:0 0 2mm;min-height:6.5mm;align-items:flex-end}
 body.print-layout #store-name{min-width:0;overflow-wrap:anywhere;font-size:22pt;font-weight:700;line-height:1}
 body.print-layout #paper-period{flex-shrink:0;white-space:nowrap;font-size:10pt;line-height:1}
 body.print-layout .table-scroll{overflow:visible}

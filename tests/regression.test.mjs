@@ -301,3 +301,15 @@ test('従業員管理UIをapp.jsから分離し、トレーニング1か月判�
  assert.equal(withinFirstMonth(employee,'2026-10-11'),false);
  assert.equal(withinFirstMonth({},'2026-09-10'),false);
 });
+
+
+test('シフト表下の案内文と通常保存メッセージを表示しない',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.equal(html.includes('空欄・名前をタップして編集'),false);
+ assert.equal(html.includes('データはこのブラウザーに保存されます。初回表示はサンプルです。'),false);
+ assert.equal(html.includes('この端末に保存</span>'),false);
+ assert.match(html,/id="save-status"[^>]*hidden/);
+ assert.match(app,/function writeRoot\(candidate,\{edit=true,allowStorageError=false,success=''\}=\{\}\)/);
+ assert.equal(app.includes("success='この端末に保存しました'"),false);
+});

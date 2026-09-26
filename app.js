@@ -9,17 +9,22 @@ state=root.stores.find(s=>s.id===root.activeStoreId);
 let undoData=null,baseline=JSON.stringify(root),backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
 function updateTools(){document.querySelectorAll('[data-undo]').forEach(b=>b.disabled=!undoData);const date=new Date(backupAt);$('#backup-date').textContent=backupAt&&!isNaN(date)?`最終バックアップ作成：${date.toLocaleString('ja-JP')}`:'バックアップはまだ作成していません';}
-function writeRoot(candidate,{edit=true,allowStorageError=false,success='この端末に保存しました'}={}){
- if(storageError&&!allowStorageError){$('#saved').textContent=storageError;return false;}
- if(externalChangeDetected){$('#saved').textContent='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';return false;}
+function setSaveStatus(text=''){
+ const host=$('#save-status'),saved=$('#saved');
+ saved.textContent=text;
+ host.hidden=!text;
+}
+function writeRoot(candidate,{edit=true,allowStorageError=false,success=''}={}){
+ if(storageError&&!allowStorageError){setSaveStatus(storageError);return false;}
+ if(externalChangeDetected){setSaveStatus('別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。');return false;}
  try{
   const next=JSON.stringify(candidate);
   localStorage.setItem(storageKey,next);
   if(edit&&next!==baseline)undoData=baseline;
   if(!edit)undoData=null;
-  baseline=next;updateTools();$('#saved').textContent=success;return true;
+  baseline=next;updateTools();setSaveStatus(success);return true;
  }catch(e){
-  $('#saved').textContent='保存できません。今回の変更は反映していません。空き容量を確認してください。';
+  setSaveStatus('保存できません。今回の変更は反映していません。空き容量を確認してください。');
   alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。');
   return false;
  }
@@ -108,7 +113,7 @@ document.addEventListener('visibilitychange',()=>{if(!document.hidden&&printRequ
 window.addEventListener('storage',event=>{
  if(event.key!==storageKey)return;
  externalChangeDetected=true;
- $('#saved').textContent='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';
+ setSaveStatus('別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。');
  alert('別のタブまたはウインドウでシフトデータが変更されました。上書きを防ぐため、この画面からの保存を停止しました。アプリを開き直してください。');
 });
 

@@ -266,3 +266,16 @@ test('従業員管理の追加・編集・非表示を分離後も維持する',
  const employee=store.employees.find(e=>e.employeeNumber==='E999');
  expect(employee).toMatchObject({name:'分離テスト 太郎',shiftName:'分離T',hidden:true});
 });
+
+
+test('シフト表下の案内文を表示せず、通常保存成功は無表示にする',async({page})=>{
+ await openApp(page);
+ await expect(page.locator('footer')).toHaveCount(0);
+ await expect(page.getByText('空欄・名前をタップして編集',{exact:false})).toHaveCount(0);
+ await expect(page.getByText('データはこのブラウザーに保存されます。初回表示はサンプルです。',{exact:true})).toHaveCount(0);
+ await expect(page.locator('#save-status')).toBeHidden();
+
+ await editFirstNote(page,'通常保存表示テスト');
+ await expect(page.locator('#save-status')).toBeHidden();
+ await expect(page.locator('#saved')).toHaveText('');
+});

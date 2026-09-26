@@ -61,7 +61,7 @@ function fitText(){document.querySelectorAll('td.slot button,td.notes-cell butto
 // 用紙幅を先に確定してから文字と罫線を計測する。印刷中の再計測は抑える。
 let printLayoutActive=false,printRequested=false,printRecoveryTimer=0;
 const printMedia=window.matchMedia('print');
-const isIPad=()=>/iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isAppleMobile=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
 let lastPrintPdfUrl='',lastPrintPdfFile=null,previewPdfGeneration=0;
 function preparePrint(){
  clearTimeout(printRecoveryTimer);
@@ -381,7 +381,7 @@ function openPreview(){
  const meta=el('div',{class:'preview-meta'});
  toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'));
  meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`));
- if(isIPad()){
+ if(isAppleMobile()){
   const status=el('small',{role:'status','aria-live':'polite'},'印刷用PDFを準備しています…');
   const actions=el('div',{class:'preview-actions'});
   const shareButton=button('PDFを共有して印刷',()=>sharePreviewPdf(status),'primary');

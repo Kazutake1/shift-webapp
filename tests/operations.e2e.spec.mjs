@@ -406,15 +406,16 @@ test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
  expect(pages).toBe(1);
 });
 
-test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる',async({page})=>{
+for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4横1ページで共有できる`,async({page})=>{
+ if(device==='iPhone')await page.setViewportSize({width:390,height:844});
  await openApp(page);
- await page.evaluate(()=>{
-  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'});
+ await page.evaluate(device=>{
+  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> `${device} Safari`});
   window.open=()=>{throw new Error('PDFは自動で新しいタブを開かない');};
   navigator.canShare=()=>true;
   navigator.share=data=>{window.sharedPdf=data.files[0];return Promise.resolve();};
   window.print=()=>{window.htmlPrintCalled=true;};
- });
+ },device);
  await page.locator('#preview').click();
  await expect(page.getByRole('status')).toContainText('準備できました');
  const openLink=page.getByRole('link',{name:'PDFを開く'});

@@ -251,7 +251,7 @@ test('保存失敗時のロールバック処理を維持',()=>{
  assert.match(manager,/if\(save\(edit\)\)return true/);
 });
 
-test('iPhone印刷後の画面復帰処理を維持',()=>{
+test('HTML印刷後の画面復帰処理を維持',()=>{
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  assert.match(app,/schedulePrintRecovery/);
  assert.match(app,/addEventListener\('afterprint',finishPrint\)/);

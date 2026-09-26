@@ -403,3 +403,40 @@ test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
  const pages=(text.match(/\/Type\s*\/Page\b/g)||[]).length;
  expect(pages).toBe(1);
 });
+
+test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる',async({page})=>{
+ await openApp(page);
+ await page.evaluate(()=>{
+  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'});
+  window.open=()=>({location:{replace:url=>{window.printPdfUrl=url;}},close:()=>{}});
+  window.print=()=>{window.htmlPrintCalled=true;};
+ });
+ await page.locator('#preview').click();
+ await page.getByRole('button',{name:'PDFを開いて印刷'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.printPdfUrl)).toMatch(/^blob:/);
+ const result=await page.evaluate(async()=>{
+  const blob=await (await fetch(window.printPdfUrl)).blob();
+  const bytes=new Uint8Array(await blob.arrayBuffer());
+  const pdf=new TextDecoder('latin1').decode(bytes);
+  const imageObject=pdf.indexOf('4 0 obj');
+  const imageStart=pdf.indexOf('stream\n',imageObject)+7;
+  const imageLength=Number(pdf.slice(imageObject,imageStart).match(/\/Length (\d+)/)?.[1]);
+  const imageUrl=URL.createObjectURL(new Blob([bytes.slice(imageStart,imageStart+imageLength)],{type:'image/jpeg'}));
+  const image=new Image();image.src=imageUrl;
+  await image.decode();
+  const canvas=document.createElement('canvas');canvas.width=560;canvas.height=396;
+  const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0,canvas.width,canvas.height);
+  const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+  let ink=0;
+  for(let i=0;i<pixels.length;i+=4)if(pixels[i]<170&&pixels[i+1]<170&&pixels[i+2]<170)ink++;
+  URL.revokeObjectURL(imageUrl);
+  return {type:blob.type,size:blob.size,header:pdf.slice(0,8),pages:(pdf.match(/\/Type \/Page\b/g)||[]).length,landscape:pdf.includes('/MediaBox [0 0 841.89 595.28]'),ink,htmlPrintCalled:window.htmlPrintCalled||false};
+ });
+ expect(result.type).toBe('application/pdf');
+ expect(result.header).toBe('%PDF-1.4');
+ expect(result.pages).toBe(1);
+ expect(result.landscape).toBe(true);
+ expect(result.size).toBeGreaterThan(15000);
+ expect(result.ink).toBeGreaterThan(500);
+ expect(result.htmlPrintCalled).toBe(false);
+});

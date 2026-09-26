@@ -302,6 +302,7 @@ function showSettings(){
  $('#settings').hidden=subpage;
  $('#header-week-nav').hidden=subpage;
  $('#settings-back').hidden=!settings;
+ $('.appbar-context').classList.toggle('settings-context',settings);
  if(settings)$('#settings-back').focus();
  else if(birthdays)$('#birthday-back').focus();
  else requestAnimationFrame(fitText);

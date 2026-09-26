@@ -438,8 +438,9 @@ body.print-layout #schedule tr{break-inside:avoid}
 @media(max-width:700px){
  .appbar{align-items:center}
  .appbar-context{order:3;width:100%;overflow-x:auto;padding-bottom:1px}
+ .appbar-context.settings-context{order:initial;width:auto;overflow:visible;padding-bottom:0}
  .appbar-context .week-nav{width:max-content;min-width:100%}
  .appbar-context #week-label{font-size:13px}
  .appbar-context :is(#prev,#next,#today){min-height:40px;padding:8px 10px;font-size:12px}
- .appbar-context #settings-back{width:auto}
+ .appbar-context #settings-back{width:auto;padding-left:10px;padding-right:10px}
 }

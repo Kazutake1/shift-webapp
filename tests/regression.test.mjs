@@ -523,3 +523,11 @@ test('週操作と設定の戻る操作を店名右側の共通ヘッダーへ�
  assert.match(app,/\$\('#header-week-nav'\)\.hidden=subpage/);
  assert.match(app,/\$\('#settings-back'\)\.hidden=!settings/);
 });
+
+
+test('狭い画面でも設定の戻るボタンは店名右側の同じヘッダー行を維持する',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(css,/\.appbar-context\.settings-context\{order:initial;width:auto;overflow:visible/);
+ assert.match(app,/classList\.toggle\('settings-context',settings\)/);
+});

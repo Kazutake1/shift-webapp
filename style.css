@@ -251,6 +251,7 @@ body.print-layout #schedule tr{break-inside:avoid}
  .birthday-gift-row input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:#426b8a}
  .birthday-gift-date{font-variant-numeric:tabular-nums;font-weight:700;color:#294b67}
  .birthday-gift-person{font-weight:700;overflow-wrap:anywhere}
+ .birthday-gift-ineligible .birthday-gift-person{color:#98a69c}
  .birthday-gift-store{font-size:13px;color:#64748b;overflow-wrap:anywhere}
  .birthday-gift-status{font-size:12px;color:#64748b;text-align:right}
  @media(max-width:650px){

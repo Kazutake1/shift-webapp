@@ -394,7 +394,7 @@ test('誕生日通知UIをapp.jsから分離する',()=>{
  assert.match(app,/const \{renderBirthdays\}=createBirthdayUi\(/);
  assert.match(birthdayUi,/export function createBirthdayUi\(/);
  assert.match(birthdayUi,/誕生日のお知らせ/);
- assert.match(birthdayUi,/従業員誕生日・プレゼント管理/);
+ assert.match(birthdayUi,/giftHost\.querySelector\('h2'\)\.textContent='従業員リスト'/);
 });
 
 test('誕生日リストは表示中従業員を並べ、入社1年以上だけプレゼント対象にする',async()=>{

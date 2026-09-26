@@ -43,26 +43,26 @@ export function createBirthdayUi({
   const year=Number(japanToday().slice(0,4));
   const entries=birthdayGiftChecklist(root,year);
 
-  giftHost.querySelector('h2').textContent=`従業員誕生日・プレゼント管理（${year}年）`;
+  giftHost.querySelector('h2').textContent='従業員リスト';
   giftList.replaceChildren();
 
   const eligible=entries.filter(entry=>entry.eligible);
   const delivered=eligible.filter(entry=>entry.delivered).length;
   giftSummary.textContent=entries.length
-   ?`プレゼント渡し済み ${delivered} / ${eligible.length}名`
+   ?`プレゼント渡し済み ${delivered} / ${eligible.length}名（${year}年）`
    :'誕生日が登録されている従業員はいません。';
 
   for(const entry of entries){
-   const row=el('label',{class:'birthday-gift-row'});
+   const row=el('label',{class:entry.eligible?'birthday-gift-row':'birthday-gift-row birthday-gift-ineligible'});
    const checkbox=el('input',{
     type:'checkbox',
-    'aria-label':`${entry.store} ${entry.name}さん 誕生日プレゼント渡し済み`
+    'aria-label':`${entry.store} ${entry.name} 誕生日プレゼント渡し済み`
    });
    checkbox.checked=entry.delivered;
    checkbox.disabled=!entry.eligible;
 
    const date=el('span',{class:'birthday-gift-date'},`${Number(entry.birthday.slice(5,7))}/${Number(entry.birthday.slice(8))}`);
-   const person=el('span',{class:'birthday-gift-person'},`${entry.name}さん`);
+   const person=el('span',{class:'birthday-gift-person'},entry.name);
    const store=el('span',{class:'birthday-gift-store'},entry.store);
    const statusText=entry.eligible
     ?entry.delivered?'渡し済み':'未渡し'

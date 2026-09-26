@@ -4,6 +4,7 @@ import {createStoreUi} from './store-dialog.js';
 import {openBackupDialog} from './backup-dialog.js';
 import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
 import {createStateManager} from './state-manager.js';
+import {createPrintPdf} from './print-pdf.js';
 const $=s=>document.querySelector(s);
 let preview=false,activeCell=null,backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
@@ -60,6 +61,8 @@ function fitText(){document.querySelectorAll('td.slot button,td.notes-cell butto
 // 用紙幅を先に確定してから文字と罫線を計測する。印刷中の再計測は抑える。
 let printLayoutActive=false,printRequested=false,printRecoveryTimer=0;
 const printMedia=window.matchMedia('print');
+const isIPad=()=>/iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+let lastPrintPdfUrl='';
 function preparePrint(){
  clearTimeout(printRecoveryTimer);
  printLayoutActive=true;
@@ -82,15 +85,29 @@ function schedulePrintRecovery(delay=1200){
 async function printSchedule(){
  if(printRequested)return;
  printRequested=true;
+ const pdfWindow=isIPad()?window.open('','_blank'):null;
  try{
   preparePrint();
   await document.fonts.ready;
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   fitText();
+  if(isIPad()){
+   const pdf=await createPrintPdf($('#paper'));
+   finishPrint();
+   if(lastPrintPdfUrl)URL.revokeObjectURL(lastPrintPdfUrl);
+   lastPrintPdfUrl=URL.createObjectURL(pdf);
+   if(pdfWindow)pdfWindow.location.replace(lastPrintPdfUrl);
+   else{
+    const link=el('a',{href:lastPrintPdfUrl,download:'シフト表.pdf'});
+    document.body.append(link);link.click();link.remove();
+    alert('印刷用PDFを保存しました。PDFを開いて「共有」から印刷してください。');
+   }
+   return;
+  }
   window.print();
   // iPhone / iPadではafterprintが戻らない場合があるため、通常画面へ戻す保険を入れる。
   schedulePrintRecovery();
- }catch(error){finishPrint();throw error;}
+ }catch(error){pdfWindow?.close();finishPrint();alert(`印刷用PDFを作成できませんでした：${error.message}`);}
 }
 if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(!printLayoutActive)drawRules();}).observe($('#schedule'));
 printMedia.addEventListener('change',event=>{if(event.matches)preparePrint();else finishPrint();});
@@ -335,9 +352,9 @@ function openPreview(){
  paper.querySelectorAll('button').forEach(n=>n.tabIndex=-1);
  const bar=el('section',{class:'preview-bar no-print',id:'print-actions','aria-label':'印刷プレビュー'});
  const toolbar=el('div',{class:'preview-toolbar'});
- toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'),button('印刷する',printSchedule,'primary'));
+ toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'),button(isIPad()?'PDFを開いて印刷':'印刷する',printSchedule,'primary'));
  const meta=el('div',{class:'preview-meta'});
- meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`),el('small',{},'A4横・1週間1枚'));
+ meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`),el('small',{},isIPad()?'A4横・1週間1ページのPDFを開き、共有から印刷します':'A4横・1週間1枚'));
  const stage=el('div',{class:'preview-stage'});
  const frame=el('iframe',{class:'preview-sheet',title:'週間シフト表の印刷イメージ',sandbox:'',tabindex:'-1'});
  frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;
@@ -374,4 +391,3 @@ if('serviceWorker' in navigator&&location.protocol!=='file:'){
   reg.update().catch(()=>{});
  }).catch(()=>{$('#offline-status').textContent='通信がないときの起動準備に失敗しました。接続中に開き直してください。';});
 }else $('#offline-status').textContent='この接続ではホーム画面・通信なし起動の準備を利用できません。';
-

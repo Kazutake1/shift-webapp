@@ -62,7 +62,7 @@ function fitText(){document.querySelectorAll('td.slot button,td.notes-cell butto
 let printLayoutActive=false,printRequested=false,printRecoveryTimer=0;
 const printMedia=window.matchMedia('print');
 const isIPad=()=>/iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
-let lastPrintPdfUrl='';
+let lastPrintPdfUrl='',lastPrintPdfFile=null,previewPdfGeneration=0;
 function preparePrint(){
  clearTimeout(printRecoveryTimer);
  printLayoutActive=true;
@@ -85,29 +85,15 @@ function schedulePrintRecovery(delay=1200){
 async function printSchedule(){
  if(printRequested)return;
  printRequested=true;
- const pdfWindow=isIPad()?window.open('','_blank'):null;
  try{
   preparePrint();
   await document.fonts.ready;
   await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
   fitText();
-  if(isIPad()){
-   const pdf=await createPrintPdf($('#paper'));
-   finishPrint();
-   if(lastPrintPdfUrl)URL.revokeObjectURL(lastPrintPdfUrl);
-   lastPrintPdfUrl=URL.createObjectURL(pdf);
-   if(pdfWindow)pdfWindow.location.replace(lastPrintPdfUrl);
-   else{
-    const link=el('a',{href:lastPrintPdfUrl,download:'シフト表.pdf'});
-    document.body.append(link);link.click();link.remove();
-    alert('印刷用PDFを保存しました。PDFを開いて「共有」から印刷してください。');
-   }
-   return;
-  }
   window.print();
   // iPhone / iPadではafterprintが戻らない場合があるため、通常画面へ戻す保険を入れる。
   schedulePrintRecovery();
- }catch(error){pdfWindow?.close();finishPrint();alert(`印刷用PDFを作成できませんでした：${error.message}`);}
+ }catch(error){finishPrint();alert(`印刷できませんでした：${error.message}`);}
 }
 if(typeof ResizeObserver!=='undefined')new ResizeObserver(()=>{if(!printLayoutActive)drawRules();}).observe($('#schedule'));
 printMedia.addEventListener('change',event=>{if(event.matches)preparePrint();else finishPrint();});
@@ -330,10 +316,50 @@ $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
 $('#store').onchange=e=>selectStore(e.target.value);
 let previewObserver=null;
 function closePreview(){
+ previewPdfGeneration++;
  previewObserver?.disconnect();previewObserver=null;
  preview=false;document.body.classList.remove('print-mode');
  $('#print-actions')?.remove();
  requestAnimationFrame(()=>{fitText();$('#preview').focus();});
+}
+async function preparePreviewPdf(generation,shareButton,openLink,saveLink,status){
+ try{
+  preparePrint();
+  await document.fonts.ready;
+  await new Promise(resolve=>requestAnimationFrame(()=>requestAnimationFrame(resolve)));
+  fitText();
+  const pdf=await createPrintPdf($('#paper'));
+  finishPrint();
+  if(generation!==previewPdfGeneration||!preview)return;
+  if(lastPrintPdfUrl)URL.revokeObjectURL(lastPrintPdfUrl);
+  lastPrintPdfUrl=URL.createObjectURL(pdf);
+  lastPrintPdfFile=new File([pdf],'シフト表.pdf',{type:'application/pdf'});
+  openLink.href=lastPrintPdfUrl;
+  saveLink.href=lastPrintPdfUrl;
+  openLink.hidden=false;
+  saveLink.hidden=false;
+  if(typeof navigator.share==='function'&&navigator.canShare?.({files:[lastPrintPdfFile]})){
+   shareButton.disabled=false;
+   status.textContent='準備できました。「PDFを共有して印刷」を押し、共有メニューから「プリント」を選んでください。';
+  }else{
+   shareButton.hidden=true;
+   openLink.classList.add('primary');
+   status.textContent='準備できました。「PDFを開く」を押し、PDFの共有メニューから印刷してください。';
+  }
+ }catch(error){
+  finishPrint();
+  if(generation===previewPdfGeneration&&preview)status.textContent=`PDFを作成できませんでした：${error.message}`;
+ }
+}
+function sharePreviewPdf(status){
+ if(!lastPrintPdfFile)return;
+ try{
+  // Share must start inside this tap; preparing the PDF here would lose user activation.
+  const result=navigator.share({files:[lastPrintPdfFile]});
+  Promise.resolve(result).catch(error=>{
+   if(error.name!=='AbortError')status.textContent='共有を開けませんでした。「PDFを開く」か「PDFを保存」をお試しください。';
+  });
+ }catch(error){status.textContent='共有を開けませんでした。「PDFを開く」か「PDFを保存」をお試しください。';}
 }
 function openPreview(){
  if(preview)return;
@@ -352,9 +378,25 @@ function openPreview(){
  paper.querySelectorAll('button').forEach(n=>n.tabIndex=-1);
  const bar=el('section',{class:'preview-bar no-print',id:'print-actions','aria-label':'印刷プレビュー'});
  const toolbar=el('div',{class:'preview-toolbar'});
- toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'),button(isIPad()?'PDFを開いて印刷':'印刷する',printSchedule,'primary'));
  const meta=el('div',{class:'preview-meta'});
- meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`),el('small',{},isIPad()?'A4横・1週間1ページのPDFを開き、共有から印刷します':'A4横・1週間1枚'));
+ toolbar.append(button('← 編集に戻る',closePreview),el('h1',{},'印刷プレビュー'));
+ meta.append(el('div',{},`${stateManager.getState().store} ｜ ${period()}`));
+ if(isIPad()){
+  const status=el('small',{role:'status','aria-live':'polite'},'印刷用PDFを準備しています…');
+  const actions=el('div',{class:'preview-actions'});
+  const shareButton=button('PDFを共有して印刷',()=>sharePreviewPdf(status),'primary');
+  shareButton.disabled=true;
+  const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:''},'PDFを開く');
+  const saveLink=el('a',{class:'preview-save-link',download:'シフト表.pdf',hidden:''},'PDFを保存');
+  actions.append(shareButton,openLink);
+  toolbar.append(actions);
+  meta.append(status,saveLink);
+  const generation=++previewPdfGeneration;
+  requestAnimationFrame(()=>{if(preview&&generation===previewPdfGeneration)preparePreviewPdf(generation,shareButton,openLink,saveLink,status);});
+ }else{
+  toolbar.append(button('印刷する',printSchedule,'primary'));
+  meta.append(el('small',{},'A4横・1週間1枚'));
+ }
  const stage=el('div',{class:'preview-stage'});
  const frame=el('iframe',{class:'preview-sheet',title:'週間シフト表の印刷イメージ',sandbox:'',tabindex:'-1'});
  frame.srcdoc='<!doctype html>'+doc.documentElement.outerHTML;

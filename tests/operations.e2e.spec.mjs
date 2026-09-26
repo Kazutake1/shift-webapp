@@ -408,14 +408,20 @@ test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる'
  await openApp(page);
  await page.evaluate(()=>{
   Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'});
-  window.open=()=>({location:{replace:url=>{window.printPdfUrl=url;}},close:()=>{}});
+  window.open=()=>{throw new Error('PDFは自動で新しいタブを開かない');};
+  navigator.canShare=()=>true;
+  navigator.share=data=>{window.sharedPdf=data.files[0];return Promise.resolve();};
   window.print=()=>{window.htmlPrintCalled=true;};
  });
  await page.locator('#preview').click();
- await page.getByRole('button',{name:'PDFを開いて印刷'}).click();
- await expect.poll(()=>page.evaluate(()=>window.printPdfUrl)).toMatch(/^blob:/);
+ await expect(page.getByRole('status')).toContainText('準備できました');
+ const openLink=page.getByRole('link',{name:'PDFを開く'});
+ await expect(openLink).toBeVisible();
+ await expect(page.getByRole('link',{name:'PDFを保存'})).toBeVisible();
+ await page.getByRole('button',{name:'PDFを共有して印刷'}).click();
+ await expect.poll(()=>page.evaluate(()=>window.sharedPdf?.name)).toBe('シフト表.pdf');
  const result=await page.evaluate(async()=>{
-  const blob=await (await fetch(window.printPdfUrl)).blob();
+  const blob=await (await fetch(document.querySelector('.preview-pdf-link').href)).blob();
   const bytes=new Uint8Array(await blob.arrayBuffer());
   const pdf=new TextDecoder('latin1').decode(bytes);
   const imageObject=pdf.indexOf('4 0 obj');
@@ -430,7 +436,7 @@ test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる'
   let ink=0;
   for(let i=0;i<pixels.length;i+=4)if(pixels[i]<170&&pixels[i+1]<170&&pixels[i+2]<170)ink++;
   URL.revokeObjectURL(imageUrl);
-  return {type:blob.type,size:blob.size,header:pdf.slice(0,8),pages:(pdf.match(/\/Type \/Page\b/g)||[]).length,landscape:pdf.includes('/MediaBox [0 0 841.89 595.28]'),ink,htmlPrintCalled:window.htmlPrintCalled||false};
+  return {type:blob.type,size:blob.size,header:pdf.slice(0,8),pages:(pdf.match(/\/Type \/Page\b/g)||[]).length,landscape:pdf.includes('/MediaBox [0 0 841.89 595.28]'),ink,htmlPrintCalled:window.htmlPrintCalled||false,sharedType:window.sharedPdf.type};
  });
  expect(result.type).toBe('application/pdf');
  expect(result.header).toBe('%PDF-1.4');
@@ -439,4 +445,11 @@ test('iPad向けの印刷用PDFはWebKitでもA4横1ページで生成できる'
  expect(result.size).toBeGreaterThan(15000);
  expect(result.ink).toBeGreaterThan(500);
  expect(result.htmlPrintCalled).toBe(false);
+ expect(result.sharedType).toBe('application/pdf');
+ await page.getByRole('button',{name:'← 編集に戻る'}).click();
+ await page.evaluate(()=>{navigator.canShare=()=>false;});
+ await page.locator('#preview').click();
+ await expect(page.getByRole('status')).toContainText('準備できました');
+ await expect(page.getByRole('button',{name:'PDFを共有して印刷'})).toBeHidden();
+ await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
 });

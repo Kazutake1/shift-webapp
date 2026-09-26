@@ -129,16 +129,19 @@ footer{display:flow-root}
 /* 印刷前に同じ寸法で組版し、実測したSVGと表を印刷時も一致させる。 */
 @page{size:A4 landscape;margin:0}
 @media print{
+ html{
+  width:297mm;height:206mm;overflow:hidden;
+ }
  html,body{
   margin:0;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact;
-  width:297mm;height:209mm;max-width:297mm;max-height:209mm;overflow:hidden;
  }
  .no-print,dialog{display:none!important}
- /* iPad Safariの自動ヘッダー／フッター用余白をなくし、URL・日時・ページ番号を出さない。
-    表そのものは281mmのまま、A4横の中央に配置する。 */
+ /* Safariのページ余白は0のまま、従来の8mm余白相当をbody内側へ移す。
+    印刷可能領域はv54相当の281mm×190mmに戻し、表そのものの寸法は変更しない。 */
  body.print-layout{
-  width:297mm;height:209mm;max-width:297mm;max-height:209mm;overflow:hidden;
-  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  box-sizing:border-box;
+  width:297mm;height:206mm;max-width:297mm;max-height:206mm;overflow:hidden;
+  padding:8mm;
   break-after:avoid;page-break-after:avoid;
  }
  main{
@@ -156,7 +159,7 @@ body.print-layout{
  -webkit-print-color-adjust:exact;print-color-adjust:exact;
 }
 body.print-layout .no-print,body.print-layout dialog{display:none!important}
-body.print-layout main{padding:0;margin:0;max-width:none;width:281mm;flex:0 0 auto}
+body.print-layout main{padding:0;margin:0;max-width:none;width:281mm}
 body.print-layout #paper{width:281mm;max-width:none;border:0;box-shadow:none;padding:0;margin:0}
 body.print-layout .paper-header{font-size:10pt;line-height:1.15;margin:0 0 2mm;min-height:4mm}
 body.print-layout #store-name{min-width:0;overflow-wrap:anywhere}

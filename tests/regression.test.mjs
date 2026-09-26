@@ -448,8 +448,8 @@ test('誕生日管理は設定画面へ直接表示せず従業員リストか�
 test('iPad印刷の空白2ページ目を防ぐためA4横1ページ内に固定する',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(css,/@page\{size:A4 landscape;margin:0\}/);
- assert.match(css,/html,body\{[\s\S]*width:297mm;height:209mm[\s\S]*overflow:hidden/);
- assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:209mm[\s\S]*overflow:hidden/);
+ assert.match(css,/html\{[\s\S]*width:297mm;height:206mm;overflow:hidden/);
+ assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:206mm[\s\S]*padding:8mm[\s\S]*overflow:hidden/);
  assert.match(css,/page-break-after:avoid/);
  assert.match(css,/page-break-inside:avoid/);
  // シフト表の印刷寸法は維持。
@@ -458,11 +458,11 @@ test('iPad印刷の空白2ページ目を防ぐためA4横1ページ内に固定
 });
 
 
-test('iPad印刷はブラウザ自動URL・日時用余白をなくしA4横1ページへ配置する',()=>{
+test('iPad印刷は自動URL・日時用のpage余白をなくしつつv54相当の印刷領域を維持する',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(css,/@page\{size:A4 landscape;margin:0\}/);
- assert.match(css,/html,body\{[\s\S]*width:297mm;height:209mm[\s\S]*overflow:hidden/);
- assert.match(css,/body\.print-layout\{[\s\S]*width:297mm;height:209mm[\s\S]*align-items:center;justify-content:center/);
+ assert.match(css,/body\.print-layout\{[\s\S]*box-sizing:border-box[\s\S]*width:297mm;height:206mm[\s\S]*padding:8mm/);
+ assert.doesNotMatch(css,/body\.print-layout\{[^}]*display:flex/);
  assert.match(css,/body\.print-layout main\{[^}]*width:281mm/);
  // シフト表本体の寸法は変更しない。
  assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);

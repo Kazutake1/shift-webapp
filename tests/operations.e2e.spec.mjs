@@ -496,6 +496,9 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  const openLink=page.getByRole('link',{name:'PDFを開く'});
  await expect(openLink).toBeVisible();
  if(device==='iPhone'){
+  await expect(page.locator('.preview-toolbar .preview-icon:visible')).toHaveCount(3);
+  await expect(page.getByRole('button',{name:'PDFを共有して印刷'})).toContainText('共有');
+  await expect(openLink).toContainText('開く');
   const bounds=await page.locator('.preview-toolbar').evaluate(toolbar=>
    [toolbar.children[0],toolbar.children[1],toolbar.children[2].children[0],toolbar.children[2].children[1]]
     .map(node=>{const r=node.getBoundingClientRect();return {left:r.left,right:r.right,center:(r.top+r.bottom)/2};})

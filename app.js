@@ -382,6 +382,15 @@ function sharePreviewPdf(status){
   });
  }catch(error){status.hidden=false;status.textContent='共有を開けませんでした。「PDFを開く」をお試しください。';}
 }
+function previewIcon(paths){
+ const svg=document.createElementNS('http://www.w3.org/2000/svg','svg');
+ svg.setAttribute('class','preview-icon');svg.setAttribute('viewBox','0 0 24 24');
+ svg.setAttribute('fill','none');svg.setAttribute('stroke','currentColor');
+ svg.setAttribute('stroke-width','2');svg.setAttribute('stroke-linecap','round');svg.setAttribute('stroke-linejoin','round');
+ svg.setAttribute('aria-hidden','true');svg.setAttribute('focusable','false');
+ for(const d of paths){const path=document.createElementNS('http://www.w3.org/2000/svg','path');path.setAttribute('d',d);svg.append(path);}
+ return svg;
+}
 function openPreview(){
  if(preview)return;
  // v25と同じ組版を複製する。表示専用の用紙は印刷対象に含めない。
@@ -402,7 +411,9 @@ function openPreview(){
  const meta=el('div',{class:'preview-meta'});
  const backButton=button('',closePreview);
  backButton.setAttribute('aria-label','← シフト表に戻る');
- backButton.append(el('span',{class:'preview-label-full'},'← シフト表に戻る'),el('span',{class:'preview-label-compact','aria-hidden':'true'},'← 戻る'));
+ const compactBack=el('span',{class:'preview-label-compact','aria-hidden':'true'});
+ compactBack.append(previewIcon(['M19 12H5','m12 19-7-7 7-7']));
+ backButton.append(el('span',{class:'preview-label-full'},'← シフト表に戻る'),compactBack);
  const heading=el('h1',{'aria-label':'印刷プレビュー'});
  heading.append(el('span',{class:'preview-label-full'},'印刷プレビュー'),el('span',{class:'preview-label-compact','aria-hidden':'true'},'印刷'));
  toolbar.append(backButton,heading);
@@ -412,9 +423,14 @@ function openPreview(){
   const actions=el('div',{class:'preview-actions'});
   const shareButton=button('',()=>sharePreviewPdf(status),'primary');
   shareButton.setAttribute('aria-label','PDFを共有して印刷');
-  shareButton.append(el('span',{class:'preview-label-full'},'PDFを共有して印刷'),el('span',{class:'preview-label-compact','aria-hidden':'true'},'共有して印刷'));
+  const compactShare=el('span',{class:'preview-label-compact','aria-hidden':'true'});
+  compactShare.append(previewIcon(['M12 16V3','m7 8 5-5 5 5','M5 13v7h14v-7']),document.createTextNode('共有'));
+  shareButton.append(el('span',{class:'preview-label-full'},'PDFを共有して印刷'),compactShare);
   shareButton.disabled=true;
-  const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:''},'PDFを開く');
+  const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:'','aria-label':'PDFを開く'});
+  const compactOpen=el('span',{class:'preview-label-compact','aria-hidden':'true'});
+  compactOpen.append(previewIcon(['M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z','M14 2v6h6','M8 13h8','M8 17h8']),document.createTextNode('開く'));
+  openLink.append(el('span',{class:'preview-label-full'},'PDFを開く'),compactOpen);
   actions.append(shareButton,openLink);
   toolbar.append(actions);
   meta.append(status);

@@ -46,19 +46,29 @@ test('印刷プレビューはChromiumとWebKitでシフト表を表示する',a
  await expect(preview.locator('#schedule tbody tr').first()).toBeVisible();
 });
 
-test('印刷プレビューは左右に約12mmの余白を表示する',async({page})=>{
+test('印刷プレビューは左25mm・右15mmの綴じ代と整列したヘッダーを表示する',async({page})=>{
  await openApp(page);
  await page.locator('#preview').click();
  const preview=page.frameLocator('.preview-sheet');
  await expect(preview.locator('#paper')).toBeVisible();
- const geometry=await preview.locator('#paper').evaluate(el=>{
+ const result=await preview.locator('#paper').evaluate(el=>{
   const r=el.getBoundingClientRect();
   const pageWidth=document.documentElement.getBoundingClientRect().width;
-  return {left:r.left,right:pageWidth-r.right,pageWidth};
+  const store=document.querySelector('#store-name');
+  const period=document.querySelector('#paper-period');
+  const sr=store.getBoundingClientRect(),pr=period.getBoundingClientRect();
+  const storeStyle=getComputedStyle(store),periodStyle=getComputedStyle(period);
+  return {
+   left:r.left,right:pageWidth-r.right,pageWidth,
+   storeBottom:sr.bottom,periodBottom:pr.bottom,
+   storeFont:parseFloat(storeStyle.fontSize),periodFont:parseFloat(periodStyle.fontSize)
+  };
  });
- expect(geometry.left/geometry.pageWidth).toBeGreaterThan(.035);
- expect(geometry.right/geometry.pageWidth).toBeGreaterThan(.035);
- expect(Math.abs(geometry.left-geometry.right)).toBeLessThan(4);
+ const mmPx=result.pageWidth/297;
+ expect(Math.abs(result.left-25*mmPx)).toBeLessThan(3);
+ expect(Math.abs(result.right-15*mmPx)).toBeLessThan(3);
+ expect(Math.abs(result.storeBottom-result.periodBottom)).toBeLessThan(2);
+ expect(result.storeFont).toBeGreaterThan(result.periodFont);
 });
 
 test('iPhone幅では週の操作4つが日付の下で一列に並ぶ',async({page})=>{

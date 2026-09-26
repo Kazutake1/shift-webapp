@@ -136,8 +136,8 @@ footer{display:flow-root}
   margin:0;background:white;-webkit-print-color-adjust:exact;print-color-adjust:exact;
  }
  .no-print,dialog{display:none!important}
- /* Safariのページ余白は0のまま、従来の8mm余白相当をbody内側へ移す。
-    印刷可能領域はv54相当の281mm×190mmに戻し、表そのものの寸法は変更しない。 */
+ /* Safariのページ余白は0のまま、印刷時だけ全体を均等縮小して
+    左25mm・右15mmの綴じ代を確保する。表そのものの281mmレイアウトは変更しない。 */
  body.print-layout{
   box-sizing:border-box;
   width:297mm;height:206mm;max-width:297mm;max-height:206mm;overflow:hidden;
@@ -161,9 +161,9 @@ body.print-layout{
 body.print-layout .no-print,body.print-layout dialog{display:none!important}
 body.print-layout main{padding:0;margin:0;max-width:none;width:281mm}
 body.print-layout #paper{width:281mm;max-width:none;border:0;box-shadow:none;padding:0;margin:0}
-body.print-layout .paper-header{font-size:10pt;line-height:1.15;margin:0 0 2mm;min-height:4mm}
-body.print-layout #store-name{min-width:0;overflow-wrap:anywhere}
-body.print-layout #paper-period{flex-shrink:0;white-space:nowrap}
+body.print-layout .paper-header{font-size:10pt;line-height:1;margin:0 0 2mm;min-height:6.5mm;align-items:baseline}
+body.print-layout #store-name{min-width:0;overflow-wrap:anywhere;font-size:18pt;font-weight:700;line-height:1}
+body.print-layout #paper-period{flex-shrink:0;white-space:nowrap;font-size:10pt;line-height:1}
 body.print-layout .table-scroll{overflow:visible}
 body.print-layout #schedule{min-width:0;width:100%;border-width:.35mm;break-inside:avoid}
 body.print-layout #schedule thead th{height:5mm;font-size:8pt}
@@ -187,8 +187,8 @@ body.print-layout #schedule tr{break-inside:avoid}
 /* SVGのwidth/height/viewBoxはdrawRulesの実測値をそのまま使用する。 */
 @media print{
  body.print-layout main{
-  margin-left:4mm;
-  transform:scale(.9715302491);
+  margin-left:17mm;
+  transform:scale(.9145907473);
   transform-origin:top left;
  }
 }

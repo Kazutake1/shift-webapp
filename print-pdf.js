@@ -4,8 +4,9 @@
 const PAGE_WIDTH_MM=297;
 const PAGE_HEIGHT_MM=210;
 const TABLE_WIDTH_MM=281;
-const PRINT_MARGIN_X_MM=12;
-const PRINT_WIDTH_MM=PAGE_WIDTH_MM-PRINT_MARGIN_X_MM*2;
+const PRINT_MARGIN_LEFT_MM=25;
+const PRINT_MARGIN_RIGHT_MM=15;
+const PRINT_WIDTH_MM=PAGE_WIDTH_MM-PRINT_MARGIN_LEFT_MM-PRINT_MARGIN_RIGHT_MM;
 const DPI=240;
 
 function pdfFromJpeg(jpeg,width,height){
@@ -50,7 +51,7 @@ function renderPaper(paper){
  const ctx=canvas.getContext('2d');
  if(!ctx)throw new Error('印刷用画像を作成できません。');
  const scale=canvas.width/(PAGE_WIDTH_MM*pixelsPerMm)*outputScale;
- const left=PRINT_MARGIN_X_MM*canvas.width/PAGE_WIDTH_MM;
+ const left=PRINT_MARGIN_LEFT_MM*canvas.width/PAGE_WIDTH_MM;
  const top=(PAGE_HEIGHT_MM-printedHeightMm)/2*canvas.height/PAGE_HEIGHT_MM;
  const x=value=>left+(value-rect.left)*scale;
  const y=value=>top+(value-rect.top)*scale;

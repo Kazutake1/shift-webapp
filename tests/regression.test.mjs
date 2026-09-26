@@ -453,7 +453,7 @@ test('iPad印刷の空白2ページ目を防ぐためA4横1ページ内に固定
  assert.match(css,/page-break-after:avoid/);
  assert.match(css,/page-break-inside:avoid/);
  // シフト表の印刷寸法は維持。
- assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
+ assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.7mm\}/);
  assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
  // 印刷時のセル文字は通常画面と同様に縦中央へ置き、長音・波ダッシュが上寄りにならない。
  assert.match(css,/body\.print-layout #schedule td\.slot button\{[^}]*display:flex[^}]*align-items:center[^}]*justify-content:center/);
@@ -469,10 +469,16 @@ test('iPad印刷は自動URL・日時用のpage余白をなくしつつv54相当
  assert.doesNotMatch(css,/body\.print-layout\{[^}]*display:flex/);
  assert.match(css,/body\.print-layout main\{[^}]*width:281mm/);
  // シフト表本体の寸法は変更しない。
- assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.3mm\}/);
+ assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.7mm\}/);
  assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
 });
 
+
+test('印刷時の行高を4.7mmへ広げ、A4横1ページ用の印刷仕様を維持する',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/body\.print-layout #schedule tbody tr,body\.print-layout #schedule td\.slot\{height:4\.7mm\}/);
+ assert.match(css,/tbody tr\{height:25px\}/);
+});
 
 test('印刷出力は左25mm・右15mmの綴じ代を取り、記号位置とヘッダー配置を維持する',()=>{
  const pdf=readFileSync(new URL('../print-pdf.js',import.meta.url),'utf8');

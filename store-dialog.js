@@ -8,7 +8,6 @@ export function createStoreUi({
  el,
  button,
  field,
- hint,
  commit,
  render
 }){
@@ -17,7 +16,6 @@ export function createStoreUi({
   const state=getState();
   const body=openDialog('店舗管理');
 
-  hint(body,'従業員・固定作業・シフト・備考は店舗ごとに保存します。新しい店舗は空の状態で作成します。');
   body.append(el('p',{},`選択中：${state.store}`));
 
   const rename=el('input',{maxlength:40,value:state.store});

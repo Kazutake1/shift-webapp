@@ -242,8 +242,8 @@ test('バックアップ画面は作成と復元を分け、復元時の注意�
  await expect(page.locator('#editor')).toContainText('1. バックアップを作成');
  await expect(page.locator('#editor')).toContainText('2. バックアップから復元');
  await expect(page.locator('#editor')).toContainText('復元すると、現在の全店舗データをバックアップ内の内容で置き換えます');
- await expect(page.locator('#editor')).toContainText('① ファイルを選択');
- await expect(page.locator('#editor')).toContainText('作成したファイルが保存先に残っているかまでは確認できません');
+ await expect(page.locator('#editor')).not.toContainText('① ファイルを選択');
+ await expect(page.locator('#editor')).not.toContainText('作成したファイルが保存先に残っているかまでは確認できません');
  await expect(page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'})).toBeDisabled();
 });
 

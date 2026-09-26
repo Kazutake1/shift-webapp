@@ -206,7 +206,6 @@ const {openStores,selectStore}=createStoreUi({
  el,
  button,
  field,
- hint,
  commit,
  render
 });
@@ -266,7 +265,6 @@ function openExtra(d,b){
 function openFixed(){
   const state=stateManager.getState();
   const body=openDialog('固定作業設定');
-  hint(body,'各時間帯に1件。表示する曜日と開始・終了時刻を設定できます。設定は毎週自動で反映されます。');
   const grid=el('div',{class:'fixed-settings'}),inputs=[];
   bands.forEach((band,b)=>{
     const setting=fixedSetting(state.fixed[b],b);

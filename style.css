@@ -422,3 +422,24 @@ body.print-layout #schedule tr{break-inside:avoid}
   .preview-toolbar>.preview-actions,.preview-toolbar>button:last-child:not(:first-child){grid-column:1/-1;grid-row:2;justify-self:end}
  }
 }
+
+
+/* v71: page navigation lives beside the store selector in the shared app bar. */
+.appbar{justify-content:flex-start}
+.appbar-context{display:flex;align-items:center;gap:10px;min-width:0}
+.appbar-context .week-nav{display:flex;align-items:center;gap:8px;flex-wrap:nowrap}
+.appbar-context #week-label{white-space:nowrap;font-size:14px;color:var(--ui-ink)}
+.appbar-context #prev,.appbar-context #next{background:#ffffffa6;border-color:transparent}
+.appbar-context #today{background:#252c28;color:#fff;border-color:#252c28}
+.appbar-context #today:hover{background:#394a3e;border-color:#394a3e}
+.appbar #settings-back{background:#e8f5ed;color:#1c6241;border-color:#c4dfce;white-space:nowrap}
+.appbar #settings-back:hover{background:#d8eddf;color:#165c3b;border-color:#a9d2b8}
+.appbar nav{margin-left:auto}
+@media(max-width:700px){
+ .appbar{align-items:center}
+ .appbar-context{order:3;width:100%;overflow-x:auto;padding-bottom:1px}
+ .appbar-context .week-nav{width:max-content;min-width:100%}
+ .appbar-context #week-label{font-size:13px}
+ .appbar-context :is(#prev,#next,#today){min-height:40px;padding:8px 10px;font-size:12px}
+ .appbar-context #settings-back{width:auto}
+}

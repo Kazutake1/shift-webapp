@@ -300,6 +300,8 @@ function showSettings(){
  $('#birthday-page').hidden=!birthdays;
  $('#preview').hidden=subpage;
  $('#settings').hidden=subpage;
+ $('#header-week-nav').hidden=subpage;
+ $('#settings-back').hidden=!settings;
  if(settings)$('#settings-back').focus();
  else if(birthdays)$('#birthday-back').focus();
  else requestAnimationFrame(fitText);

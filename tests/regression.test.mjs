@@ -503,3 +503,23 @@ test('印刷出力は左25mm・右15mmの綴じ代を取り、記号位置とヘ
  assert.match(css,/body\.print-layout #paper-period\{[^}]*font-size:10pt/);
  assert.match(app,/margin-left:25mm!important;transform:scale\(\.9145907473\)/);
 });
+
+
+test('週操作と設定の戻る操作を店名右側の共通ヘッダーへ配置する',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const header=html.slice(html.indexOf('<header class="appbar no-print">'),html.indexOf('</header>')+9);
+ const shift=html.slice(html.indexOf('<main id="shift-page">'),html.indexOf('</main>')+7);
+ const settings=html.slice(html.indexOf('<section id="settings-page"'),html.indexOf('<section id="birthday-page"'));
+ assert.match(header,/<select id="store"[^>]*><\/select><\/div><div class="appbar-context">/);
+ assert.match(header,/id="header-week-nav"/);
+ assert.match(header,/id="prev"/);
+ assert.match(header,/id="week-label"/);
+ assert.match(header,/id="next"/);
+ assert.match(header,/id="today"/);
+ assert.match(header,/id="settings-back" hidden/);
+ assert.doesNotMatch(shift,/class="controls no-print"/);
+ assert.doesNotMatch(settings,/<button id="settings-back"/);
+ assert.match(app,/\$\('#header-week-nav'\)\.hidden=subpage/);
+ assert.match(app,/\$\('#settings-back'\)\.hidden=!settings/);
+});

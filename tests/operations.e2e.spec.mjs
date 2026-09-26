@@ -8,34 +8,31 @@ async function openApp(page){
  await page.waitForFunction(key=>!!localStorage.getItem(key),STORAGE_KEY);
 }
 
-test('各画面の戻るボタンは左上にあり、行き先を同じ文言で示す',async({page})=>{
- await page.setViewportSize({width:320,height:844});
+test('設定の戻る操作は店名の右側に表示し、各サブページの戻り先を維持する',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
  await openApp(page);
  await page.locator('#settings').click();
  await expect(page.locator('#settings-page')).toBeVisible();
+ await expect(page.locator('#settings-back')).toBeVisible();
  await expect(page.locator('#settings-back')).toHaveText('← シフト表に戻る');
- let back=await page.locator('#settings-back').boundingBox();
- let title=await page.locator('#settings-page .settings-heading h1').boundingBox();
- expect(back.x).toBeLessThanOrEqual(title.x);
- expect(back.y).toBeLessThanOrEqual(title.y);
+ const store=await page.locator('#store').boundingBox();
+ const back=await page.locator('#settings-back').boundingBox();
+ expect(back.x).toBeGreaterThan(store.x);
 
  await page.locator('#birthday-list').click();
  await expect(page.locator('#birthday-page')).toBeVisible();
+ await expect(page.locator('#settings-back')).toBeHidden();
  await expect(page.locator('#birthday-back')).toHaveText('← 設定に戻る');
- back=await page.locator('#birthday-back').boundingBox();
- title=await page.locator('#birthday-page .settings-heading h1').boundingBox();
- expect(back.x).toBeLessThanOrEqual(title.x);
- expect(back.y).toBeLessThanOrEqual(title.y);
 
  await page.locator('#birthday-back').click();
  await page.locator('#settings-back').click();
  await page.locator('#preview').click();
  await expect(page.locator('.preview-toolbar')).toBeVisible();
- back=await page.getByRole('button',{name:'← シフト表に戻る'}).boundingBox();
- title=await page.locator('.preview-toolbar h1').boundingBox();
+ const previewBack=await page.getByRole('button',{name:'← シフト表に戻る'}).boundingBox();
+ const title=await page.locator('.preview-toolbar h1').boundingBox();
  const printAction=await page.getByRole('button',{name:'印刷する'}).boundingBox();
- expect(back.x).toBeLessThan(title.x);
- expect(printAction.y).toBeGreaterThanOrEqual(back.y+back.height);
+ expect(previewBack.x).toBeLessThan(title.x);
+ expect(printAction.y).toBeGreaterThanOrEqual(previewBack.y+previewBack.height);
 });
 
 test('印刷プレビューはChromiumとWebKitでシフト表を表示する',async({page})=>{
@@ -71,21 +68,23 @@ test('印刷プレビューは左25mm・右15mmの綴じ代と整列したヘッ
  expect(result.storeFont).toBeGreaterThan(result.periodFont);
 });
 
-test('iPhone幅では週の操作3つが日付の下で一列に並び、Undoボタンを表示しない',async({page})=>{
- for(const width of [320,390,430]){
+test('週操作は店名の右側の上部バーへ移動し、通常ページだけ表示する',async({page})=>{
+ for(const width of [320,390,1180]){
   await page.setViewportSize({width,height:844});
   if(width===320)await openApp(page);
-  await expect(page.locator('[data-undo]')).toHaveCount(0);
-  const boxes=await page.locator('#prev,#next,#today').evaluateAll(nodes=>nodes.map(node=>{
-   const {left,right,top,bottom}=node.getBoundingClientRect();
-   return {left,right,top,bottom};
-  }));
-  const date=await page.locator('#week-label').boundingBox();
-  expect(date.y+date.height).toBeLessThanOrEqual(boxes[0].top);
-  expect(boxes.map(box=>Math.round(box.top))).toEqual(Array(3).fill(Math.round(boxes[0].top)));
-  for(let i=1;i<boxes.length;i++)expect(boxes[i].left).toBeGreaterThanOrEqual(boxes[i-1].right);
-  expect(boxes[2].right).toBeLessThanOrEqual(width);
+  await expect(page.locator('#header-week-nav')).toBeVisible();
+  await expect(page.locator('#shift-page .week-nav')).toHaveCount(0);
+  const store=await page.locator('#store').boundingBox();
+  const nav=await page.locator('#header-week-nav').boundingBox();
+  if(width>=700)expect(nav.x).toBeGreaterThanOrEqual(store.x+store.width);
+  await expect(page.locator('#prev')).toBeVisible();
+  await expect(page.locator('#week-label')).toBeVisible();
+  await expect(page.locator('#next')).toBeVisible();
+  await expect(page.locator('#today')).toBeVisible();
  }
+ await page.locator('#settings').click();
+ await expect(page.locator('#header-week-nav')).toBeHidden();
+ await expect(page.locator('#settings-back')).toBeVisible();
 });
 
 async function editFirstNote(page,text){

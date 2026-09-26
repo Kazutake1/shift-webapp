@@ -284,3 +284,20 @@ test('別タブ更新を検知したら共通保存処理が保存を停止す�
  assert.match(writer,/externalChangeDetected/);
  assert.match(writer,/安全のため保存を停止しています/);
 });
+
+
+test('従業員管理UIをapp.jsから分離し、トレーニング1か月判定を維持',async()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const employeeUi=readFileSync(new URL('../employee-dialog.js',import.meta.url),'utf8');
+ assert.match(app,/import \{createEmployeeUi,withinFirstMonth\} from '\.\/employee-dialog\.js'/);
+ assert.equal(app.includes('function openEmployees(){'),false);
+ assert.equal(app.includes('function employeeForm('),false);
+ assert.match(employeeUi,/export function createEmployeeUi\(/);
+ assert.match(employeeUi,/名前・シフト表名・従業員番号/);
+
+ const {withinFirstMonth}=await import('../employee-dialog.js');
+ const employee={hireDate:'2026-09-10'};
+ assert.equal(withinFirstMonth(employee,'2026-10-10'),true);
+ assert.equal(withinFirstMonth(employee,'2026-10-11'),false);
+ assert.equal(withinFirstMonth({},'2026-09-10'),false);
+});

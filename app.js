@@ -2,6 +2,7 @@ import {birthdayNotices} from './birthdays.js';
 import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,employeeShiftConflicts,initialState,fixedSetting,fixedTextAt} from './model.js';
 import {storageKey,validateRoot,migrate,newStore} from './stores.js';
 import {openBackupDialog} from './backup-dialog.js';
+import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
 const $=s=>document.querySelector(s);let root,state,storageError='',externalChangeDetected=false,preview=false,activeCell=null;
 try{const raw=localStorage.getItem(storageKey);const old=localStorage.getItem('shift-ipad-step1-v1');root=raw?validateRoot(JSON.parse(raw)):migrate(old?JSON.parse(old):initialState());}catch(e){storageError='保存データを読み込めません。既存データを上書きせず一時表示しています。';root=migrate();}
 state=root.stores.find(s=>s.id===root.activeStoreId);
@@ -177,19 +178,17 @@ function field(label,input){const wrapper=el('label',{class:'field'},label);wrap
 function hint(parent,text){parent.append(el('p',{class:'hint'},text));}
 function confirmChange(existing){return !existing||confirm('登録済みの内容を変更しますか？');}
 function commit(fn){if(!persistChange(fn))return false;render();close();return true;}
-function normalizeEmployeeSearch(value){return String(value||'').normalize('NFKC').toLocaleLowerCase('ja-JP').replace(/\s+/g,'');}
-function employeesList(parent,choose,currentId,filter){
- const available=state.employees.filter(e=>(!filter||filter(e))&&(!e.hidden||e.id===currentId));
- const search=el('input',{type:'search',placeholder:'名前・シフト表名・従業員番号','aria-label':'従業員を検索'});
- const choices=el('div',{class:'choices'}),empty=el('p',{class:'hint'});
- const draw=()=>{
-  const query=normalizeEmployeeSearch(search.value);choices.replaceChildren();
-  const matched=available.filter(e=>!query||normalizeEmployeeSearch([e.name,employeeShiftName(e),e.employeeNumber||''].join(' ')).includes(query));
-  matched.forEach(e=>{const shiftName=employeeShiftName(e),label=e.name===shiftName?e.name:`${e.name}（シフト：${shiftName}）`;choices.append(button(label+(e.hidden?'（非表示）':''),()=>choose(e)));});
-  empty.textContent=matched.length?'':available.length?'検索条件に一致する従業員がいません。':'選択できる従業員がいません。従業員管理から追加してください。';
- };
- search.oninput=draw;parent.append(field('従業員を検索',search),choices,empty);draw();
-}
+const {employeesList,openEmployees}=createEmployeeUi({
+ getState:()=>state,
+ openDialog,
+ el,
+ button,
+ field,
+ hint,
+ confirmChange,
+ persistChange,
+ renderBirthdays
+});
 function confirmShiftOverlap(d,candidate,exclude=null){
  const conflicts=employeeShiftConflicts(week().days[d],candidate,exclude);
  if(!conflicts.length)return true;
@@ -197,7 +196,6 @@ function confirmShiftOverlap(d,candidate,exclude=null){
  const registered=[...new Set(conflicts.map(({shift})=>`${timeLabel(shift.start)}〜${timeLabel(shift.end)}`))].join('、');
  return confirm(`勤務時間が重複しています。\n従業員：${name}\n登録済み：${registered}\n今回：${timeLabel(candidate.start)}〜${timeLabel(candidate.end)}\n\nこのまま保存しますか？`);
 }
-function withinFirstMonth(employee,date){if(!employee?.hireDate)return false;const hire=new Date(employee.hireDate+'T12:00:00Z'),target=new Date(date+'T12:00:00Z');if(Number.isNaN(hire.getTime())||Number.isNaN(target.getTime())||target<hire)return false;const y=hire.getUTCFullYear(),m=hire.getUTCMonth()+1,day=hire.getUTCDate(),last=new Date(Date.UTC(y,m+1,0,12)).getUTCDate(),limit=new Date(Date.UTC(y,m,Math.min(day,last),12));return target<=limit;}
 function openCell(d,row,b){activeCell={d,row,b};if(row===0)return openFixed();if(row===4)return openExtra(d,b);const existing=week().days[d].shifts[row-1][b];if(existing)return editShift(d,row,b,structuredClone(existing));const body=openDialog('従業員を選択');hint(body,`${week().days[d].date}　${timeLabel(bands[b].start)}〜${timeLabel(bands[b].end)} ／ 時間帯に関係なく全従業員を表示`);employeesList(body,e=>{const candidate=makeShift(e,b);if(confirmShiftOverlap(d,candidate))commit(()=>week().days[d].shifts[row-1][b]=candidate);});}
 function editShift(d,row,b,draft){const body=openDialog('勤務を編集');const name=button(`${draft.name}　変更`,()=>{try{Object.assign(draft,workingTimes(start.value,end.value));}catch{}const picker=openDialog('従業員を変更');employeesList(picker,e=>editShift(d,row,b,{...draft,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId);picker.append(button('戻る',()=>editShift(d,row,b,draft)));});body.append(name);const start=el('input',{type:'time',required:'',value:timeValue(draft.start)}),end=el('input',{type:'time',required:'',value:timeValue(draft.end)});const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));body.append(rowEl);hint(body,'6:00から翌朝6:00までの勤務を入力。0:00〜5:59は翌日として扱います。');if(b===4){body.append(button('22:00〜翌1:00',()=>{start.value='22:00';end.value='01:00';}),button('22:00〜翌6:00',()=>{start.value='22:00';end.value='06:00';}));}const err=el('p',{class:'error',role:'alert'});body.append(err);const actions=el('div',{class:'actions'});actions.append(button('削除',()=>{if(confirm('この勤務を削除しますか？'))commit(()=>week().days[d].shifts[row-1][b]=null);},'danger'),button('保存',()=>{try{const times=workingTimes(start.value,end.value);const candidate={...draft,...times};if(confirmChange(true)&&confirmShiftOverlap(d,candidate,{row:row-1,band:b}))commit(()=>week().days[d].shifts[row-1][b]=candidate);}catch(e){err.textContent=e.message;}},'primary'));body.append(actions);}
 function openNotes(d){const body=openDialog('備考');const input=el('textarea',{rows:6,maxlength:180});input.value=week().days[d].notes;body.append(field('自由入力（180文字まで）',input),button('保存',()=>{if(confirmChange(week().days[d].notes&&week().days[d].notes!==input.value))commit(()=>week().days[d].notes=input.value);},'primary'));}
@@ -274,33 +272,6 @@ function openFixed(){
     if(values.some(v=>v.text&&!v.days.length)){error.textContent='作業名を入力した時間帯には、曜日を1つ以上選んでください。';return;}
     if(confirm('固定作業の設定を変更しますか？選択した曜日に、過去を含む全週で反映します。'))commit(()=>state.fixed=values);
   },'primary'));
-}
-function openEmployees(){const body=openDialog('従業員管理');hint(body,'≡をドラッグして並べ替え。非表示の従業員は選択一覧から除外され、登録済みの名前は残ります。');const list=el('div');body.append(list);state.employees.forEach((e,index)=>{const row=el('div',{class:'employee-row','data-employee':e.id});const handle=button('≡',()=>{} ,'handle');handle.setAttribute('aria-label',`${e.name}をドラッグして並べ替え`);let target=null;handle.onpointerdown=ev=>{ev.preventDefault();handle.setPointerCapture(ev.pointerId);row.classList.add('dragging');};handle.onpointermove=ev=>{if(!handle.hasPointerCapture(ev.pointerId))return;const hit=document.elementFromPoint(ev.clientX,ev.clientY)?.closest('[data-employee]');list.querySelectorAll('.drop-target').forEach(n=>n.classList.remove('drop-target'));target=hit?.dataset.employee||null;if(hit&&hit!==row)hit.classList.add('drop-target');};handle.onpointerup=ev=>{if(handle.hasPointerCapture(ev.pointerId))handle.releasePointerCapture(ev.pointerId);if(target&&target!==e.id){const to=state.employees.findIndex(x=>x.id===target);moveEmployee(index,to);}else{row.classList.remove('dragging');list.querySelectorAll('.drop-target').forEach(n=>n.classList.remove('drop-target'));}};handle.onpointercancel=()=>openEmployees();const name=el('span',{class:'name'},e.name);const shiftName=employeeShiftName(e);if(shiftName!==e.name)name.append(el('span',{class:'muted'},`　シフト：${shiftName}`));if(e.hidden)name.append(el('span',{class:'muted'},'　非表示'));row.append(handle,name,button('編集',()=>employeeForm(e)),button(e.hidden?'表示':'非表示',()=>{persistChange(()=>e.hidden=!e.hidden);renderBirthdays();openEmployees();}),button('削除',()=>{if(confirm(`${e.name}を削除しますか？既存シフト・トレーニングの名前は保持されます。`)){persistChange(()=>state.employees=state.employees.filter(x=>x.id!==e.id));renderBirthdays();openEmployees();}},'danger'));list.append(row);});body.append(button('＋ 従業員を追加',()=>employeeForm(null),'primary'));}
-function moveEmployee(from,to){persistChange(()=>{const [employee]=state.employees.splice(from,1);state.employees.splice(to,0,employee);});renderBirthdays();openEmployees();}
-function employeeForm(employee){
- const body=openDialog(employee?'従業員を編集':'従業員を追加');
- const fullName=el('input',{maxlength:20,value:employee?.name||'',placeholder:'例：山田 太郎',autocomplete:'name'});
- const shiftName=el('input',{maxlength:20,value:employee?.shiftName||employee?.name||'',placeholder:'例：山田'});
- const number=el('input',{maxlength:40,value:employee?.employeeNumber||'',placeholder:'例：0012'});
- const hired=el('input',{type:'date',value:employee?.hireDate||''});
- const birth=el('input',{type:'date',value:employee?.birthDate||''});
- hint(body,'フルネームでは半角・全角スペースを使用できます。登録済みシフトには登録時のシフト表用の名前を保持します。追加情報は未入力でも保存できます。');
- body.append(field('フルネーム（20文字まで）',fullName),field('シフト表で使う名前（20文字まで）',shiftName),field('従業員番号',number),field('入社年月日',hired),field('生年月日',birth));
- const err=el('p',{class:'error',role:'alert'});
- body.append(err,button('保存',()=>{
-  const name=fullName.value.trim();if(!name){err.textContent='フルネームを入力してください。';return;}
-  const displayName=shiftName.value.trim();if(!displayName){err.textContent='シフト表で使う名前を入力してください。';return;}
-  if(!hired.checkValidity()||!birth.checkValidity()){err.textContent='年月日を確認してください。';return;}
-  const details={name,shiftName:displayName,employeeNumber:number.value.trim(),hireDate:hired.value,birthDate:birth.value};
-  const now=new Date(),today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
-  if(details.birthDate&&details.birthDate>today){err.textContent='生年月日は今日以前の日付を入力してください。';return;}
-  if(details.birthDate&&details.hireDate&&details.birthDate>details.hireDate){err.textContent='入社年月日は生年月日以降の日付を入力してください。';return;}
-  if(details.employeeNumber&&state.employees.some(e=>e.id!==employee?.id&&e.employeeNumber===details.employeeNumber)){err.textContent='この店舗では同じ従業員番号が使われています。';return;}
-  if(employee&&!confirmChange(Object.entries(details).some(([k,v])=>(employee[k]||'')!==v)))return;
-  const employeeId=employee?.id||null;
-  if(persistChange(()=>{if(employee)Object.assign(employee,details);else state.employees.push({id:crypto.randomUUID(),...details,hidden:false});})){renderBirthdays();openEmployees();}
-  else if(employeeId)employeeForm(state.employees.find(e=>e.id===employeeId));
- },'primary'),button('戻る',openEmployees));
 }
 function navigate(delta,target){const next=target||addDays(state.current,delta),existed=!!state.weeks[next];let copied=false;if(!persistChange(()=>{copied=ensureWeek(state,next);state.current=next;},false))return;render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
 function openStores(){

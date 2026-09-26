@@ -233,3 +233,36 @@ test('同じ従業員の勤務時間が重なる登録は警告し、利用者�
  afterStore=after.stores.find(s=>s.id===after.activeStoreId);
  expect(afterStore.weeks[afterStore.current].days[0].shifts[2][0].employeeId).toBe(employee.id);
 });
+
+
+test('従業員管理の追加・編集・非表示を分離後も維持する',async({page})=>{
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#employees').click();
+
+ await expect(page.locator('#editor')).toContainText('従業員管理');
+ await page.getByRole('button',{name:'＋ 従業員を追加'}).click();
+ await page.getByLabel('フルネーム（20文字まで）').fill('分離テスト 太郎');
+ await page.getByLabel('シフト表で使う名前（20文字まで）').fill('分離太郎');
+ await page.getByLabel('従業員番号').fill('E999');
+ await page.getByRole('button',{name:'保存',exact:true}).click();
+
+ const row=page.locator('#dialog-body .employee-row').filter({hasText:'分離テスト 太郎'});
+ await expect(row).toHaveCount(1);
+ await expect(row).toContainText('シフト：分離太郎');
+
+ await row.getByRole('button',{name:'編集'}).click();
+ await page.getByLabel('シフト表で使う名前（20文字まで）').fill('分離T');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.getByRole('button',{name:'保存',exact:true}).click();
+
+ const edited=page.locator('#dialog-body .employee-row').filter({hasText:'分離テスト 太郎'});
+ await expect(edited).toContainText('シフト：分離T');
+ await edited.getByRole('button',{name:'非表示'}).click();
+ await expect(page.locator('#dialog-body .employee-row').filter({hasText:'分離テスト 太郎'})).toContainText('非表示');
+
+ const root=await savedRoot(page);
+ const store=root.stores.find(s=>s.id===root.activeStoreId);
+ const employee=store.employees.find(e=>e.employeeNumber==='E999');
+ expect(employee).toMatchObject({name:'分離テスト 太郎',shiftName:'分離T',hidden:true});
+});

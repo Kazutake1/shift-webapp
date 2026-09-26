@@ -12,6 +12,7 @@ test('各画面の戻るボタンは左上にあり、行き先を同じ文言�
  await page.setViewportSize({width:320,height:844});
  await openApp(page);
  await page.locator('#settings').click();
+ await expect(page.locator('#settings-page')).toBeVisible();
  await expect(page.locator('#settings-back')).toHaveText('← シフト表に戻る');
  let back=await page.locator('#settings-back').boundingBox();
  let title=await page.locator('#settings-page .settings-heading h1').boundingBox();
@@ -19,6 +20,7 @@ test('各画面の戻るボタンは左上にあり、行き先を同じ文言�
  expect(back.y).toBeLessThanOrEqual(title.y);
 
  await page.locator('#birthday-list').click();
+ await expect(page.locator('#birthday-page')).toBeVisible();
  await expect(page.locator('#birthday-back')).toHaveText('← 設定に戻る');
  back=await page.locator('#birthday-back').boundingBox();
  title=await page.locator('#birthday-page .settings-heading h1').boundingBox();
@@ -28,6 +30,7 @@ test('各画面の戻るボタンは左上にあり、行き先を同じ文言�
  await page.locator('#birthday-back').click();
  await page.locator('#settings-back').click();
  await page.locator('#preview').click();
+ await expect(page.locator('.preview-toolbar')).toBeVisible();
  back=await page.getByRole('button',{name:'← シフト表に戻る'}).boundingBox();
  title=await page.locator('.preview-toolbar h1').boundingBox();
  const printAction=await page.getByRole('button',{name:'印刷する'}).boundingBox();

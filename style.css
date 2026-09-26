@@ -318,11 +318,13 @@ body.print-layout #schedule tr{break-inside:avoid}
   #settings-page #settings-back,#birthday-page #birthday-back{background:#e8f5ed;color:#1c6241;border-color:#c4dfce}
   #settings-page #settings-back:hover,#birthday-page #birthday-back:hover{background:#d8eddf;color:#165c3b;border-color:#a9d2b8}
  #settings-page>.hint,#birthday-page>.hint,#backup-date{color:var(--ui-muted);font-size:13px;line-height:1.8}
- .settings-menu{gap:14px;margin-top:28px}
- .settings-menu button{min-height:108px;border-radius:12px;padding:24px 48px 24px 24px;font-size:16px;box-shadow:none}
-  .settings-menu button::before{content:'';display:block;width:24px;height:3px;background:var(--ui-accent);border-radius:2px;margin-bottom:14px}
-  .settings-menu button::after{color:#91a89a}
-  .settings-menu button:hover{background:var(--ui-wash);border-color:#b8d9c3;box-shadow:0 5px 16px #25563a08}
+ .settings-menu{display:block;margin-top:24px;border:1px solid var(--ui-line);border-radius:12px;background:#fff}
+ #settings-page .settings-menu button{display:block;width:100%;min-height:68px;padding:16px 52px 16px 22px;border:0;border-bottom:1px solid var(--ui-line);border-radius:0;text-align:left;font-size:16px;font-weight:600;box-shadow:none}
+ #settings-page .settings-menu button:first-child{border-radius:11px 11px 0 0}
+ #settings-page .settings-menu button:last-child{border-bottom:0;border-radius:0 0 11px 11px}
+ #settings-page .settings-menu button::before{content:none}
+ #settings-page .settings-menu button::after{right:22px;color:#789784}
+ #settings-page .settings-menu button:hover{background:#f2faf4;color:#1c6241}
   dialog{padding:28px;border-radius:18px;border:1px solid #dfe9e1;background:#fff;color:var(--ui-ink);box-shadow:0 24px 80px #183c272b}
   dialog::backdrop{background:#203a2a55;backdrop-filter:blur(4px)}
   .dialog-top{margin:-28px -28px 24px;padding:24px 28px;background:var(--ui-wash);border-bottom:1px solid #dfe9e1}
@@ -365,7 +367,7 @@ body.print-layout #schedule tr{break-inside:avoid}
   .controls{padding:10px}.week-nav{gap:8px}
   #settings-page,#birthday-page{margin:14px 12px 24px;padding:20px;border-radius:14px}
   .settings-heading{align-items:flex-start;flex-wrap:wrap;gap:12px;padding-bottom:18px}
-  .settings-heading h1{font-size:23px}.settings-menu button{min-height:92px;padding-top:18px;padding-bottom:18px}
+  .settings-heading h1{font-size:23px}
   dialog{padding:20px}.dialog-top{margin:-20px -20px 20px;padding:20px}
   .preview-toolbar{padding:12px}.preview-meta{padding:12px 12px 0}
   .birthday-gift-section{padding:14px}

@@ -556,10 +556,10 @@ test('印刷シフト表左上の店舗名を22ptで強調する',()=>{
 });
 
 
-test('印刷時の長い従業員表示は8.2ptを基準にし、通常名9.5ptは維持する',()=>{
+test('印刷時の従業員名は9.5ptを基準にし、時間は6.7ptで表示する',()=>{
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(css,/body\.print-layout #schedule td\.employee-slot button\{font-size:9\.5pt!important\}/);
- assert.match(css,/body\.print-layout #schedule td\.employee-slot \.long\{font-size:8\.2pt!important\}/);
+ assert.match(css,/body\.print-layout #schedule td\.employee-slot \.employee-time\{font-size:6\.7pt\}/);
  assert.doesNotMatch(css,/body\.print-layout #schedule td\.employee-slot \.long\{font-size:7\.4pt!important\}/);
 });
 

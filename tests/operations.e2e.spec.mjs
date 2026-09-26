@@ -367,7 +367,7 @@ test('設定画面の従業員誕生日一覧で対象者の渡し済みを年�
  expect(root.birthdayGiftDelivered).toHaveLength(1);
 
  await page.reload();
- await page.locator('#settings').click();
+ await expect(page.locator('#settings-page')).toBeVisible();
  await expect(page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/})).toBeChecked();
 
  await page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/}).uncheck();

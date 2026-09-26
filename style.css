@@ -177,7 +177,7 @@ body.print-layout #schedule td.slot button,body.print-layout #schedule td.notes-
 body.print-layout #schedule td.slot button{padding:0 .3mm;font-size:8pt!important;display:flex;align-items:center;justify-content:center;text-align:center;line-height:1.1}
 body.print-layout #schedule td.slot .long{font-size:6.7pt!important}
 body.print-layout #schedule td.employee-slot button{font-size:9.5pt!important}
-body.print-layout #schedule td.employee-slot .long{font-size:7.4pt!important}
+body.print-layout #schedule td.employee-slot .long{font-size:8.2pt!important}
 body.print-layout #schedule td.notes-cell button{padding:1mm;font-size:7pt}
 body.print-layout #schedule td.date-cell{font-size:17pt}
 body.print-layout #schedule td.date-cell.month-date{font-size:11pt}

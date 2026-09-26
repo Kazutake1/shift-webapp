@@ -244,11 +244,11 @@ test('Service Workerの更新安全策を維持',()=>{
 });
 
 test('保存失敗時のロールバック処理を維持',()=>{
- const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
- assert.match(app,/function persistChange\(/);
- assert.match(app,/const before=JSON\.stringify\(root\)/);
- assert.match(app,/root=JSON\.parse\(before\)/);
- assert.match(app,/if\(save\(edit\)\)return true/);
+ const manager=readFileSync(new URL('../state-manager.js',import.meta.url),'utf8');
+ assert.match(manager,/function persistChange\(/);
+ assert.match(manager,/const before=JSON\.stringify\(root\)/);
+ assert.match(manager,/restoreSnapshot\(before,beforeBaseline,beforeUndo\)/);
+ assert.match(manager,/if\(save\(edit\)\)return true/);
 });
 
 test('iPhone印刷後の画面復帰処理を維持',()=>{
@@ -264,25 +264,28 @@ test('シフトデータを外部の実験的ブラウザー機能へ公開し�
  assert.equal(app.includes('read_visible_shift_week'),false);
 });
 
-test('シフトデータの書き込み経路を共通化',()=>{
+test('シフトデータの書き込み経路をstate-managerへ共通化',()=>{
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const manager=readFileSync(new URL('../state-manager.js',import.meta.url),'utf8');
  const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
- assert.match(app,/function writeRoot\(/);
- assert.match(app,/function replaceRoot\(/);
- assert.equal((app.match(/localStorage\.setItem\(storageKey,/g)||[]).length,1);
- assert.match(app,/function save\(edit=true\)\{return writeRoot\(root,\{edit\}\);\}/);
- assert.match(app,/replaceRoot\(candidate,\{edit:false,success:'直前の操作を取り消しました'\}\)/);
+ assert.equal(app.includes('function writeRoot('),false);
+ assert.equal(app.includes('function persistChange('),false);
+ assert.match(manager,/function writeRoot\(/);
+ assert.match(manager,/function replaceRoot\(/);
+ assert.equal((manager.match(/storage\.setItem\(storageKey,/g)||[]).length,1);
+ assert.match(manager,/function save\(edit=true\)/);
+ assert.match(manager,/replaceRoot\(candidate,\{edit:false,success:'直前の操作を取り消しました'\}\)/);
  assert.match(app,/replaceRoot\(candidate,\{edit:false,success:'誕生日の確認済みを保存しました'\}\)/);
  assert.match(backup,/replaceRoot\(candidate,\{edit:false,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
 });
 
-test('別タブ更新を検知したら共通保存処理が保存を停止する',()=>{
+test('別タブ更新を検知したらstate-managerが保存を停止する',()=>{
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const manager=readFileSync(new URL('../state-manager.js',import.meta.url),'utf8');
  assert.match(app,/addEventListener\('storage'/);
- const start=app.indexOf('function writeRoot('),end=app.indexOf('function replaceRoot(',start);
- const writer=app.slice(start,end);
- assert.match(writer,/externalChangeDetected/);
- assert.match(writer,/安全のため保存を停止しています/);
+ assert.match(app,/stateManager\.handleStorageEvent\(event\)/);
+ assert.match(manager,/externalChangeDetected/);
+ assert.match(manager,/安全のため保存を停止しています/);
 });
 
 
@@ -305,11 +308,63 @@ test('従業員管理UIをapp.jsから分離し、トレーニング1か月判�
 
 test('シフト表下の案内文と通常保存メッセージを表示しない',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
- const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const manager=readFileSync(new URL('../state-manager.js',import.meta.url),'utf8');
  assert.equal(html.includes('空欄・名前をタップして編集'),false);
  assert.equal(html.includes('データはこのブラウザーに保存されます。初回表示はサンプルです。'),false);
  assert.equal(html.includes('この端末に保存</span>'),false);
  assert.match(html,/id="save-status"[^>]*hidden/);
- assert.match(app,/function writeRoot\(candidate,\{edit=true,allowStorageError=false,success=''\}=\{\}\)/);
- assert.equal(app.includes("success='この端末に保存しました'"),false);
+ assert.match(manager,/function writeRoot\(candidate,\{edit=true,allowStorageError=false,success=''\}=\{\}\)/);
+ assert.equal(manager.includes("success='この端末に保存しました'"),false);
+});
+
+
+test('state-managerは保存・Undo・競合を一元管理',async()=>{
+ const {createStateManager}=await import('../state-manager.js');
+ const data=new Map();
+ const storage={
+  getItem:key=>data.has(key)?data.get(key):null,
+  setItem:(key,value)=>data.set(key,value)
+ };
+ const statuses=[];
+ let undoAvailable=false;
+ let rollbackCount=0;
+ const manager=createStateManager({
+  storage,
+  onStatus:text=>statuses.push(text),
+  onUndoChange:value=>{undoAvailable=value;},
+  onRollback:()=>{rollbackCount++;}
+ });
+
+ const state=manager.getState();
+ const originalName=state.store;
+ assert.equal(manager.persistChange(()=>{state.store='変更店';}),true);
+ assert.equal(manager.getState().store,'変更店');
+ assert.equal(undoAvailable,true);
+
+ assert.equal(manager.undoLast().ok,true);
+ assert.equal(manager.getState().store,originalName);
+ assert.equal(undoAvailable,false);
+
+ manager.handleStorageEvent({key:'shift-ipad-stores-v2'});
+ assert.equal(manager.persistChange(()=>{manager.getState().store='競合変更';}),false);
+ assert.equal(manager.getState().store,originalName);
+ assert.equal(rollbackCount,1);
+ assert.match(statuses.at(-1),/安全のため保存を停止/);
+});
+
+test('state-managerはlocalStorage書き込み失敗時に変更前へ戻す',async()=>{
+ const {createStateManager}=await import('../state-manager.js');
+ const data=new Map();
+ let fail=false;
+ const storage={
+  getItem:key=>data.has(key)?data.get(key):null,
+  setItem:(key,value)=>{if(fail)throw Error('quota');data.set(key,value);}
+ };
+ let rollbackCount=0;
+ const manager=createStateManager({storage,onRollback:()=>{rollbackCount++;}});
+ const before=manager.getState().store;
+ fail=true;
+ assert.equal(manager.persistChange(()=>{manager.getState().store='保存失敗';}),false);
+ assert.equal(manager.getState().store,before);
+ assert.equal(rollbackCount,1);
 });

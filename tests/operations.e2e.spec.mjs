@@ -8,6 +8,22 @@ async function openApp(page){
  await page.waitForFunction(key=>!!localStorage.getItem(key),STORAGE_KEY);
 }
 
+test('iPhone幅では週の操作4つが日付の下で一列に並ぶ',async({page})=>{
+ for(const width of [320,390,430]){
+  await page.setViewportSize({width,height:844});
+  if(width===320)await openApp(page);
+  const boxes=await page.locator('#prev,#next,#today,.controls .undo-button').evaluateAll(nodes=>nodes.map(node=>{
+   const {left,right,top,bottom}=node.getBoundingClientRect();
+   return {left,right,top,bottom};
+  }));
+  const date=await page.locator('#week-label').boundingBox();
+  expect(date.y+date.height).toBeLessThanOrEqual(boxes[0].top);
+  expect(boxes.map(box=>Math.round(box.top))).toEqual(Array(4).fill(Math.round(boxes[0].top)));
+  for(let i=1;i<boxes.length;i++)expect(boxes[i].left).toBeGreaterThanOrEqual(boxes[i-1].right);
+  expect(boxes[3].right).toBeLessThanOrEqual(width);
+ }
+});
+
 async function editFirstNote(page,text){
  await page.locator('td.notes-cell button').first().click();
  await page.locator('#editor textarea').fill(text);

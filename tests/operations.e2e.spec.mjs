@@ -430,34 +430,35 @@ test('設定画面の従業員誕生日一覧で対象者の渡し済みを年�
  await expect(page.locator('#birthday-page')).toBeVisible();
  await expect(page.locator('#birthday-page h1')).toHaveText('従業員リスト');
  await expect(page.locator('#birthday-gifts h2')).toHaveText('従業員リスト');
+ await expect(page.locator('#birthday-page')).not.toContainText('誕生日のお知らせ：');
  await expect(page.locator('#birthday-gift-list')).toContainText('プレゼント対象');
  await expect(page.locator('#birthday-gift-list')).toContainText('一年未満');
  await expect(page.locator('#birthday-gift-list')).toContainText('対象外（1年未満）');
- await expect(page.locator('#birthday-gift-summary')).toHaveText(`プレゼント渡し済み 0 / 1名（${year}年）`);
+ await expect(page.locator('#birthday-gift-summary')).toHaveText(`クオカード渡し済み 0 / 1名（${year}年）`);
  await expect(page.locator('#birthday-gift-list')).not.toContainText('さん');
 
- const eligible=page.getByRole('checkbox',{name:/プレゼント対象 誕生日プレゼント渡し済み/});
- const ineligible=page.getByRole('checkbox',{name:/一年未満 誕生日プレゼント渡し済み/});
+ const eligible=page.getByRole('checkbox',{name:/プレゼント対象 誕生日クオカード渡し済み/});
+ const ineligible=page.getByRole('checkbox',{name:/一年未満 誕生日クオカード渡し済み/});
  await expect(eligible).not.toBeChecked();
  await expect(ineligible).toBeDisabled();
  await expect(ineligible.locator('..').locator('.birthday-gift-person')).toHaveCSS('color','rgb(152, 166, 156)');
 
  await eligible.check();
- await expect(page.locator('#birthday-gift-summary')).toHaveText(`プレゼント渡し済み 1 / 1名（${year}年）`);
+ await expect(page.locator('#birthday-gift-summary')).toHaveText(`クオカード渡し済み 1 / 1名（${year}年）`);
 
  let root=await savedRoot(page);
  expect(root.birthdayGiftDelivered).toHaveLength(1);
 
  await page.reload();
  await expect(page.locator('#birthday-page')).toBeVisible();
- await expect(page.getByRole('checkbox',{name:/プレゼント対象 誕生日プレゼント渡し済み/})).toBeChecked();
+ await expect(page.getByRole('checkbox',{name:/プレゼント対象 誕生日クオカード渡し済み/})).toBeChecked();
 
  await page.getByRole('button',{name:'← 設定に戻る',exact:true}).click();
  await expect(page.locator('#settings-page')).toBeVisible();
  await expect(page.locator('#birthday-list')).toBeVisible();
  await page.locator('#birthday-list').click();
 
- await page.getByRole('checkbox',{name:/プレゼント対象 誕生日プレゼント渡し済み/}).uncheck();
+ await page.getByRole('checkbox',{name:/プレゼント対象 誕生日クオカード渡し済み/}).uncheck();
  root=await savedRoot(page);
  expect(root.birthdayGiftDelivered).toEqual([]);
 });

@@ -49,14 +49,14 @@ export function createBirthdayUi({
   const eligible=entries.filter(entry=>entry.eligible);
   const delivered=eligible.filter(entry=>entry.delivered).length;
   giftSummary.textContent=entries.length
-   ?`プレゼント渡し済み ${delivered} / ${eligible.length}名（${year}年）`
+   ?`クオカード渡し済み ${delivered} / ${eligible.length}名（${year}年）`
    :'誕生日が登録されている従業員はいません。';
 
   for(const entry of entries){
    const row=el('label',{class:entry.eligible?'birthday-gift-row':'birthday-gift-row birthday-gift-ineligible'});
    const checkbox=el('input',{
     type:'checkbox',
-    'aria-label':`${entry.store} ${entry.name} 誕生日プレゼント渡し済み`
+    'aria-label':`${entry.store} ${entry.name} 誕生日クオカード渡し済み`
    });
    checkbox.checked=entry.delivered;
    checkbox.disabled=!entry.eligible;

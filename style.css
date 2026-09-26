@@ -214,3 +214,30 @@ body.print-layout #schedule tr{break-inside:avoid}
  .backup-status{margin:12px 0 0;color:#456658;font-size:13px;line-height:1.6}
  .backup-summary{margin:12px 0;color:#35546b;font-size:13px;line-height:1.65;overflow-wrap:anywhere}
 }
+
+
+/* 設定画面：誕生日プレゼントの年次チェックリスト */
+@media screen{
+ .birthday-gift-section{
+  margin:20px 0;padding:18px;border:1px solid #d9e3eb;border-radius:12px;background:#fff;
+ }
+ .birthday-gift-heading{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+ .birthday-gift-heading h2{font-size:18px;margin:0}
+ #birthday-gift-summary{font-size:13px;color:#546a78}
+ .birthday-gift-list{display:flex;flex-direction:column;margin-top:10px}
+ .birthday-gift-row{
+  display:grid;grid-template-columns:28px 56px minmax(120px,1fr) minmax(100px,.8fr) 64px;
+  align-items:center;gap:10px;min-height:48px;padding:8px 4px;border-top:1px solid #edf1f4;cursor:pointer;
+ }
+ .birthday-gift-row:first-child{border-top:0}
+ .birthday-gift-row input[type=checkbox]{width:20px;height:20px;margin:0;accent-color:#426b8a}
+ .birthday-gift-date{font-variant-numeric:tabular-nums;font-weight:700;color:#294b67}
+ .birthday-gift-person{font-weight:700;overflow-wrap:anywhere}
+ .birthday-gift-store{font-size:13px;color:#64748b;overflow-wrap:anywhere}
+ .birthday-gift-status{font-size:12px;color:#64748b;text-align:right}
+ @media(max-width:650px){
+  .birthday-gift-row{grid-template-columns:28px 50px minmax(0,1fr) 58px}
+  .birthday-gift-store{grid-column:3/5}
+  .birthday-gift-status{grid-column:4;grid-row:1}
+ }
+}

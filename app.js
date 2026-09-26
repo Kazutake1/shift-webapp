@@ -1,4 +1,4 @@
-import {birthdayNotices} from './birthdays.js';
+import {createBirthdayUi} from './birthday-ui.js';
 import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,employeeShiftConflicts,fixedSetting,fixedTextAt} from './model.js';
 import {createStoreUi} from './store-dialog.js';
 import {openBackupDialog} from './backup-dialog.js';
@@ -146,24 +146,6 @@ function drawRules(){
   host.append(svg);
 }
 
-function renderBirthdays(){
- const root=stateManager.getRoot();
- const host=$('#birthday-notices');host.replaceChildren();
- const notices=birthdayNotices(root);host.hidden=!notices.length;
- if(!notices.length)return;
- host.append(el('h2',{},'誕生日のお知らせ'));
- for(const notice of notices){
-  const row=el('div',{class:'birthday-notice'});
-  row.append(el('span',{},`${notice.store}：${notice.name}さん${notice.days===0?'は今日が誕生日です':`の誕生日まであと${notice.days}日です`}（${Number(notice.birthday.slice(5,7))}月${Number(notice.birthday.slice(8))}日）`),button('確認済み',()=>{
-   const candidate=structuredClone(root);candidate.birthdayAcknowledgements=[...(candidate.birthdayAcknowledgements||[]),notice.key];
-   if(!replaceRoot(candidate,{edit:false,success:'誕生日の確認済みを保存しました'}))return;
-   renderBirthdays();
-  }));host.append(row);
- }
-}
-window.addEventListener('focus',()=>renderBirthdays());
-document.addEventListener('visibilitychange',()=>{if(!document.hidden)renderBirthdays();});
-setInterval(()=>{if(!document.hidden)renderBirthdays();},60000);
 function render(){const root=stateManager.getRoot(),state=stateManager.getState(),storageError=stateManager.getStorageError();renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date,b);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else if(extra?.type==='task'){const start=Number.isInteger(extra.start)?extra.start:band.start,end=Number.isInteger(extra.end)?extra.end:band.end;label=timedTextLabel(extra.text,start,end,b);}}else label=shiftLabel(day.shifts[row-1][b],b);const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:'notes-cell'}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?'この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：2026・2027年）。':'');requestAnimationFrame(fitText);}
 function openDialog(title){$('#dialog-title').textContent=title;$('#dialog-body').replaceChildren();if(!$('#editor').open)$('#editor').showModal();return $('#dialog-body');}
 function close(){ $('#editor').close();activeCell=null;}
@@ -172,6 +154,13 @@ function field(label,input){const wrapper=el('label',{class:'field'},label);wrap
 function hint(parent,text){parent.append(el('p',{class:'hint'},text));}
 function confirmChange(existing){return !existing||confirm('登録済みの内容を変更しますか？');}
 function commit(fn){if(!persistChange(fn))return false;render();close();return true;}
+const {renderBirthdays}=createBirthdayUi({
+ getRoot:()=>stateManager.getRoot(),
+ replaceRoot,
+ persistChange,
+ el,
+ button
+});
 const {employeesList,openEmployees}=createEmployeeUi({
  getState:()=>stateManager.getState(),
  openDialog,

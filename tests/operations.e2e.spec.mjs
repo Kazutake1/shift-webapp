@@ -318,3 +318,59 @@ test('店舗管理の追加・店名変更・店舗切り替えを分離後も�
  root=await savedRoot(page);
  expect(root.activeStoreId).toBe(originalId);
 });
+
+
+test('設定画面の従業員誕生日一覧で対象者の渡し済みを年次保存する',async({page})=>{
+ await openApp(page);
+
+ const year=Number(new Intl.DateTimeFormat('en-US',{
+  timeZone:'Asia/Tokyo',year:'numeric'
+ }).format(new Date()));
+
+ await page.evaluate(({key,year})=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(s=>s.id===root.activeStoreId);
+  Object.assign(store.employees[0],{
+   name:'プレゼント対象',
+   birthDate:'1990-12-01',
+   hireDate:`${year-1}-10-01`,
+   hidden:false
+  });
+  Object.assign(store.employees[1],{
+   name:'一年未満',
+   birthDate:'1990-09-01',
+   hireDate:`${year-1}-10-01`,
+   hidden:false
+  });
+  root.birthdayGiftDelivered=[];
+  localStorage.setItem(key,JSON.stringify(root));
+ },{key:STORAGE_KEY,year});
+
+ await page.reload();
+ await page.locator('#settings').click();
+
+ await expect(page.locator('#birthday-gifts h2')).toHaveText(`従業員誕生日・プレゼント管理（${year}年）`);
+ await expect(page.locator('#birthday-gift-list')).toContainText('プレゼント対象');
+ await expect(page.locator('#birthday-gift-list')).toContainText('一年未満');
+ await expect(page.locator('#birthday-gift-list')).toContainText('対象外（1年未満）');
+ await expect(page.locator('#birthday-gift-summary')).toHaveText('プレゼント渡し済み 0 / 1名');
+
+ const eligible=page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/});
+ const ineligible=page.getByRole('checkbox',{name:/一年未満さん 誕生日プレゼント渡し済み/});
+ await expect(eligible).not.toBeChecked();
+ await expect(ineligible).toBeDisabled();
+
+ await eligible.check();
+ await expect(page.locator('#birthday-gift-summary')).toHaveText('プレゼント渡し済み 1 / 1名');
+
+ let root=await savedRoot(page);
+ expect(root.birthdayGiftDelivered).toHaveLength(1);
+
+ await page.reload();
+ await page.locator('#settings').click();
+ await expect(page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/})).toBeChecked();
+
+ await page.getByRole('checkbox',{name:/プレゼント対象さん 誕生日プレゼント渡し済み/}).uncheck();
+ root=await savedRoot(page);
+ expect(root.birthdayGiftDelivered).toEqual([]);
+});

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test tests/regression.test.mjs",
-    "check": "node --check app.js && node --check backup-dialog.js && node --check employee-dialog.js && node --check store-dialog.js && node --check state-manager.js && node --check model.js && node --check stores.js && node --check birthdays.js && node --check crypto-backup.js && node --check sw.js && node --check playwright.config.mjs && node --check tests/regression.test.mjs && node --check tests/operations.e2e.spec.mjs",
+    "check": "node --check app.js && node --check backup-dialog.js && node --check employee-dialog.js && node --check store-dialog.js && node --check state-manager.js && node --check model.js && node --check stores.js && node --check birthdays.js && node --check birthday-ui.js && node --check crypto-backup.js && node --check sw.js && node --check playwright.config.mjs && node --check tests/regression.test.mjs && node --check tests/operations.e2e.spec.mjs",
     "test:e2e": "playwright test --config=playwright.config.mjs"
   }
 }

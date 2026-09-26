@@ -7,6 +7,7 @@ const person=v=>v&&str(v.employeeId)&&str(v.name,20)&&v.name.trim();
 export function validateRoot(root){
  check(root?.version===2&&Array.isArray(root.stores)&&root.stores.length>0);
  check(root.birthdayAcknowledgements===undefined||Array.isArray(root.birthdayAcknowledgements)&&root.birthdayAcknowledgements.every(k=>str(k,500)));
+ check(root.birthdayGiftDelivered===undefined||Array.isArray(root.birthdayGiftDelivered)&&root.birthdayGiftDelivered.every(k=>str(k,500)));
  const ids=new Set();
  for(const s of root.stores){
   check(s&&str(s.id)&&s.id&&!ids.has(s.id));ids.add(s.id);

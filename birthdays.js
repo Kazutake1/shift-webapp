@@ -23,3 +23,42 @@ export function birthdayNotices(root,today=japanToday()){
  }
  return result.sort((a,b)=>a.birthday.localeCompare(b.birthday)||a.store.localeCompare(b.store));
 }
+
+
+export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4))){
+ if(!Number.isInteger(year)||year<2000||year>9999)return [];
+ const delivered=new Set(root.birthdayGiftDelivered||[]);
+ const result=[];
+
+ for(const store of root.stores){
+  for(const employee of store.employees){
+   if(employee.hidden||!validDate(employee.birthDate))continue;
+
+   const birthday=anniversary(employee.birthDate,year);
+   const hasHireDate=validDate(employee.hireDate);
+   const firstAnniversary=hasHireDate
+    ?anniversary(employee.hireDate,Number(employee.hireDate.slice(0,4))+1)
+    :'';
+   const eligible=hasHireDate&&firstAnniversary<=birthday;
+   const key=JSON.stringify([store.id,employee.id,birthday]);
+
+   result.push({
+    key,
+    storeId:store.id,
+    store:store.store,
+    employeeId:employee.id,
+    name:employee.name,
+    birthday,
+    eligible,
+    eligibilityReason:eligible?'eligible':hasHireDate?'underOneYear':'hireDateMissing',
+    delivered:eligible&&delivered.has(key)
+   });
+  }
+ }
+
+ return result.sort((a,b)=>
+  a.birthday.slice(5).localeCompare(b.birthday.slice(5))||
+  a.store.localeCompare(b.store)||
+  a.name.localeCompare(b.name)
+ );
+}

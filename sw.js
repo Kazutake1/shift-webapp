@@ -1,6 +1,6 @@
 const CACHE_PREFIX='shift-ipad-step1-shell-';
-const CACHE=CACHE_PREFIX+'v49';
-const FILES=['./','./index.html','./style.css','./app.js','./backup-dialog.js','./employee-dialog.js','./store-dialog.js','./state-manager.js','./model.js','./stores.js','./crypto-backup.js','./birthdays.js','./holidays.js','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
+const CACHE=CACHE_PREFIX+'v50';
+const FILES=['./','./index.html','./style.css','./app.js','./backup-dialog.js','./employee-dialog.js','./store-dialog.js','./state-manager.js','./model.js','./stores.js','./crypto-backup.js','./birthdays.js','./birthday-ui.js','./holidays.js','./manifest.webmanifest','./icon.svg','./icon-180.png','./icon-192.png','./icon-512.png'];
 self.addEventListener('install',e=>e.waitUntil(caches.open(CACHE).then(c=>c.addAll(FILES)).then(()=>self.skipWaiting())));
 self.addEventListener('activate',e=>e.waitUntil(Promise.all([
  caches.keys().then(keys=>Promise.all(keys.filter(key=>key.startsWith(CACHE_PREFIX)&&key!==CACHE).map(key=>caches.delete(key)))),

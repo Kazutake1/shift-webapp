@@ -383,3 +383,48 @@ test('店舗管理UIと店舗切り替えをapp.jsから分離する',()=>{
  assert.match(storeUi,/同じ店名が登録されています/);
  assert.match(storeUi,/重複しない店名を入力してください/);
 });
+
+
+test('誕生日通知UIをapp.jsから分離する',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const birthdayUi=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ assert.match(app,/import \{createBirthdayUi\} from '\.\/birthday-ui\.js'/);
+ assert.equal(app.includes('function renderBirthdays(){'),false);
+ assert.match(app,/const \{renderBirthdays\}=createBirthdayUi\(/);
+ assert.match(birthdayUi,/export function createBirthdayUi\(/);
+ assert.match(birthdayUi,/誕生日のお知らせ/);
+ assert.match(birthdayUi,/従業員誕生日・プレゼント管理/);
+});
+
+test('誕生日リストは表示中従業員を並べ、入社1年以上だけプレゼント対象にする',async()=>{
+ const {birthdayGiftChecklist}=await import('../birthdays.js');
+ const root={
+  birthdayGiftDelivered:[],
+  stores:[{
+   id:'s1',store:'店舗A',employees:[
+    {id:'e1',name:'対象A',hidden:false,birthDate:'1990-12-01',hireDate:'2025-10-01'},
+    {id:'e2',name:'一年未満B',hidden:false,birthDate:'1990-09-01',hireDate:'2025-10-01'},
+    {id:'e3',name:'入社日なしC',hidden:false,birthDate:'1990-11-01',hireDate:''},
+    {id:'e4',name:'非表示D',hidden:true,birthDate:'1990-08-01',hireDate:'2020-01-01'}
+   ]
+  }]
+ };
+ const list=birthdayGiftChecklist(root,2026);
+ assert.deepEqual(list.map(item=>item.name),['一年未満B','入社日なしC','対象A']);
+ assert.equal(list.find(item=>item.name==='対象A').eligible,true);
+ assert.equal(list.find(item=>item.name==='一年未満B').eligible,false);
+ assert.equal(list.find(item=>item.name==='入社日なしC').eligibilityReason,'hireDateMissing');
+
+ const target=list.find(item=>item.name==='対象A');
+ root.birthdayGiftDelivered=[target.key];
+ assert.equal(birthdayGiftChecklist(root,2026).find(item=>item.name==='対象A').delivered,true);
+ assert.equal(birthdayGiftChecklist(root,2027).find(item=>item.name==='対象A').delivered,false);
+});
+
+test('誕生日プレゼント渡し済み情報を保存データとして検証する',()=>{
+ const root=migrate(initialState());
+ root.birthdayGiftDelivered=['["first-store","employee-1","2026-12-01"]'];
+ assert.doesNotThrow(()=>validateRoot(root));
+ root.birthdayGiftDelivered=[123];
+ assert.throws(()=>validateRoot(root));
+});

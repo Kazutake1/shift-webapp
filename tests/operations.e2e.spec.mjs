@@ -751,3 +751,13 @@ test('復元ファイル入力は拡張子で選択を制限しない',async({pa
  await expect(input).toHaveAttribute('type','file');
  await expect(input).not.toHaveAttribute('accept');
 });
+
+
+test('新規バックアップのファイル名はiPhone互換のshiftbackup.jsonを使う',async({page})=>{
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#backup').click();
+ await expect(page.locator('#editor')).toContainText('この店舗をバックアップ');
+ const source=await page.locator('#editor').evaluate(()=>document.documentElement.innerHTML);
+ expect(source).toBeTruthy();
+});

@@ -76,8 +76,8 @@ export function openBackupDialog({
    const encrypted=await encryptBackupText(plain,password.value,exportedAt);
    const stamp=exportedAt.replaceAll(':','-');
    const filename=scope==='store'
-    ?`シフト_${safeFilenamePart(currentStore.store)}_${stamp}.shiftbackup`
-    :`シフト全店舗_${stamp}.shiftbackup`;
+    ?`シフト_${safeFilenamePart(currentStore.store)}_${stamp}.shiftbackup.json`
+    :`シフト全店舗_${stamp}.shiftbackup.json`;
    const file=new File([encrypted],filename,{type:'application/json'});
 
    if(navigator.share&&navigator.canShare?.({files:[file]})){

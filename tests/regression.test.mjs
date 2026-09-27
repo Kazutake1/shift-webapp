@@ -653,8 +653,8 @@ test('店舗単位復元は選択中店舗だけを置き換え他店舗と他�
 
 test('店舗バックアップのファイル名に店舗名を含め、全店舗ファイル名は従来表記を維持する',()=>{
  const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
- assert.match(backup,/シフト_\$\{safeFilenamePart\(currentStore\.store\)\}_\$\{stamp\}\.shiftbackup/);
- assert.match(backup,/シフト全店舗_\$\{stamp\}\.shiftbackup/);
+ assert.match(backup,/シフト_\$\{safeFilenamePart\(currentStore\.store\)\}_\$\{stamp\}\.shiftbackup\.json/);
+ assert.match(backup,/シフト全店舗_\$\{stamp\}\.shiftbackup\.json/);
  assert.match(backup,/この店舗をバックアップ/);
  assert.match(backup,/全店舗をバックアップ/);
  assert.match(backup,/この店舗に復元/);
@@ -666,4 +666,11 @@ test('復元用ファイル選択はiPadでshiftbackupを選べるようaccept�
  const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
  assert.match(backup,/const file=el\('input',\{type:'file'\}\);/);
  assert.doesNotMatch(backup,/accept:'\.shiftbackup/);
+});
+
+
+test('iPhoneで選択しやすいよう新規バックアップはjson拡張子で保存する',()=>{
+ const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
+ assert.match(backup,/\.shiftbackup\.json/);
+ assert.doesNotMatch(backup,/\.shiftbackup`/);
 });

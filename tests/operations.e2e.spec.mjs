@@ -26,22 +26,14 @@ test('PDFの横方向の細線を重複描画しない',async({page,context,brow
   });
  }
  const fixed=await palePixels(page);
- const borderDebug=await page.evaluate(()=>{
-  document.body.classList.add('print-layout');
-  const sample=[...document.querySelectorAll('#schedule tbody tr')].slice(0,3).map(row=>{
-   const cell=row.querySelector('td.slot');const s=getComputedStyle(cell);
-   return {top:s.borderTopWidth,topColor:s.borderTopColor,bottom:s.borderBottomWidth,bottomColor:s.borderBottomColor};
-  });
-  document.body.classList.remove('print-layout');
-  return sample;
- });
- console.log('PDF_HORIZONTAL_BORDER_DEBUG',JSON.stringify(borderDebug));
  const baselinePage=await context.newPage();
  await baselinePage.route('**/print-pdf.js',async route=>{
   const response=await route.fetch();
   const source=await response.text();
-  expect(source).toContain("if(side==='Top'&&width<1)continue;");
-  await route.fulfill({response,body:source.replace("if(side==='Top'&&width<1)continue;","if(false)continue;")});
+  expect(source).toContain("if(side==='Top'&&lightGrid)continue;");
+  await route.fulfill({response,body:source
+   .replace("if(side==='Top'&&lightGrid)continue;","if(false)continue;")
+   .replace('const inkWidth=lightGrid?.65:width;','const inkWidth=width;')});
  });
  const baseline=await palePixels(baselinePage);
  expect(fixed.pale).toBeLessThan(baseline.pale);

@@ -155,13 +155,13 @@ function drawRules(){
   ticks.push(bounds(table.querySelector('.notes-head')).left);
   const major=new Set([0,3,7,11,16,24]);
   const header=bounds(table.querySelector('thead'));
-  for(let i=1;i<24;i++)if(!major.has(i))line(ticks[i],0,ticks[i],header.bottom,1,'#bbb');
+  for(let i=1;i<24;i++)if(!major.has(i))line(ticks[i],0,ticks[i],header.bottom,.65,'#bbb');
   table.querySelectorAll('tbody tr').forEach(row=>{
     let offset=0;
     row.querySelectorAll('.slot').forEach(cell=>{
       const span=cell.colSpan,r=bounds(cell);
       if(!cell.classList.contains('occupied')){
-        for(let i=offset+1;i<offset+span;i++)line(ticks[i],r.top,ticks[i],r.bottom,1,'#bbb');
+        for(let i=offset+1;i<offset+span;i++)line(ticks[i],r.top,ticks[i],r.bottom,.65,'#bbb');
       }
       offset+=span;
     });

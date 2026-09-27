@@ -678,7 +678,7 @@ test('印刷時は名前と時間を9.5ptで表示し、長い組み合わせだ
   const id=store.employees[0].id;
   day.shifts[0][0]={employeeId:id,name:'山田',start:360,end:540};
   day.shifts[1][4]={employeeId:id,name:'山田',start:1335,end:1785};
-  day.shifts[2][4]={employeeId:id,name:'山田佐藤鈴木高橋渡辺',start:1335,end:1785};
+  day.shifts[2][4]={employeeId:id,name:'山田佐藤鈴木高橋渡辺田中伊藤小林中村加藤',start:1335,end:1785};
   localStorage.setItem(key,JSON.stringify(root));
  },STORAGE_KEY);
  await page.reload();

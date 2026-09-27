@@ -170,6 +170,7 @@ test('スマホを横向きにしても上部操作と印刷プレビューの�
   await page.evaluate(()=>{
    Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPhone Safari'});
    navigator.canShare=()=>true;
+   navigator.share=()=>Promise.resolve();
   });
   await page.locator('#preview').click();
   await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();

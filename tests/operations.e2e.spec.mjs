@@ -88,6 +88,9 @@ test('印刷プレビューはChromiumとWebKitでシフト表を表示する',a
  const preview=page.frameLocator('.preview-sheet');
  await expect(preview.locator('#schedule')).toBeVisible();
  await expect(preview.locator('#schedule tbody tr').first()).toBeVisible();
+ const widths=await preview.locator('.table-rules line[stroke="#111"]').evaluateAll(lines=>lines.map(line=>Number(line.getAttribute('stroke-width'))));
+ expect(widths.slice(0,4)).toEqual([2,2,2,2]);
+ expect(widths.slice(6)).toContain(2);
 });
 
 test('印刷プレビューは左25mm・右15mmの綴じ代と整列したヘッダーを表示する',async({page})=>{

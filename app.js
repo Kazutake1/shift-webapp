@@ -166,7 +166,8 @@ function drawRules(){
       offset+=span;
     });
   });
-  const outer=parseFloat(getComputedStyle(table).borderTopWidth);
+  // Match the inner heavy rules even when the print layout uses a thinner table border.
+  const outer=2;
   line(outer/2,0,outer/2,rect.height,outer);line(rect.width-outer/2,0,rect.width-outer/2,rect.height,outer);
   line(0,outer/2,rect.width,outer/2,outer);line(0,rect.height-outer/2,rect.width,rect.height-outer/2,outer);
   line(0,header.bottom-1,rect.width,header.bottom-1,1);line(0,header.bottom+1,rect.width,header.bottom+1,1);

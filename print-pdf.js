@@ -66,6 +66,9 @@ function renderPaper(paper){
   ]){
    const color=style[`border${side}Color`],width=parseFloat(style[`border${side}Width`]);
    if(!width||style[`border${side}Style`]==='none'||color==='transparent'||/rgba?\([^)]*,\s*0(?:\.0+)?\)$/.test(color))continue;
+   // The adjacent cell's bottom already draws each thin collapsed row border.
+   // Drawing its neighbor's top as well doubles the horizontal line in the PDF.
+   if(side==='Top'&&width<1)continue;
    ctx.fillStyle=color;
    if(side==='Top'||side==='Bottom')ctx.fillRect(x(rx),y(ry)-(side==='Bottom'?width*scale:0),rw*scale,width*scale);
    else ctx.fillRect(x(rx)-(side==='Right'?width*scale:0),y(ry),width*scale,rh*scale);

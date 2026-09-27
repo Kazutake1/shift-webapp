@@ -264,7 +264,7 @@ test('バックアップ画面は作成と復元を分け、復元時の注意�
 
  await expect(page.locator('#editor')).toContainText('1. バックアップを作成');
  await expect(page.locator('#editor')).toContainText('2. バックアップから復元');
- await expect(page.locator('#editor')).toContainText('復元すると、現在の全店舗データをバックアップ内の内容で置き換えます');
+ await expect(page.locator('#editor')).toContainText('店舗単位の復元では現在選択中の店舗だけを置き換え');
  await expect(page.locator('#editor')).not.toContainText('① ファイルを選択');
  await expect(page.locator('#editor')).not.toContainText('作成したファイルが保存先に残っているかまでは確認できません');
  await expect(page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'})).toBeDisabled();
@@ -701,4 +701,43 @@ test('従業員名と時間を分け、印刷では収まる名前を9.5ptに保
  expect(result[2].time).toBeCloseTo(result[1].time,1);
  expect(result.every(item=>item.fits)).toBe(true);
  expect(result[1].text).toBe('山田（6:15〜8:45）');
+});
+
+
+test('店舗単位バックアップ復元は現在店舗だけを置き換え他店舗を保持する',async({page})=>{
+ await openApp(page);
+ const before=await savedRoot(page);
+ const activeId=before.activeStoreId;
+ const other=before.stores.find(s=>s.id!==activeId);
+ if(!other)test.skip(true,'複数店舗が必要');
+
+ const source=structuredClone(before);
+ source.stores=[structuredClone(before.stores.find(s=>s.id===activeId))];
+ source.activeStoreId=activeId;
+ source.stores[0].store='店舗単位復元店';
+ source.stores[0].weeks[source.stores[0].current].days[0].notes='店舗単位復元成功';
+ source.birthdayAcknowledgements=[];
+ source.birthdayGiftDelivered=[];
+ const backupText=JSON.stringify({
+  format:'shift-ipad-backup',version:2,scope:'store',
+  storeId:source.stores[0].id,storeName:source.stores[0].store,
+  exportedAt:'2026-09-27T00:00:00.000Z',data:source
+ });
+
+ await page.locator('#settings').click();
+ await page.locator('#backup').click();
+ const chooser=page.locator('#editor input[type=file]');
+ await chooser.setInputFiles({name:'シフト_店舗単位復元店_test.shiftbackup',mimeType:'application/json',buffer:Buffer.from(backupText)});
+ await page.locator('#editor').getByRole('button',{name:'バックアップ内容を確認'}).click();
+ await expect(page.locator('#editor')).toContainText('店舗単位バックアップ：店舗単位復元店');
+ await expect(page.locator('#editor').getByRole('button',{name:'この店舗に復元'})).toBeEnabled();
+ await expect(page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'})).toBeDisabled();
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#editor').getByRole('button',{name:'この店舗に復元'}).click();
+
+ const after=await savedRoot(page);
+ expect(after.stores.length).toBe(before.stores.length);
+ expect(after.stores.find(s=>s.id===activeId).store).toBe('店舗単位復元店');
+ expect(after.stores.find(s=>s.id===activeId).weeks[source.stores[0].current].days[0].notes).toBe('店舗単位復元成功');
+ expect(after.stores.find(s=>s.id===other.id).store).toBe(other.store);
 });

@@ -36,10 +36,87 @@ export function newStore(name,current,id){
  const title=name.trim();check(title&&str(title,40)&&date(current)&&monday(current)===current&&str(id)&&id);
  return {id,version:1,store:title,employees:[],fixed:Array(5).fill(''),current,weeks:{[current]:emptyWeek(current)}};
 }
-export function backupText(root){return JSON.stringify({format:'shift-ipad-backup',version:1,exportedAt:new Date().toISOString(),data:validateRoot(root)},null,2);}
-export function parseBackup(text){
+function backupKeyBelongsToStore(key,storeId){
+ try{
+  const parsed=JSON.parse(key);
+  return Array.isArray(parsed)&&parsed[0]===storeId;
+ }catch{return false;}
+}
+function remapBackupKey(key,sourceStoreId,targetStoreId){
+ try{
+  const parsed=JSON.parse(key);
+  if(!Array.isArray(parsed)||parsed[0]!==sourceStoreId)return null;
+  parsed[0]=targetStoreId;
+  return JSON.stringify(parsed);
+ }catch{return null;}
+}
+export function storeBackupRoot(root,storeId=root.activeStoreId){
+ validateRoot(root);
+ const store=root.stores.find(item=>item.id===storeId);
+ check(store);
+ return validateRoot({
+  version:2,
+  activeStoreId:store.id,
+  stores:[structuredClone(store)],
+  birthdayAcknowledgements:(root.birthdayAcknowledgements||[]).filter(key=>backupKeyBelongsToStore(key,store.id)),
+  birthdayGiftDelivered:(root.birthdayGiftDelivered||[]).filter(key=>backupKeyBelongsToStore(key,store.id))
+ });
+}
+export function backupText(root,{scope='all',storeId=root.activeStoreId,exportedAt=new Date().toISOString()}={}){
+ const validated=validateRoot(root);
+ check(scope==='all'||scope==='store');
+ const data=scope==='store'?storeBackupRoot(validated,storeId):validated;
+ const store=data.stores.find(item=>item.id===data.activeStoreId);
+ return JSON.stringify({
+  format:'shift-ipad-backup',
+  version:2,
+  scope,
+  storeId:scope==='store'?store.id:null,
+  storeName:scope==='store'?store.store:null,
+  exportedAt,
+  data
+ },null,2);
+}
+export function parseBackupInfo(text){
  check(typeof text==='string'&&text.length<=10000000);
  let backup;try{backup=JSON.parse(text);}catch{check(false);}
- check(backup?.format==='shift-ipad-backup'&&backup.version===1);
- return validateRoot(backup.data);
+ check(backup?.format==='shift-ipad-backup');
+ if(backup.version===1){
+  return {scope:'all',exportedAt:backup.exportedAt||'',data:validateRoot(backup.data),legacy:true};
+ }
+ check(backup.version===2&&(backup.scope==='all'||backup.scope==='store'));
+ const data=validateRoot(backup.data);
+ if(backup.scope==='store'){
+  check(data.stores.length===1&&data.activeStoreId===data.stores[0].id);
+  check(backup.storeId===data.stores[0].id&&backup.storeName===data.stores[0].store);
+ }
+ return {
+  scope:backup.scope,
+  exportedAt:backup.exportedAt||'',
+  storeId:backup.scope==='store'?backup.storeId:null,
+  storeName:backup.scope==='store'?backup.storeName:null,
+  data,
+  legacy:false
+ };
+}
+export function parseBackup(text){return parseBackupInfo(text).data;}
+export function mergeStoreBackup(currentRoot,storeBackup){
+ const current=structuredClone(validateRoot(currentRoot));
+ const source=validateRoot(storeBackup);
+ check(source.stores.length===1);
+ const sourceStore=structuredClone(source.stores[0]);
+ const sourceStoreId=sourceStore.id;
+ const targetStoreId=current.activeStoreId;
+ const index=current.stores.findIndex(item=>item.id===targetStoreId);
+ check(index>=0);
+ sourceStore.id=targetStoreId;
+ current.stores[index]=sourceStore;
+
+ const mergeKeys=(currentKeys=[],sourceKeys=[])=>[
+  ...currentKeys.filter(key=>!backupKeyBelongsToStore(key,targetStoreId)),
+  ...sourceKeys.map(key=>remapBackupKey(key,sourceStoreId,targetStoreId)).filter(Boolean)
+ ];
+ current.birthdayAcknowledgements=mergeKeys(current.birthdayAcknowledgements,source.birthdayAcknowledgements);
+ current.birthdayGiftDelivered=mergeKeys(current.birthdayGiftDelivered,source.birthdayGiftDelivered);
+ return validateRoot(current);
 }

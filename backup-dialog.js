@@ -1,4 +1,4 @@
-import {backupText,parseBackup} from './stores.js';
+import {backupText,parseBackupInfo,mergeStoreBackup} from './stores.js';
 import {
   encryptBackupText,
   decryptBackupText,
@@ -36,15 +36,22 @@ export function openBackupDialog({
  onBackupCreated,
  onRestoreSuccess
 }){
+ const root=getRoot();
+ const activeStore=root.stores.find(store=>store.id===root.activeStoreId);
+ const safeFilenamePart=value=>String(value||'店舗').trim().replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').slice(0,40)||'店舗';
+
  const createSection=el('section',{class:'backup-section'});
- createSection.append(el('h3',{},'1. バックアップを作成'));
+ createSection.append(
+  el('h3',{},'1. バックアップを作成'),
+  el('p',{class:'backup-summary'},`選択中の店舗：${activeStore.store}`)
+ );
 
  const password=el('input',{type:'password',minlength:8,autocomplete:'new-password'});
  const confirmPassword=el('input',{type:'password',minlength:8,autocomplete:'new-password'});
  const exportError=el('p',{class:'error',role:'alert'});
  const exportStatus=el('p',{class:'backup-status',role:'status'});
 
- const exportButton=button('暗号化バックアップを作成',async()=>{
+ async function createBackup(scope){
   exportError.textContent='';
   exportStatus.textContent='';
 
@@ -59,15 +66,25 @@ export function openBackupDialog({
    return;
   }
 
-  exportButton.disabled=true;
+  storeExport.disabled=true;
+  allExport.disabled=true;
   try{
    const exportedAt=new Date().toISOString();
-   const encrypted=await encryptBackupText(backupText(getRoot()),password.value,exportedAt);
-   const filename=`シフト全店舗_${exportedAt.replaceAll(':','-')}.shiftbackup`;
+   const current=getRoot();
+   const currentStore=current.stores.find(store=>store.id===current.activeStoreId);
+   const plain=backupText(current,{scope,storeId:current.activeStoreId,exportedAt});
+   const encrypted=await encryptBackupText(plain,password.value,exportedAt);
+   const stamp=exportedAt.replaceAll(':','-');
+   const filename=scope==='store'
+    ?`シフト_${safeFilenamePart(currentStore.store)}_${stamp}.shiftbackup`
+    :`シフト全店舗_${stamp}.shiftbackup`;
    const file=new File([encrypted],filename,{type:'application/json'});
 
    if(navigator.share&&navigator.canShare?.({files:[file]})){
-    await navigator.share({files:[file],title:'シフト暗号化バックアップ'});
+    await navigator.share({
+     files:[file],
+     title:scope==='store'?`${currentStore.store} シフト暗号化バックアップ`:'シフト全店舗 暗号化バックアップ'
+    });
    }else{
     const url=URL.createObjectURL(file);
     const link=el('a',{href:url,download:filename});
@@ -78,7 +95,9 @@ export function openBackupDialog({
    }
 
    onBackupCreated(exportedAt);
-   exportStatus.textContent='バックアップファイルを作成しました。保存先にファイルがあることを確認してください。';
+   exportStatus.textContent=scope==='store'
+    ?`${currentStore.store}のバックアップファイルを作成しました。`
+    :'全店舗のバックアップファイルを作成しました。';
    password.value='';
    confirmPassword.value='';
   }catch(error){
@@ -86,51 +105,76 @@ export function openBackupDialog({
     exportError.textContent=error.message||'暗号化バックアップを作成できませんでした。';
    }
   }finally{
-   exportButton.disabled=false;
+   storeExport.disabled=false;
+   allExport.disabled=false;
   }
- },'primary');
+ }
+
+ const storeExport=button('この店舗をバックアップ',()=>createBackup('store'),'primary');
+ const allExport=button('全店舗をバックアップ',()=>createBackup('all'));
+ const exportActions=el('div',{class:'backup-actions'});
+ exportActions.append(storeExport,allExport);
 
  createSection.append(
   field('バックアップ用パスワード（8文字以上）',password),
   field('パスワードをもう一度入力',confirmPassword),
   exportError,
-  exportButton,
+  exportActions,
   exportStatus
  );
 
  const restoreSection=el('section',{class:'backup-section'});
- restoreSection.append(el('h3',{},'2. バックアップから復元'));
- restoreSection.append(el('p',{class:'backup-warning'},'注意：復元すると、現在の全店舗データをバックアップ内の内容で置き換えます。復元前に現在のバックアップを作成してください。'));
+ restoreSection.append(
+  el('h3',{},'2. バックアップから復元'),
+  el('p',{class:'backup-warning'},'店舗単位の復元では現在選択中の店舗だけを置き換え、他店舗は変更しません。全店舗バックアップの復元では現在の全店舗データを置き換えます。復元前に現在のバックアップを作成してください。')
+ );
 
  const file=el('input',{type:'file',accept:'.shiftbackup,.json,application/json'});
  const restorePassword=el('input',{type:'password',autocomplete:'current-password'});
  const summary=el('p',{class:'backup-summary'});
  const error=el('p',{class:'error',role:'alert'});
- let candidate=null;
+ let candidateInfo=null;
  let selectedText='';
  let encrypted=false;
 
- const restore=button('確認したバックアップで全店舗を復元',()=>{
-  if(!candidate)return;
-
-  if(!confirm(`現在の全店舗データを、選択したバックアップの${candidate.stores.length}店舗に置き換えます。現在の内容は先にバックアップしてください。復元しますか？`)){
+ const storeRestore=button('この店舗に復元',()=>{
+  if(!candidateInfo||candidateInfo.scope!=='store')return;
+  const current=getRoot();
+  const target=current.stores.find(store=>store.id===current.activeStoreId);
+  const source=candidateInfo.data.stores[0];
+  if(!confirm(`${target.store}の現在のデータを、バックアップ「${source.store}」の内容で置き換えます。他の店舗は変更されません。復元しますか？`))return;
+  const merged=mergeStoreBackup(current,candidateInfo.data);
+  if(!replaceRoot(merged,{edit:false,allowStorageError:true,success:'選択中の店舗を復元しました'})){
+   error.textContent=isExternalChangeDetected()
+    ?'別の画面でデータが変更されています。安全のため復元を停止しました。アプリを開き直してから、もう一度復元してください。'
+    :'保存できないため復元しませんでした。空き容量を確認してください。';
    return;
   }
+  onRestoreSuccess();
+ },'danger');
+ storeRestore.disabled=true;
 
+ const allRestore=button('確認したバックアップで全店舗を復元',()=>{
+  if(!candidateInfo||candidateInfo.scope!=='all')return;
+  const candidate=candidateInfo.data;
+  if(!confirm(`現在の全店舗データを、選択したバックアップの${candidate.stores.length}店舗に置き換えます。現在の内容は先にバックアップしてください。復元しますか？`))return;
   if(!replaceRoot(candidate,{edit:false,allowStorageError:true,success:'全店舗を復元しました'})){
    error.textContent=isExternalChangeDetected()
     ?'別の画面でデータが変更されています。安全のため復元を停止しました。アプリを開き直してから、もう一度復元してください。'
     :'保存できないため復元しませんでした。空き容量を確認してください。';
    return;
   }
-
   onRestoreSuccess();
  },'danger');
- restore.disabled=true;
+ allRestore.disabled=true;
+
+ const restoreActions=el('div',{class:'backup-actions'});
+ restoreActions.append(storeRestore,allRestore);
 
  const unlock=button('バックアップ内容を確認',async()=>{
-  candidate=null;
-  restore.disabled=true;
+  candidateInfo=null;
+  storeRestore.disabled=true;
+  allRestore.disabled=true;
   error.textContent='';
   summary.textContent='';
   if(!selectedText)return;
@@ -140,9 +184,16 @@ export function openBackupDialog({
    const plain=encrypted
     ?await decryptBackupText(selectedText,restorePassword.value)
     :selectedText;
-   candidate=parseBackup(plain);
-   summary.textContent=`復元対象：${candidate.stores.map(store=>store.store).join('、')}（合計${candidate.stores.length}店舗）${encrypted?'／暗号化バックアップ':'／旧形式・暗号化なし'}`;
-   restore.disabled=false;
+   candidateInfo=parseBackupInfo(plain);
+   if(candidateInfo.scope==='store'){
+    const source=candidateInfo.data.stores[0];
+    summary.textContent=`店舗単位バックアップ：${source.store}（${encrypted?'暗号化バックアップ':'旧形式・暗号化なし'}）／現在選択中の店舗だけに復元します。`;
+    storeRestore.disabled=false;
+   }else{
+    const candidate=candidateInfo.data;
+    summary.textContent=`全店舗バックアップ：${candidate.stores.map(store=>store.store).join('、')}（合計${candidate.stores.length}店舗）${encrypted?'／暗号化バックアップ':'／旧形式・暗号化なし'}`;
+    allRestore.disabled=false;
+   }
   }catch(caught){
    error.textContent=caught.message;
   }finally{
@@ -152,10 +203,11 @@ export function openBackupDialog({
  unlock.disabled=true;
 
  file.onchange=async()=>{
-  candidate=null;
+  candidateInfo=null;
   selectedText='';
   encrypted=false;
-  restore.disabled=true;
+  storeRestore.disabled=true;
+  allRestore.disabled=true;
   unlock.disabled=true;
   restorePassword.value='';
   summary.textContent='';
@@ -166,7 +218,6 @@ export function openBackupDialog({
 
   try{
    if(selected.size>15000000)throw Error('15MB以下のバックアップを選んでください。');
-
    selectedText=await selected.text();
    if(file.files[0]!==selected)return;
 
@@ -195,7 +246,7 @@ export function openBackupDialog({
   unlock,
   summary,
   error,
-  restore
+  restoreActions
  );
 
  body.append(createSection,restoreSection);

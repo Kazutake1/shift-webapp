@@ -11,7 +11,7 @@ import {
   initialState,ensureWeek,addDays,monday,shiftLabel,workingTimes,dayInfo,makeShift,
   employeeShiftName,employeeShiftConflicts,fixedSetting,fixedTextAt,timedTextLabel,bands
 } from '../model.js';
-import {migrate,newStore,validateRoot,backupText,parseBackup} from '../stores.js';
+import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
 import {
   encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText
@@ -600,4 +600,63 @@ test('iPadの従業員日付入力だけ独自カレンダーを使い、PC・iP
  assert.match(employee,/const birthControl=iPad\?ipadDateControl\(birth,'生年月日'\):birth/);
  assert.match(css,/\.ipad-date-picker\{[\s\S]*grid-template-rows:auto minmax\(0,1fr\) auto/);
  assert.match(css,/\.ipad-date-picker-actions\{[\s\S]*border-top/);
+});
+
+
+test('店舗単位バックアップは選択店舗とその誕生日情報だけを含み、全店舗形式と旧形式を区別する',()=>{
+ const root=migrate(),first=root.stores[0],second=newStore('駅前店',first.current,'second');
+ root.stores.push(second);
+ root.birthdayAcknowledgements=[
+  JSON.stringify([first.id,first.employees[0].id,'2026-10-01']),
+  JSON.stringify([second.id,'x','2026-11-01'])
+ ];
+ root.birthdayGiftDelivered=[
+  JSON.stringify([first.id,first.employees[0].id,'2026-10-01']),
+  JSON.stringify([second.id,'x','2026-11-01'])
+ ];
+ const one=parseBackupInfo(backupText(root,{scope:'store',storeId:first.id,exportedAt:'2026-09-27T00:00:00.000Z'}));
+ assert.equal(one.scope,'store');
+ assert.equal(one.data.stores.length,1);
+ assert.equal(one.data.stores[0].id,first.id);
+ assert.equal(one.data.birthdayAcknowledgements.length,1);
+ assert.equal(one.data.birthdayGiftDelivered.length,1);
+ const all=parseBackupInfo(backupText(root,{scope:'all',exportedAt:'2026-09-27T00:00:00.000Z'}));
+ assert.equal(all.scope,'all');
+ assert.equal(all.data.stores.length,2);
+ const legacy=parseBackupInfo(JSON.stringify({format:'shift-ipad-backup',version:1,data:root}));
+ assert.equal(legacy.scope,'all');
+});
+
+test('店舗単位復元は選択中店舗だけを置き換え他店舗と他店舗の誕生日情報を保持する',()=>{
+ const root=migrate(),first=root.stores[0],second=newStore('駅前店',first.current,'second');
+ root.stores.push(second);
+ root.activeStoreId=first.id;
+ second.weeks[second.current].days[0].notes='他店舗保持';
+ root.birthdayAcknowledgements=[JSON.stringify([second.id,'x','2026-11-01'])];
+ root.birthdayGiftDelivered=[JSON.stringify([second.id,'x','2026-11-01'])];
+
+ const source=structuredClone(root);
+ source.stores=[structuredClone(first)];
+ source.activeStoreId=first.id;
+ source.stores[0].store='復元店舗名';
+ source.stores[0].weeks[source.stores[0].current].days[0].notes='店舗復元成功';
+ source.birthdayAcknowledgements=[JSON.stringify([first.id,first.employees[0].id,'2026-10-01'])];
+ source.birthdayGiftDelivered=[JSON.stringify([first.id,first.employees[0].id,'2026-10-01'])];
+
+ const merged=mergeStoreBackup(root,source);
+ assert.equal(merged.stores.find(s=>s.id===first.id).store,'復元店舗名');
+ assert.equal(merged.stores.find(s=>s.id===first.id).weeks[first.current].days[0].notes,'店舗復元成功');
+ assert.equal(merged.stores.find(s=>s.id===second.id).weeks[second.current].days[0].notes,'他店舗保持');
+ assert.equal(merged.birthdayAcknowledgements.some(k=>JSON.parse(k)[0]===second.id),true);
+ assert.equal(merged.birthdayGiftDelivered.some(k=>JSON.parse(k)[0]===second.id),true);
+});
+
+test('店舗バックアップのファイル名に店舗名を含め、全店舗ファイル名は従来表記を維持する',()=>{
+ const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
+ assert.match(backup,/シフト_\$\{safeFilenamePart\(currentStore\.store\)\}_\$\{stamp\}\.shiftbackup/);
+ assert.match(backup,/シフト全店舗_\$\{stamp\}\.shiftbackup/);
+ assert.match(backup,/この店舗をバックアップ/);
+ assert.match(backup,/全店舗をバックアップ/);
+ assert.match(backup,/この店舗に復元/);
+ assert.match(backup,/確認したバックアップで全店舗を復元/);
 });

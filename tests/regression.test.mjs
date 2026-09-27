@@ -13,6 +13,8 @@ import {
 } from '../model.js';
 import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
+import {birthdayGiftChecklist} from '../birthdays.js';
+import {linkEmployees,unlinkEmployee,syncEmployeeProfile,updateBirthdayKeys} from '../employee-identity.js';
 import {
   encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText
 } from '../crypto-backup.js';
@@ -686,4 +688,71 @@ test('iPadのトレーニング編集は従業員変更に余白を設け保存�
  assert.match(app,/if\(existing\?\.type==='training'&&remove\)actions\.append\(remove\)/);
  assert.match(css,/\.training-employee-change\{margin-top:18px\}/);
  assert.match(css,/\.extra-ipad-actions\{[\s\S]*display:flex;[\s\S]*justify-content:flex-end;[\s\S]*gap:10px;[\s\S]*margin-top:24px/);
+});
+
+function sharedEmployeesFixture(){
+ const root=migrate();
+ const first=root.stores[0];
+ first.employees[0].name='山田';
+ first.employees[0].birthDate='1990-10-01';
+ first.employees[0].hireDate='2020-01-01';
+ const second=newStore('二号店',first.current,'second');
+ second.employees=[{id:'local-2',name:'山田',birthDate:'1990-10-01',hireDate:'2020-01-01',hidden:false}];
+ root.stores.push(second);
+ return {root,first,second,employee:first.employees[0],other:second.employees[0]};
+}
+
+test('同名の別人は自動連携せず、明示的連携で誕生日とクオカードを共通化する',()=>{
+ const {root,first,second,employee,other}=sharedEmployeesFixture();
+ const before=birthdayNotices(root,'2026-09-27');
+ assert.equal(before.filter(n=>n.name==='山田').length,2);
+ const legacy=JSON.stringify([second.id,other.id,'2026-10-01']);
+ root.birthdayGiftDelivered=[legacy];
+ root.birthdayAcknowledgements=[legacy];
+ linkEmployees(root,first.id,employee.id,second.id,other.id);
+ validateRoot(root);
+ assert.equal(employee.sharedId,other.sharedId);
+ assert.equal(birthdayNotices(root,'2026-09-27').filter(n=>n.name==='山田').length,0);
+ const gifts=birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田');
+ assert.equal(gifts.length,2);
+ assert.equal(gifts[0].key,gifts[1].key);
+ assert.equal(gifts.every(n=>n.delivered),true);
+ assert.equal(first.weeks[first.current].days[0].shifts[0][0].name,'従業員A');
+});
+
+test('共通プロフィールの変更と連携解除は店舗固有の番号と過去のシフトを保つ',()=>{
+ const {root,first,second,employee,other}=sharedEmployeesFixture();
+ employee.employeeNumber='001';other.employeeNumber='002';
+ linkEmployees(root,first.id,employee.id,second.id,other.id);
+ const oldKey=birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).key;
+ root.birthdayGiftDelivered=[oldKey];
+ updateBirthdayKeys(root,employee,'1990-11-01');
+ employee.birthDate='1990-11-01';employee.name='山田 改';
+ syncEmployeeProfile(root,employee);
+ assert.equal(other.birthDate,'1990-11-01');
+ assert.equal(other.name,'山田 改');
+ assert.equal(other.employeeNumber,'002');
+ assert.equal(birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田 改').every(n=>n.delivered),true);
+ unlinkEmployee(root,first.id,employee.id);
+ assert.equal(employee.sharedId,undefined);
+ assert.equal(other.sharedId!==undefined,true);
+ assert.equal(birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田 改').every(n=>n.delivered),true);
+ assert.equal(first.weeks[first.current].days[0].shifts[0][0].name,'従業員A');
+});
+
+test('店舗バックアップは連携情報を保ち、無関係な店舗への復元で誤連携しない',()=>{
+ const {root,first,second,employee,other}=sharedEmployeesFixture();
+ linkEmployees(root,first.id,employee.id,second.id,other.id);
+ const key=birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).key;
+ root.birthdayGiftDelivered=[key];
+ const backup=parseBackup(backupText(root,{scope:'store',storeId:first.id}));
+ assert.deepEqual(backup.birthdayGiftDelivered,[key]);
+ const restored=mergeStoreBackup(root,backup);
+ assert.equal(restored.stores[0].employees[0].sharedId,other.sharedId);
+ assert.equal(restored.birthdayGiftDelivered.includes(key),true);
+ const different=structuredClone(root);
+ different.stores[0].employees[0].id='unrelated-person';
+ const safe=mergeStoreBackup(different,backup);
+ assert.notEqual(safe.stores[0].employees[0].sharedId,other.sharedId);
+ assert.equal(safe.birthdayGiftDelivered.some(k=>JSON.parse(k)[1]===safe.stores[0].employees[0].sharedId),true);
 });

@@ -193,6 +193,7 @@ const {renderBirthdays}=createBirthdayUi({
  button
 });
 const {employeesList,openEmployees}=createEmployeeUi({
+ getRoot:()=>stateManager.getRoot(),
  getState:()=>stateManager.getState(),
  openDialog,
  el,

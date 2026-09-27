@@ -2,6 +2,45 @@ import {test,expect} from '@playwright/test';
 
 const STORAGE_KEY='shift-ipad-stores-v2';
 
+test('PDFの横方向の細線を重複描画しない',async({page,context,browserName})=>{
+ test.skip(browserName!=='chromium');
+ async function palePixels(target){
+  await openApp(target);
+  await target.evaluate(()=>Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'}));
+  await target.locator('#preview').click();
+  await expect(target.getByRole('link',{name:'PDFを開く'})).toBeVisible();
+  return target.evaluate(async()=>{
+   const bytes=new Uint8Array(await (await fetch(document.querySelector('.preview-pdf-link').href)).arrayBuffer());
+   const pdf=new TextDecoder('latin1').decode(bytes);
+   const marker=pdf.indexOf('4 0 obj'),start=pdf.indexOf('stream\n',marker)+7;
+   const length=Number(pdf.slice(marker,start).match(/\/Length (\d+)/)[1]);
+   const url=URL.createObjectURL(new Blob([bytes.slice(start,start+length)],{type:'image/jpeg'}));
+   const image=new Image();image.src=url;await image.decode();
+   const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+   const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+   const pixels=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+   let pale=0,dark=0;
+   for(let i=0;i<pixels.length;i+=4){const r=pixels[i],g=pixels[i+1],b=pixels[i+2];if(r>130&&r<247&&Math.abs(r-g)<5&&Math.abs(g-b)<5)pale++;if(r<120&&g<120&&b<120)dark++;}
+   URL.revokeObjectURL(url);
+   return {pale,dark};
+  });
+ }
+ const fixed=await palePixels(page);
+ const baselinePage=await context.newPage();
+ await baselinePage.route('**/print-pdf.js',async route=>{
+  const response=await route.fetch();
+  const source=await response.text();
+  expect(source).toContain("if(side==='Top'&&lightGrid)continue;");
+  await route.fulfill({response,body:source
+   .replace("if(side==='Top'&&lightGrid)continue;","if(false)continue;")
+   .replace('const inkWidth=lightGrid?.65:width;','const inkWidth=width;')});
+ });
+ const baseline=await palePixels(baselinePage);
+ console.log('PDF_HORIZONTAL_LINES',JSON.stringify({baseline,fixed}));
+ expect(fixed.pale).toBeLessThan(baseline.pale);
+ expect(Math.abs(fixed.dark-baseline.dark)).toBeLessThan(baseline.dark*.01);
+});
+
 async function openApp(page){
  await page.goto('/');
  await expect(page.locator('#schedule')).toBeVisible();

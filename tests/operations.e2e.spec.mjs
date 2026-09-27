@@ -155,6 +155,30 @@ test('週操作は店名の右側の上部バーへ移動し、スマホでは�
  await expect(page.locator('#settings-back')).toBeVisible();
 });
 
+test('スマホを横向きにしても上部操作と印刷プレビューのアイコンを維持する',async({browser})=>{
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
+ try{
+  const page=await context.newPage();
+  await openApp(page);
+  await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(4);
+  await page.setViewportSize({width:844,height:390});
+  await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(4);
+  await expect(page.locator('.appbar .nav-label:visible')).toHaveCount(0);
+  await expect(page.locator('#week-label')).toBeHidden();
+  const row=await Promise.all(['#store','#prev','#next','#today','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
+  for(const box of row)expect(Math.abs(box.y-row[0].y)).toBeLessThan(2);
+  await page.evaluate(()=>{
+   Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPhone Safari'});
+   navigator.canShare=()=>true;
+   navigator.share=()=>Promise.resolve();
+  });
+  await page.locator('#preview').click();
+  await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
+  await expect(page.locator('.preview-toolbar .preview-icon:visible')).toHaveCount(3);
+  await expect(page.locator('.preview-toolbar .preview-actions .preview-label-full:visible')).toHaveCount(0);
+ }finally{await context.close();}
+});
+
 async function editFirstNote(page,text){
  await page.locator('td.notes-cell button').first().click();
  await page.locator('#editor textarea').fill(text);

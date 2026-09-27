@@ -36,8 +36,9 @@ test('PDFの横方向の細線を重複描画しない',async({page,context,brow
    .replace('const inkWidth=lightGrid?.65:width;','const inkWidth=width;')});
  });
  const baseline=await palePixels(baselinePage);
+ console.log('PDF_HORIZONTAL_LINES',JSON.stringify({baseline,fixed}));
  expect(fixed.pale).toBeLessThan(baseline.pale);
- expect(Math.abs(fixed.dark-baseline.dark)).toBeLessThan(500);
+ expect(Math.abs(fixed.dark-baseline.dark)).toBeLessThan(baseline.dark*.01);
 });
 
 async function openApp(page){

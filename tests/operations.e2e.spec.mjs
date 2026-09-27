@@ -196,7 +196,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  await stale.locator('#backup').click();
  await stale.locator('#editor input[type=file]').setInputFiles(backupFile(restoreCandidate,'conflict-restore.json'));
  await stale.locator('#editor').getByRole('button',{name:'バックアップ内容を確認'}).click();
- await expect(stale.locator('#editor')).toContainText('復元対象');
+ await expect(stale.locator('#editor')).toContainText('全店舗バックアップ：競合復元店');
  await stale.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'}).click();
  await expect(stale.locator('#dialog-body .error').filter({hasText:'安全のため復元を停止しました'})).toHaveCount(1);
  root=await savedRoot(latest);
@@ -245,7 +245,7 @@ test('バックアップ復元は実際の画面とlocalStorageを復元デー�
  await page.locator('#backup').click();
  await page.locator('#editor input[type=file]').setInputFiles(backupFile(candidate));
  await page.locator('#editor').getByRole('button',{name:'バックアップ内容を確認'}).click();
- await expect(page.locator('#editor')).toContainText('復元対象：復元確認店');
+ await expect(page.locator('#editor')).toContainText('全店舗バックアップ：復元確認店');
 
  page.on('dialog',dialog=>dialog.accept());
  await page.locator('#editor').getByRole('button',{name:'確認したバックアップで全店舗を復元'}).click();

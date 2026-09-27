@@ -16,6 +16,8 @@ import {birthdayNotices,japanToday} from '../birthdays.js';
 import {
   encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText
 } from '../crypto-backup.js';
+import {holidays} from '../holidays.js';
+import {generateHolidays,parseOfficialCsv} from '../scripts/update-holidays.mjs';
 
 test('勤務時間の差分表示を維持',()=>{
  const base={name:'従業員A',start:540,end:780};
@@ -90,6 +92,18 @@ test('祝日・振替休日・土日・未収録年の色判定を維持',()=>{
  assert.equal(dayInfo('2026-09-26').color,'blue');
  assert.equal(dayInfo('2026-09-27').color,'red');
  assert.equal(dayInfo('2028-01-01').supported,false);
+});
+
+test('公式CSVの新しい年を取り込み、未公表・欠損データでは更新を止める',()=>{
+ const original=Object.entries(holidays).map(([date,name])=>`${date.replaceAll('-','/')},${['振替休日','国民の休日'].includes(name)?'休日':name}`);
+ const nextYear=Object.entries(holidays).filter(([date])=>date.startsWith('2027-')).map(([date,name])=>`${date.replace('2027-','2028-').replaceAll('-','/')},${['振替休日','国民の休日'].includes(name)?'休日':name}`);
+ const csv=['国民の祝日・休日月日,国民の祝日・休日名称',...original,...nextYear].join('\r\n');
+ const {content,years}=generateHolidays(csv);
+ assert.deepEqual(years,[2026,2027,2028]);
+ assert.match(content,/"2028-01-01": "元日"/);
+ assert.equal(parseOfficialCsv(csv).get(2028).size,nextYear.length);
+ assert.throws(()=>generateHolidays(['国民の祝日・休日月日,国民の祝日・休日名称',...original,...nextYear.slice(0,3)].join('\n')),/未公表または不完全/);
+ assert.throws(()=>generateHolidays(original.filter(row=>!row.startsWith('2026/05/06,')).join('\n')),/既存の祝日と公式データが異なります/);
 });
 
 test('初期データは7日・5帯・従業員3段の構造を維持',()=>{

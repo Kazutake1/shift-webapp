@@ -503,6 +503,25 @@ test('印刷PDFはA4横1ページに収まる',async({page,browserName})=>{
  expect(pages).toBe(1);
 });
 
+test('iPadの補助ボタンは淡い緑色で、印刷ボタンは「PDFを印刷」と表示する',async({page})=>{
+ await page.addInitScript(()=>{
+  Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'Mozilla/5.0 (iPad; CPU OS 18_0 like Mac OS X) AppleWebKit/605.1.15 Safari/604.1'});
+  Object.defineProperty(navigator,'platform',{configurable:true,get:()=> 'iPad'});
+ });
+ await openApp(page);
+ const colors=async selector=>page.locator(selector).evaluate(el=>{
+  const css=getComputedStyle(el);
+  return [css.backgroundColor,css.color,css.borderTopColor];
+ });
+ const expected=['rgb(232, 245, 237)','rgb(28, 98, 65)','rgb(100, 173, 127)'];
+ expect(await colors('#today')).toEqual(expected);
+ await page.locator('#preview').click();
+ await expect(page.getByRole('button',{name:'PDFを印刷'})).toBeVisible();
+ await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
+ expect(await colors('.preview-toolbar>button:first-child')).toEqual(expected);
+ expect(await colors('.preview-pdf-link')).toEqual(expected);
+});
+
 for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4横1ページで共有できる`,async({page})=>{
  if(device==='iPhone')await page.setViewportSize({width:390,height:844});
  await openApp(page);
@@ -545,7 +564,7 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  }
  await expect(page.locator('.preview-meta [role="status"]')).toBeHidden();
  await expect(page.getByRole('link',{name:'PDFを保存'})).toHaveCount(0);
- await page.getByRole('button',{name:'PDFを共有して印刷'}).click();
+ await page.getByRole('button',{name:device==='iPad'?'PDFを印刷':'PDFを共有して印刷'}).click();
  await expect.poll(()=>page.evaluate(()=>window.sharedPdf?.name)).toBe('シフト表.pdf');
  const result=await page.evaluate(async()=>{
   const blob=await (await fetch(document.querySelector('.preview-pdf-link').href)).blob();

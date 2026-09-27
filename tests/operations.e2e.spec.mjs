@@ -669,7 +669,7 @@ test('iPadの従業員日付カレンダーはリセットと決定を見切ら�
 });
 
 
-test('従業員名と時間を分け、印刷では収まる名前を9.5ptに保つ',async({page})=>{
+test('印刷時は名前と時間を9.5ptで表示し、長い組み合わせだけ一緒に縮小する',async({page})=>{
  await openApp(page);
  await page.evaluate(key=>{
   const root=JSON.parse(localStorage.getItem(key));
@@ -677,8 +677,8 @@ test('従業員名と時間を分け、印刷では収まる名前を9.5ptに保
   const day=store.weeks[store.current].days[0];
   const id=store.employees[0].id;
   day.shifts[0][0]={employeeId:id,name:'山田',start:360,end:540};
-  day.shifts[1][0]={employeeId:id,name:'山田',start:375,end:525};
-  day.shifts[2][0]={employeeId:id,name:'山田佐藤鈴木高橋渡辺',start:375,end:525};
+  day.shifts[1][4]={employeeId:id,name:'山田',start:1335,end:1785};
+  day.shifts[2][4]={employeeId:id,name:'山田佐藤鈴木高橋渡辺',start:1335,end:1785};
   localStorage.setItem(key,JSON.stringify(root));
  },STORAGE_KEY);
  await page.reload();
@@ -686,7 +686,7 @@ test('従業員名と時間を分け、印刷では収まる名前を9.5ptに保
  const preview=page.frameLocator('.preview-sheet');
  await expect(preview.locator('.employee-name').first()).toBeVisible();
  const result=await preview.locator('td.employee-slot button').evaluateAll(nodes=>{
-  return [nodes[0],nodes[5],nodes[10]].map(button=>{
+  return [nodes[0],nodes[9],nodes[14]].map(button=>{
    const name=button.querySelector('.employee-name'),time=button.querySelector('.employee-time');
    const cell=button.getBoundingClientRect(),caption=button.querySelector('.employee-caption').getBoundingClientRect();
    return {name:parseFloat(getComputedStyle(name).fontSize),time:time?parseFloat(getComputedStyle(time).fontSize):null,
@@ -696,11 +696,11 @@ test('従業員名と時間を分け、印刷では収まる名前を9.5ptに保
  });
  expect(result[0].name).toBeCloseTo(9.5*96/72,1);
  expect(result[1].name).toBeCloseTo(result[0].name,1);
- expect(result[1].time).toBeCloseTo(6.7*96/72,1);
+ expect(result[1].time).toBeCloseTo(result[1].name,1);
  expect(result[2].name).toBeLessThan(result[1].name);
- expect(result[2].time).toBeCloseTo(result[1].time,1);
+ expect(result[2].time).toBeCloseTo(result[2].name,1);
  expect(result.every(item=>item.fits)).toBe(true);
- expect(result[1].text).toBe('山田（6:15〜8:45）');
+ expect(result[1].text).toBe('山田（22:15〜5:45）');
 });
 
 

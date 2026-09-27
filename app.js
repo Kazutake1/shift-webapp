@@ -63,14 +63,15 @@ function fitText(){
   n.style.removeProperty('font-size');
   const name=n.querySelector('.employee-name');
   if(name){
-   name.style.removeProperty('font-size');
+   const caption=n.querySelector('.employee-caption');
+   caption.style.removeProperty('font-size');
    if(!n.clientWidth)return;
-   const style=getComputedStyle(n),caption=n.querySelector('.employee-caption');
+   const style=getComputedStyle(n);
    const available=n.clientWidth-parseFloat(style.paddingLeft)-parseFloat(style.paddingRight)-2;
-   let size=parseFloat(getComputedStyle(name).fontSize);
-   // Keep the time size fixed; only reduce the name when the complete label is too wide.
+   let size=parseFloat(getComputedStyle(caption).fontSize);
+   // Keep name and time at the base size when they fit; reduce both together only as needed.
    while(size>1&&caption.offsetWidth>available){
-    size=Math.max(1,size-.25);name.style.fontSize=size+'px';
+    size=Math.max(1,size-.25);caption.style.fontSize=size+'px';
    }
    return;
   }

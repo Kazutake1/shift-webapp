@@ -2,6 +2,38 @@ import {test,expect} from '@playwright/test';
 
 const STORAGE_KEY='shift-ipad-stores-v2';
 
+test('PDFの細線を旧1px版と比較する調査',async({page,context,browserName})=>{
+ test.skip(browserName!=='chromium');
+ async function pdfStats(target){
+  await openApp(target);
+  await target.evaluate(()=>Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPad Safari'}));
+  await target.locator('#preview').click();
+  await expect(target.getByRole('link',{name:'PDFを開く'})).toBeVisible();
+  return target.evaluate(async()=>{
+   const pdf=new Uint8Array(await (await fetch(document.querySelector('.preview-pdf-link').href)).arrayBuffer());
+   const text=new TextDecoder('latin1').decode(pdf);
+   const marker=text.indexOf('4 0 obj'),start=text.indexOf('stream\n',marker)+7;
+   const length=Number(text.slice(marker,start).match(/\/Length (\d+)/)[1]);
+   const image=new Image();image.src=URL.createObjectURL(new Blob([pdf.slice(start,start+length)],{type:'image/jpeg'}));
+   await image.decode();
+   const canvas=document.createElement('canvas');canvas.width=image.width;canvas.height=image.height;
+   const ctx=canvas.getContext('2d');ctx.drawImage(image,0,0);
+   const data=ctx.getImageData(0,0,canvas.width,canvas.height).data;
+   let pale=0,dark=0;
+   for(let i=0;i<data.length;i+=4){const r=data[i],g=data[i+1],b=data[i+2];if(r>130&&r<247&&Math.abs(r-g)<5&&Math.abs(g-b)<5)pale++;if(r<120&&g<120&&b<120)dark++;}
+   URL.revokeObjectURL(image.src);
+   return {pale,dark,width:image.width,height:image.height};
+  });
+ }
+ const current=await pdfStats(page);
+ const old=await context.newPage();
+ await old.route('**/style.css',async route=>{const response=await route.fetch();await route.fulfill({response,body:(await response.text()).replace('th,td{padding:0;border:.65px solid #bbb}','th,td{padding:0;border:1px solid #bbb}')});});
+ await old.route('**/app.js',async route=>{const response=await route.fetch();await route.fulfill({response,body:(await response.text()).replaceAll(".65,'#bbb'","1,'#bbb'")});});
+ const baseline=await pdfStats(old);
+ console.log('PDF_LINE_AUDIT',JSON.stringify({baseline,current}));
+ expect(current.pale).toBeLessThan(baseline.pale);
+});
+
 async function openApp(page){
  await page.goto('/');
  await expect(page.locator('#schedule')).toBeVisible();

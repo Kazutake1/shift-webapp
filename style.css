@@ -540,12 +540,12 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
 @media screen{
  html.ipad-device .appbar-context #today,
  html.ipad-device .preview-toolbar>button:first-child,
- html.ipad-device .preview-pdf-link:not(.primary){
+ html.ipad-device .preview-pdf-link{
   background:#e8f5ed;color:#1c6241;border-color:#64ad7f;
  }
  html.ipad-device .appbar-context #today:hover,
  html.ipad-device .preview-toolbar>button:first-child:hover,
- html.ipad-device .preview-pdf-link:not(.primary):hover{
+ html.ipad-device .preview-pdf-link:hover{
   background:#d8eddf;color:#165c3b;border-color:#4b9868;
  }
 }

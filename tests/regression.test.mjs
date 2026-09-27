@@ -17,7 +17,7 @@ import {
   encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText
 } from '../crypto-backup.js';
 import {holidays} from '../holidays.js';
-import {generateHolidays,parseOfficialCsv} from '../scripts/update-holidays.mjs';
+import {generateHolidays,parseOfficialCsv,nextCacheVersion} from '../scripts/update-holidays.mjs';
 
 test('勤務時間の差分表示を維持',()=>{
  const base={name:'従業員A',start:540,end:780};
@@ -104,6 +104,11 @@ test('公式CSVの新しい年を取り込み、未公表・欠損データで�
  assert.equal(parseOfficialCsv(csv).get(2028).size,nextYear.length);
  assert.throws(()=>generateHolidays(['国民の祝日・休日月日,国民の祝日・休日名称',...original,...nextYear.slice(0,3)].join('\n')),/未公表または不完全/);
  assert.throws(()=>generateHolidays(original.filter(row=>!row.startsWith('2026/05/06,')).join('\n')),/既存の祝日と公式データが異なります/);
+});
+
+test('祝日更新後はオフライン用キャッシュの版番号を進める',()=>{
+ assert.equal(nextCacheVersion("const CACHE=CACHE_PREFIX+'v99';"),"const CACHE=CACHE_PREFIX+'v100';");
+ assert.throws(()=>nextCacheVersion("const CACHE='unknown';"),/版が見つかりません/);
 });
 
 test('初期データは7日・5帯・従業員3段の構造を維持',()=>{

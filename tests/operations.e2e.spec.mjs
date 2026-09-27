@@ -170,7 +170,14 @@ test('スマホを横向きにしても上部操作と印刷プレビューの�
   await page.evaluate(()=>Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPhone Safari'}));
   await page.locator('#preview').click();
   await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
-  await expect(page.locator('.preview-toolbar .preview-icon:visible')).toHaveCount(3);
+  const iconState=await page.locator('.preview-toolbar').evaluate(toolbar=>
+   [...toolbar.querySelectorAll('.preview-icon')].map(svg=>({
+    visible:Boolean(svg.getClientRects().length),
+    parent:svg.parentElement.parentElement.outerHTML.slice(0,260),
+    display:getComputedStyle(svg.parentElement).display
+   }))
+  );
+  expect(iconState.filter(icon=>icon.visible),JSON.stringify(iconState)).toHaveLength(3);
   await expect(page.locator('.preview-toolbar .preview-actions .preview-label-full:visible')).toHaveCount(0);
  }finally{await context.close();}
 });

@@ -514,12 +514,12 @@ test('iPadの補助ボタンは淡い緑色で、印刷ボタンは「PDFを印�
   return [css.backgroundColor,css.color,css.borderTopColor];
  });
  const expected=['rgb(232, 245, 237)','rgb(28, 98, 65)','rgb(100, 173, 127)'];
- expect(await colors('#today')).toEqual(expected);
+ await expect.poll(()=>colors('#today')).toEqual(expected);
  await page.locator('#preview').click();
  await expect(page.getByRole('button',{name:'PDFを印刷'})).toBeVisible();
  await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
- expect(await colors('.preview-toolbar>button:first-child')).toEqual(expected);
- expect(await colors('.preview-pdf-link')).toEqual(expected);
+ await expect.poll(()=>colors('.preview-toolbar>button:first-child')).toEqual(expected);
+ await expect.poll(()=>colors('.preview-pdf-link')).toEqual(expected);
 });
 
 for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4横1ページで共有できる`,async({page})=>{

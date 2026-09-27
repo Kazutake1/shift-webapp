@@ -12,8 +12,8 @@ export function validateRoot(root){
  for(const s of root.stores){
   check(s&&str(s.id)&&s.id&&!ids.has(s.id));ids.add(s.id);
   check(str(s.store,40)&&Array.isArray(s.employees)&&Array.isArray(s.fixed)&&s.fixed.length===5);
-  const employeeIds=new Set();
-  for(const e of s.employees){check(e&&str(e.id)&&e.id&&!employeeIds.has(e.id)&&str(e.name,20)&&e.name.trim()&&typeof e.hidden==='boolean');check(e.shiftName===undefined||str(e.shiftName,20)&&e.shiftName.trim());check(e.employeeNumber===undefined||str(e.employeeNumber,40));for(const key of ['hireDate','birthDate'])check(e[key]===undefined||e[key]===''||date(e[key]));employeeIds.add(e.id);}
+  const employeeIds=new Set(),sharedIds=new Set();
+  for(const e of s.employees){check(e&&str(e.id)&&e.id&&!employeeIds.has(e.id)&&str(e.name,20)&&e.name.trim()&&typeof e.hidden==='boolean');check(e.sharedId===undefined||str(e.sharedId)&&e.sharedId&&!sharedIds.has(e.sharedId));check(e.shiftName===undefined||str(e.shiftName,20)&&e.shiftName.trim());check(e.employeeNumber===undefined||str(e.employeeNumber,40));for(const key of ['hireDate','birthDate'])check(e[key]===undefined||e[key]===''||date(e[key]));employeeIds.add(e.id);if(e.sharedId)sharedIds.add(e.sharedId);}
   for(const f of s.fixed)check(typeof f==='string'?str(f,40):f&&str(f.text,40)&&Array.isArray(f.days)&&f.days.every(d=>Number.isInteger(d)&&d>=0&&d<=6)&&((f.start===undefined&&f.end===undefined)||(Number.isInteger(f.start)&&Number.isInteger(f.end)&&f.start>=360&&f.end<=1800&&f.end>f.start)));
   check(date(s.current)&&monday(s.current)===s.current&&s.weeks&&typeof s.weeks==='object'&&!Array.isArray(s.weeks)&&Object.hasOwn(s.weeks,s.current));
   for(const [key,w] of Object.entries(s.weeks)){
@@ -42,6 +42,12 @@ function backupKeyBelongsToStore(key,storeId){
   return Array.isArray(parsed)&&parsed[0]===storeId;
  }catch{return false;}
 }
+function backupKeyForEmployee(key,store){
+ try{
+  const parts=JSON.parse(key);
+  return Array.isArray(parts)&&parts[0]==='person'&&store.employees.some(e=>e.sharedId===parts[1]);
+ }catch{return false;}
+}
 function remapBackupKey(key,sourceStoreId,targetStoreId){
  try{
   const parsed=JSON.parse(key);
@@ -58,8 +64,8 @@ export function storeBackupRoot(root,storeId=root.activeStoreId){
   version:2,
   activeStoreId:store.id,
   stores:[structuredClone(store)],
-  birthdayAcknowledgements:(root.birthdayAcknowledgements||[]).filter(key=>backupKeyBelongsToStore(key,store.id)),
-  birthdayGiftDelivered:(root.birthdayGiftDelivered||[]).filter(key=>backupKeyBelongsToStore(key,store.id))
+  birthdayAcknowledgements:(root.birthdayAcknowledgements||[]).filter(key=>backupKeyBelongsToStore(key,store.id)||backupKeyForEmployee(key,store)),
+  birthdayGiftDelivered:(root.birthdayGiftDelivered||[]).filter(key=>backupKeyBelongsToStore(key,store.id)||backupKeyForEmployee(key,store))
  });
 }
 export function backupText(root,{scope='all',storeId=root.activeStoreId,exportedAt=new Date().toISOString()}={}){
@@ -109,12 +115,35 @@ export function mergeStoreBackup(currentRoot,storeBackup){
  const targetStoreId=current.activeStoreId;
  const index=current.stores.findIndex(item=>item.id===targetStoreId);
  check(index>=0);
+ const oldStore=current.stores[index];
+ const externalIds=new Set(current.stores.filter(s=>s.id!==targetStoreId).flatMap(s=>s.employees.map(e=>e.sharedId).filter(Boolean)));
+ const idMap=new Map();
+ for(const employee of sourceStore.employees){
+  if(!employee.sharedId)continue;
+  const previous=oldStore.employees.find(e=>e.id===employee.id);
+  if(externalIds.has(employee.sharedId)&&previous?.sharedId!==employee.sharedId){
+   if(!idMap.has(employee.sharedId))idMap.set(employee.sharedId,crypto.randomUUID());
+   employee.sharedId=idMap.get(employee.sharedId);
+  }
+ }
  sourceStore.id=targetStoreId;
  current.stores[index]=sourceStore;
 
  const mergeKeys=(currentKeys=[],sourceKeys=[])=>[
-  ...currentKeys.filter(key=>!backupKeyBelongsToStore(key,targetStoreId)),
-  ...sourceKeys.map(key=>remapBackupKey(key,sourceStoreId,targetStoreId)).filter(Boolean)
+  ...currentKeys.filter(key=>{
+   if(backupKeyBelongsToStore(key,targetStoreId))return false;
+   if(!backupKeyForEmployee(key,oldStore))return true;
+   return current.stores.some(s=>s.id!==targetStoreId&&backupKeyForEmployee(key,s));
+  }),
+  ...sourceKeys.map(key=>{
+   try{
+    const parsed=JSON.parse(key);
+    if(parsed[0]==='person'&&sourceStore.employees.some(e=>e.sharedId===parsed[1]||idMap.has(parsed[1]))){
+     parsed[1]=idMap.get(parsed[1])||parsed[1];return JSON.stringify(parsed);
+    }
+   }catch{}
+   return remapBackupKey(key,sourceStoreId,targetStoreId);
+  }).filter(Boolean)
  ];
  current.birthdayAcknowledgements=mergeKeys(current.birthdayAcknowledgements,source.birthdayAcknowledgements);
  current.birthdayGiftDelivered=mergeKeys(current.birthdayGiftDelivered,source.birthdayGiftDelivered);

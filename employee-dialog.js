@@ -1,4 +1,5 @@
 import {employeeShiftName} from './model.js';
+import {linkEmployees,unlinkEmployee,syncEmployeeProfile,updateBirthdayKeys} from './employee-identity.js';
 
 function normalizeEmployeeSearch(value){
  return String(value||'')
@@ -42,6 +43,7 @@ export function withinFirstMonth(employee,date){
 
 export function createEmployeeUi({
  getState,
+ getRoot,
  openDialog,
  el,
  button,
@@ -307,13 +309,41 @@ export function createEmployeeUi({
   const birthControl=iPad?ipadDateControl(birth,'生年月日'):birth;
 
   hint(body,'フルネームでは半角・全角スペースを使用できます。登録済みシフトには登録時のシフト表用の名前を保持します。追加情報は未入力でも保存できます。');
-  body.append(
+ body.append(
    field('フルネーム（20文字まで）',fullName),
    field('シフト表で使う名前（20文字まで）',shiftName),
    field('従業員番号',number),
    field('入社年月日',hiredControl),
    field('生年月日',birthControl)
   );
+
+  if(employee&&getRoot().stores.length>1){
+   const root=getRoot();
+   const candidates=root.stores.filter(s=>s.id!==root.activeStoreId).flatMap(s=>s.employees.map(e=>({store:s,employee:e})))
+    .filter(item=>item.employee.sharedId!==employee.sharedId||!employee.sharedId);
+   const linked=root.stores.flatMap(s=>s.employees.filter(e=>e!==employee&&e.sharedId&&e.sharedId===employee.sharedId).map(e=>`${s.store}：${e.name}`));
+   if(linked.length)body.append(el('p',{class:'hint'},`連携中：${linked.join('、')}`));
+   if(candidates.length){
+    const select=el('select',{'aria-label':'連携する他店舗の従業員'});
+    select.append(el('option',{value:''},'連携する従業員を選択'));
+    for(const item of candidates)select.append(el('option',{value:JSON.stringify([item.store.id,item.employee.id])},`${item.store.store}：${item.employee.name}`));
+    body.append(field('他店舗の従業員と連携',select),button('選択した従業員と連携',()=>{
+     if(!select.value)return;
+     const [storeId,id]=JSON.parse(select.value);
+     const other=getRoot().stores.find(s=>s.id===storeId)?.employees.find(e=>e.id===id);
+     if(!other)return;
+     if(!confirm(`「${employee.name}」と「${other.name}」を同じ従業員として連携しますか？氏名・入社日・生年月日は現在編集中の従業員の情報に揃います。`))return;
+     try{
+      const ok=persistChange(()=>linkEmployees(getRoot(),getState().id,employee.id,storeId,id));
+      if(ok){renderBirthdays();employeeForm(employee);}
+     }catch(err){alert(err.message);}
+    }));
+   }
+   if(linked.length)body.append(button('この店舗の連携を解除',()=>{
+    if(!confirm(`${employee.name}の他店舗との連携を解除しますか？`))return;
+    if(persistChange(()=>unlinkEmployee(getRoot(),getState().id,employee.id))){renderBirthdays();employeeForm(employee);}
+   }));
+  }
 
   const error=el('p',{class:'error',role:'alert'});
   body.append(
@@ -373,10 +403,13 @@ export function createEmployeeUi({
     if(persistChange(()=>{
      const current=getState();
      if(employee){
+      updateBirthdayKeys(getRoot(),employee,details.birthDate);
       Object.assign(employee,details);
+      syncEmployeeProfile(getRoot(),employee);
      }else{
       current.employees.push({
        id:crypto.randomUUID(),
+       sharedId:crypto.randomUUID(),
        ...details,
        hidden:false
       });

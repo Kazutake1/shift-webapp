@@ -660,3 +660,10 @@ test('店舗バックアップのファイル名に店舗名を含め、全店�
  assert.match(backup,/この店舗に復元/);
  assert.match(backup,/確認したバックアップで全店舗を復元/);
 });
+
+
+test('復元用ファイル選択はiPadでshiftbackupを選べるようaccept制限を設けない',()=>{
+ const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
+ assert.match(backup,/const file=el\('input',\{type:'file'\}\);/);
+ assert.doesNotMatch(backup,/accept:'\.shiftbackup/);
+});

@@ -129,7 +129,7 @@ export function openBackupDialog({
   el('p',{class:'backup-warning'},'店舗単位の復元では現在選択中の店舗だけを置き換え、他店舗は変更しません。全店舗バックアップの復元では現在の全店舗データを置き換えます。復元前に現在のバックアップを作成してください。')
  );
 
- const file=el('input',{type:'file',accept:'.shiftbackup,.json,application/json'});
+ const file=el('input',{type:'file'});
  const restorePassword=el('input',{type:'password',autocomplete:'current-password'});
  const summary=el('p',{class:'backup-summary'});
  const error=el('p',{class:'error',role:'alert'});

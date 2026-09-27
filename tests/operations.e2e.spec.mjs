@@ -741,3 +741,13 @@ test('店舗単位バックアップ復元は現在店舗だけを置き換え�
  expect(after.stores.find(s=>s.id===activeId).weeks[source.stores[0].current].days[0].notes).toBe('店舗単位復元成功');
  expect(after.stores.find(s=>s.id===other.id).store).toBe(other.store);
 });
+
+
+test('復元ファイル入力は拡張子で選択を制限しない',async({page})=>{
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#backup').click();
+ const input=page.locator('#editor input[type=file]');
+ await expect(input).toHaveAttribute('type','file');
+ await expect(input).not.toHaveAttribute('accept');
+});

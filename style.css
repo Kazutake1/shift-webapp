@@ -535,3 +535,17 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
 .employee-caption{display:inline-flex;flex:none;align-items:baseline;white-space:nowrap;line-height:1.1}
 .employee-name,.employee-time{flex:none;white-space:nowrap}
 .employee-time{font-size:.72em}
+
+/* iPad の補助操作は、緑の枠と淡い緑の背景で揃える。 */
+@media screen{
+ html.ipad-device .appbar-context #today,
+ html.ipad-device .preview-toolbar>button:first-child,
+ html.ipad-device .preview-pdf-link{
+  background:#e8f5ed;color:#1c6241;border-color:#64ad7f;
+ }
+ html.ipad-device .appbar-context #today:hover,
+ html.ipad-device .preview-toolbar>button:first-child:hover,
+ html.ipad-device .preview-pdf-link:hover{
+  background:#d8eddf;color:#165c3b;border-color:#4b9868;
+ }
+}

@@ -86,6 +86,8 @@ function fitText(){
 let printLayoutActive=false,printRequested=false,printRecoveryTimer=0;
 const printMedia=window.matchMedia('print');
 const isAppleMobile=()=>/iPhone|iPad|iPod/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+const isIpad=()=>/iPad/.test(navigator.userAgent)||(navigator.platform==='MacIntel'&&navigator.maxTouchPoints>1);
+if(isIpad())document.documentElement.classList.add('ipad-device');
 let lastPrintPdfUrl='',lastPrintPdfFile=null,previewPdfGeneration=0;
 function preparePrint(){
  clearTimeout(printRecoveryTimer);
@@ -423,10 +425,10 @@ function openPreview(){
   const status=el('small',{role:'status','aria-live':'polite'},'印刷用PDFを準備しています…');
   const actions=el('div',{class:'preview-actions'});
   const shareButton=button('',()=>sharePreviewPdf(status),'primary');
-  shareButton.setAttribute('aria-label','PDFを共有して印刷');
+  shareButton.setAttribute('aria-label',isIpad()?'PDFを印刷':'PDFを共有して印刷');
   const compactShare=el('span',{class:'preview-label-compact','aria-hidden':'true'});
   compactShare.append(previewIcon(['M6 9V3h12v6M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2','M6 15h12v6H6zM18 12h.01']));
-  shareButton.append(el('span',{class:'preview-label-full'},'PDFを共有して印刷'),compactShare);
+  shareButton.append(el('span',{class:'preview-label-full'},isIpad()?'PDFを印刷':'PDFを共有して印刷'),compactShare);
   shareButton.disabled=true;
   const openLink=el('a',{class:'preview-pdf-link',target:'_blank',rel:'noopener',hidden:'','aria-label':'PDFを開く'});
   const compactOpen=el('span',{class:'preview-label-compact','aria-hidden':'true'});

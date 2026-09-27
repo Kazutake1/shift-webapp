@@ -674,3 +674,16 @@ test('iPhoneで選択しやすいよう新規バックアップはjson拡張子�
  assert.match(backup,/\.shiftbackup\.json/);
  assert.doesNotMatch(backup,/\.shiftbackup`/);
 });
+
+
+test('iPadのトレーニング編集は従業員変更に余白を設け保存と削除を右下横並びにする',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(app,/band=bands\[b\],ipad=isIpad\(\)/);
+ assert.match(app,/if\(ipad\)change\.classList\.add\('training-employee-change'\)/);
+ assert.match(app,/const actions=el\('div',\{class:'extra-ipad-actions'\}\)/);
+ assert.match(app,/actions\.append\(save\)/);
+ assert.match(app,/if\(existing\?\.type==='training'&&remove\)actions\.append\(remove\)/);
+ assert.match(css,/\.training-employee-change\{margin-top:18px\}/);
+ assert.match(css,/\.extra-ipad-actions\{[\s\S]*display:flex;[\s\S]*justify-content:flex-end;[\s\S]*gap:10px;[\s\S]*margin-top:24px/);
+});

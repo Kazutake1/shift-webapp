@@ -224,10 +224,11 @@ function openCell(d,row,b){activeCell={d,row,b};if(row===0)return openFixed();if
 function editShift(d,row,b,draft){const body=openDialog('勤務を編集');const name=button(`${draft.name}　変更`,()=>{try{Object.assign(draft,workingTimes(start.value,end.value));}catch{}const picker=openDialog('従業員を変更');employeesList(picker,e=>editShift(d,row,b,{...draft,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId);picker.append(button('戻る',()=>editShift(d,row,b,draft)));});body.append(name);const start=el('input',{type:'time',required:'',value:timeValue(draft.start)}),end=el('input',{type:'time',required:'',value:timeValue(draft.end)});const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));body.append(rowEl);hint(body,'6:00から翌朝6:00までの勤務を入力。0:00〜5:59は翌日として扱います。');if(b===4){body.append(button('22:00〜翌1:00',()=>{start.value='22:00';end.value='01:00';}),button('22:00〜翌6:00',()=>{start.value='22:00';end.value='06:00';}));}const err=el('p',{class:'error',role:'alert'});body.append(err);const actions=el('div',{class:'actions'});actions.append(button('削除',()=>{if(confirm('この勤務を削除しますか？'))commit(()=>week().days[d].shifts[row-1][b]=null);},'danger'),button('保存',()=>{try{const times=workingTimes(start.value,end.value);const candidate={...draft,...times};if(confirmChange(true)&&confirmShiftOverlap(d,candidate,{row:row-1,band:b}))commit(()=>week().days[d].shifts[row-1][b]=candidate);}catch(e){err.textContent=e.message;}},'primary'));body.append(actions);}
 function openNotes(d){const body=openDialog('備考');const input=el('textarea',{rows:6,maxlength:180});input.value=week().days[d].notes;body.append(field('自由入力（180文字まで）',input),button('保存',()=>{if(confirmChange(week().days[d].notes&&week().days[d].notes!==input.value))commit(()=>week().days[d].notes=input.value);},'primary'));}
 function openExtra(d,b){
- const existing=week().days[d].extras[b],band=bands[b];
+ const existing=week().days[d].extras[b],band=bands[b],ipad=isIpad();
  const body=openDialog('不定期作業／トレーニング');
  hint(body,'この枠は翌週へコピーされません。各時間帯につき1件です。');
  const tabs=el('div',{class:'row'}),content=el('div');body.append(tabs,content);
+ const remove=existing?button('削除',()=>{if(confirm('この登録を削除しますか？'))commit(()=>week().days[d].extras[b]=null);},'danger'):null;
  const trainingEditor=(draft)=>{
   content.replaceChildren();
   const start=el('input',{type:'time',required:'',value:timeValue(Number.isInteger(draft.start)?draft.start:band.start)});
@@ -238,11 +239,18 @@ function openExtra(d,b){
    employeesList(content,e=>trainingEditor({...draft,...times,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId,e=>withinFirstMonth(e,week().days[d].date));
    content.append(button('戻る',()=>trainingEditor({...draft,...times})));
   });
+  if(ipad)change.classList.add('training-employee-change');
   const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));
   const error=el('p',{class:'error',role:'alert'});
   content.append(change,rowEl);
   hint(content,'6:00から翌朝6:00までの時間を入力できます。0:00〜5:59は翌日として扱います。');
-  content.append(error,button('保存',()=>{try{const times=workingTimes(start.value,end.value);if(confirmChange(existing))commit(()=>week().days[d].extras[b]={type:'training',employeeId:draft.employeeId,name:draft.name,...times});}catch(e){error.textContent=e.message;}},'primary'));
+  const save=button('保存',()=>{try{const times=workingTimes(start.value,end.value);if(confirmChange(existing))commit(()=>week().days[d].extras[b]={type:'training',employeeId:draft.employeeId,name:draft.name,...times});}catch(e){error.textContent=e.message;}},'primary');
+  if(ipad){
+   const actions=el('div',{class:'extra-ipad-actions'});
+   actions.append(save);
+   if(existing?.type==='training'&&remove)actions.append(remove);
+   content.append(error,actions);
+  }else content.append(error,save);
  };
  const training=()=>{
   if(existing?.type==='training')return trainingEditor({...existing,start:Number.isInteger(existing.start)?existing.start:band.start,end:Number.isInteger(existing.end)?existing.end:band.end});
@@ -260,10 +268,11 @@ function openExtra(d,b){
   content.append(field('不定期作業',input),rowEl);
   hint(content,'6:00から翌朝6:00までの時間を入力できます。0:00〜5:59は翌日として扱います。');
   content.append(error,button('登録',()=>{if(!input.value.trim()){input.focus();return;}try{const times=workingTimes(start.value,end.value);if(confirmChange(existing))commit(()=>week().days[d].extras[b]={type:'task',text:input.value.trim(),...times});}catch(e){error.textContent=e.message;}},'primary'));
+  if(ipad&&existing?.type==='training'&&remove)body.append(remove);
  };
  tabs.append(button('トレーニング',training),button('不定期作業',task));
  if(existing?.type==='task')task();else training();
- if(existing)body.append(button('削除',()=>{if(confirm('この登録を削除しますか？'))commit(()=>week().days[d].extras[b]=null);},'danger'));
+ if(remove&&(!ipad||existing?.type!=='training'))body.append(remove);
 }
 function openFixed(){
   const state=stateManager.getState();

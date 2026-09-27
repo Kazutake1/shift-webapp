@@ -549,3 +549,15 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
   background:#d8eddf;color:#165c3b;border-color:#4b9868;
  }
 }
+
+
+/* v105: iPad training editor spacing and bottom-right actions. */
+.training-employee-change{margin-top:18px}
+.extra-ipad-actions{
+ display:flex;
+ justify-content:flex-end;
+ align-items:center;
+ gap:10px;
+ margin-top:24px;
+}
+.extra-ipad-actions button{margin:0}

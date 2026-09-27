@@ -167,17 +167,13 @@ test('スマホを横向きにしても上部操作と印刷プレビューの�
   await expect(page.locator('#week-label')).toBeHidden();
   const row=await Promise.all(['#store','#prev','#next','#today','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
   for(const box of row)expect(Math.abs(box.y-row[0].y)).toBeLessThan(2);
-  await page.evaluate(()=>Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPhone Safari'}));
+  await page.evaluate(()=>{
+   Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPhone Safari'});
+   navigator.canShare=()=>true;
+  });
   await page.locator('#preview').click();
   await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
-  const iconState=await page.locator('.preview-toolbar').evaluate(toolbar=>
-   [...toolbar.querySelectorAll('.preview-icon')].map(svg=>({
-    visible:Boolean(svg.getClientRects().length),
-    parent:svg.parentElement.parentElement.outerHTML.slice(0,260),
-    display:getComputedStyle(svg.parentElement).display
-   }))
-  );
-  expect(iconState.filter(icon=>icon.visible),JSON.stringify(iconState)).toHaveLength(3);
+  await expect(page.locator('.preview-toolbar .preview-icon:visible')).toHaveCount(3);
   await expect(page.locator('.preview-toolbar .preview-actions .preview-label-full:visible')).toHaveCount(0);
  }finally{await context.close();}
 });

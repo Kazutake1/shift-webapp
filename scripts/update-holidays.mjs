@@ -64,6 +64,12 @@ export function generateHolidays(csv){
  return {content,years};
 }
 
+export function nextCacheVersion(cache){
+ const updated=cache.replace(/(const CACHE=CACHE_PREFIX\+'v)(\d+)(')/,(_,head,version,tail)=>head+(Number(version)+1)+tail);
+ if(updated===cache)throw new Error('オフライン用キャッシュの版が見つかりません');
+ return updated;
+}
+
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
  const input=process.argv[2];
  if(!input)throw new Error('使い方: node scripts/update-holidays.mjs /tmp/syukujitsu.csv');
@@ -76,8 +82,7 @@ if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
   writeFileSync(filename,content);
   const sw=fileURLToPath(new URL('../sw.js',import.meta.url));
   const cache=readFileSync(sw,'utf8');
-  const updated=cache.replace(/(const CACHE=CACHE_PREFIX+'v)(\d+)(')/,(_,head,version,tail)=>head+(Number(version)+1)+tail);
-  if(updated===cache)throw new Error('オフライン用キャッシュの版が見つかりません');
+  const updated=nextCacheVersion(cache);
   writeFileSync(sw,updated);
  }
  console.log(`内閣府祝日CSVを確認: ${years.join('、')}年${content===old?'（変更なし）':'（更新あり）'}`);

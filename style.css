@@ -514,6 +514,9 @@ body.print-layout #schedule tr{break-inside:avoid}
 }
 .ipad-date-picker-header button{min-height:44px;padding:0}
 .ipad-date-picker-title{text-align:center;font-size:18px}
+.ipad-date-picker-year-month{display:flex;align-items:center;justify-content:center;gap:5px;min-width:0}
+.ipad-date-picker-year-month input{width:86px;min-width:0;min-height:44px;padding:6px 4px;text-align:center;font-size:16px}
+.ipad-date-picker-year-month select{width:75px;min-height:44px;padding:6px 4px;font-size:16px}
 .ipad-date-picker-body{min-height:0;overflow:auto;padding:12px 14px}
 .ipad-date-picker-weekdays,.ipad-date-picker-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:4px}
 .ipad-date-picker-weekdays{margin-bottom:6px;text-align:center;color:#6c7b70;font-size:13px}

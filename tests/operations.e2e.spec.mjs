@@ -748,6 +748,7 @@ test('iPadの従業員日付カレンダーはリセットと決定を見切ら�
  await page.getByRole('button',{name:'入社年月日を選択'}).click();
  const picker=page.locator('.ipad-date-picker');
  await expect(picker).toBeVisible();
+ await expect(picker.getByRole('textbox',{name:'生年を入力'})).toHaveCount(0);
  const reset=page.getByRole('button',{name:'リセット'});
  const confirm=page.getByRole('button',{name:'決定'});
  await expect(reset).toBeVisible();
@@ -762,6 +763,23 @@ test('iPadの従業員日付カレンダーはリセットと決定を見切ら�
  expect(confirmBox.y+confirmBox.height).toBeLessThanOrEqual(panel.y+panel.height+1);
  await page.getByRole('button',{name:'キャンセル'}).click();
  await expect(picker).toHaveCount(0);
+
+ await page.setViewportSize({width:768,height:1024});
+ await page.getByRole('button',{name:'生年月日を選択'}).click();
+ const yearInput=picker.getByRole('textbox',{name:'生年を入力'});
+ const monthSelect=picker.getByRole('combobox',{name:'生月を選択'});
+ await expect(yearInput).toBeVisible();
+ await yearInput.fill('1990');
+ await monthSelect.selectOption('4');
+ await picker.getByRole('button',{name:'1990年4月15日'}).click();
+ await expect(confirm).toBeVisible();
+ await confirm.click();
+ await expect(page.getByRole('button',{name:'生年月日を選択'})).toHaveText('1990/04/15');
+ await expect(page.locator('#dialog-body input[type="date"]').last()).toHaveValue('1990-04-15');
+ await page.getByRole('button',{name:'生年月日を選択'}).click();
+ await expect(yearInput).toHaveValue('1990');
+ await expect(monthSelect).toHaveValue('4');
+ await page.getByRole('button',{name:'キャンセル'}).click();
 });
 
 

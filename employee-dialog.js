@@ -78,7 +78,29 @@ export function createEmployeeUi({
   const title=el('strong',{class:'ipad-date-picker-title'});
   const next=button('›',()=>changeMonth(1));
   next.setAttribute('aria-label','次月');
-  header.append(previous,title,next);
+  const isBirthDate=label==='生年月日';
+  const earliestYear=Math.min(1900,initial?.year??1900);
+  let yearInput,monthSelect;
+  if(isBirthDate){
+   const yearMonth=el('div',{class:'ipad-date-picker-year-month'});
+   yearInput=el('input',{
+    type:'text',inputmode:'numeric',maxlength:4,
+    value:year,'aria-label':'生年を入力'
+   });
+   monthSelect=el('select',{'aria-label':'生月を選択'});
+   for(let value=1;value<=12;value++)monthSelect.append(el('option',{value:String(value)},`${value}月`));
+   yearInput.oninput=()=>{
+    if(!/^\d{4}$/.test(yearInput.value))return;
+    const value=Number(yearInput.value);
+    if(value<earliestYear||value>today.getFullYear())return;
+    year=value;renderCalendar();
+   };
+   yearInput.onchange=()=>{yearInput.value=String(year);};
+   yearInput.onfocus=()=>yearInput.select();
+   monthSelect.onchange=()=>{month=Number(monthSelect.value)-1;renderCalendar();};
+   yearMonth.append(yearInput,el('span',{},'年'),monthSelect);
+   header.append(previous,yearMonth,next);
+  }else header.append(previous,title,next);
 
   const body=el('div',{class:'ipad-date-picker-body'});
   const weekdays=el('div',{class:'ipad-date-picker-weekdays'});
@@ -111,6 +133,7 @@ export function createEmployeeUi({
 
   function changeMonth(delta){
    const changed=new Date(year,month+delta,1);
+   if(isBirthDate&&(changed.getFullYear()<earliestYear||changed.getFullYear()>today.getFullYear()))return;
    year=changed.getFullYear();
    month=changed.getMonth();
    renderCalendar();
@@ -118,6 +141,10 @@ export function createEmployeeUi({
 
   function renderCalendar(){
    title.textContent=`${year}年${month+1}月`;
+   if(isBirthDate){
+    if(document.activeElement!==yearInput)yearInput.value=String(year);
+    monthSelect.value=String(month+1);
+   }
    grid.replaceChildren();
    const firstDay=new Date(year,month,1).getDay();
    const lastDay=new Date(year,month+1,0).getDate();

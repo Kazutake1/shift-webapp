@@ -1,5 +1,30 @@
 import {test,expect} from '@playwright/test';
 
+test('連携従業員は一店舗の勤続年数で対象となり渡し済みが両店舗に反映される',async({page})=>{
+ await openApp(page);
+ const year=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric'}).format(new Date()));
+ await page.evaluate(({key,year})=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const first=root.stores[0];
+  first.employees=[{id:'first-person',sharedId:'same-person',name:'共通従業員',birthDate:'1990-12-01',hireDate:`${year-2}-01-01`,hidden:false}];
+  const second=structuredClone(first);
+  second.id='second';second.store='B店舗';
+  second.employees=[{id:'second-person',sharedId:'same-person',name:'共通従業員',birthDate:'1990-12-01',hireDate:`${year}-01-01`,hidden:false}];
+  root.stores.push(second);
+  localStorage.setItem(key,JSON.stringify(root));
+ },{key:STORAGE_KEY,year});
+ await page.reload();
+ await page.locator('#settings').click();
+ await page.locator('#birthday-list').click();
+ const first=page.getByRole('checkbox',{name:/共通従業員 誕生日クオカード渡し済み/});
+ await first.check();
+ await page.locator('#store').selectOption('second');
+ const second=page.getByRole('checkbox',{name:/B店舗 共通従業員 誕生日クオカード渡し済み/});
+ await expect(second).toBeEnabled();
+ await expect(second).toBeChecked();
+ await expect(page.locator('#birthday-gift-summary')).toHaveText(`クオカード渡し済み 1 / 1名（${year}年）`);
+});
+
 const STORAGE_KEY='shift-ipad-stores-v2';
 
 test('PDFの横方向の細線を重複描画しない',async({page,context,browserName})=>{

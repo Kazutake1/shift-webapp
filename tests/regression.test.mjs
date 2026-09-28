@@ -727,7 +727,7 @@ test('共通プロフィールの変更と連携解除は店舗固有の番号�
  linkEmployees(root,first.id,employee.id,second.id,other.id);
  assert.equal(employee.hireDate,'2020-02-01');
  assert.equal(other.hireDate,'2026-01-01');
- assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).eligible,false);
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).eligible,true);
  const oldKey=birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).key;
  root.birthdayGiftDelivered=[oldKey];
  updateBirthdayKeys(root,employee,'1990-11-01');
@@ -740,13 +740,31 @@ test('共通プロフィールの変更と連携解除は店舗固有の番号�
  assert.equal(employee.hireDate,'2021-03-01');
  assert.equal(other.hireDate,'2026-01-01');
  assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).delivered,true);
- assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).eligible,false);
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).delivered,true);
  unlinkEmployee(root,first.id,employee.id);
  assert.equal(employee.sharedId,undefined);
  assert.equal(other.sharedId!==undefined,true);
  assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).delivered,true);
  assert.equal(other.hireDate,'2026-01-01');
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).eligible,false);
  assert.equal(first.weeks[first.current].days[0].shifts[0][0].name,'従業員A');
+});
+
+test('連携先の一店舗が勤続1年以上なら各店舗でQUOカードをチェックできる',()=>{
+ const {root,first,second,employee,other}=sharedEmployeesFixture();
+ employee.hireDate='2020-01-01';other.hireDate='2026-01-01';
+ linkEmployees(root,first.id,employee.id,second.id,other.id);
+ let entries=birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田');
+ assert.equal(entries.length,2);
+ assert.equal(entries.every(n=>n.eligible),true);
+ assert.equal(entries[0].key,entries[1].key);
+ root.birthdayGiftDelivered=[entries[0].key];
+ entries=birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田');
+ assert.equal(entries.every(n=>n.delivered),true);
+ other.hireDate='';
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).delivered,true);
+ employee.hireDate='2026-01-01';
+ assert.equal(birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田').every(n=>!n.eligible&&!n.delivered),true);
 });
 
 test('店舗バックアップは連携情報を保ち、無関係な店舗への復元で誤連携しない',()=>{

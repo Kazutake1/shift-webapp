@@ -446,7 +446,11 @@ test('誕生日リストは表示中従業員を並べ、入社1年以上だけ�
 test('誕生日プレゼント渡し済み情報を保存データとして検証する',()=>{
  const root=migrate(initialState());
  root.birthdayGiftDelivered=['["first-store","employee-1","2026-12-01"]'];
+ root.birthdayGiftDeliveryStores={[root.birthdayGiftDelivered[0]]:{storeId:'first-store',storeName:'A店'}};
  assert.doesNotThrow(()=>validateRoot(root));
+ root.birthdayGiftDeliveryStores={[root.birthdayGiftDelivered[0]]:{storeId:123,storeName:'A店'}};
+ assert.throws(()=>validateRoot(root));
+ root.birthdayGiftDeliveryStores={};
  root.birthdayGiftDelivered=[123];
  assert.throws(()=>validateRoot(root));
 });
@@ -782,6 +786,30 @@ test('店舗バックアップは連携情報を保ち、無関係な店舗へ�
  const safe=mergeStoreBackup(different,backup);
  assert.notEqual(safe.stores[0].employees[0].sharedId,other.sharedId);
  assert.equal(safe.birthdayGiftDelivered.some(k=>JSON.parse(k)[1]===safe.stores[0].employees[0].sharedId),true);
+});
+
+test('QUOカードを渡した店舗を保持し、連携・誕生日変更・解除・店舗復元でも追跡する',()=>{
+ const {root,first,second,employee,other}=sharedEmployeesFixture();
+ const legacy=JSON.stringify([first.id,employee.id,'2026-10-01']);
+ root.birthdayGiftDelivered=[legacy];
+ root.birthdayGiftDeliveryStores={[legacy]:{storeId:first.id,storeName:first.store}};
+ linkEmployees(root,first.id,employee.id,second.id,other.id);
+ let entries=birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田');
+ assert.equal(entries.every(n=>n.deliveredByStoreName===first.store),true);
+ const backup=parseBackup(backupText(root,{scope:'store',storeId:first.id}));
+ assert.equal(backup.birthdayGiftDeliveryStores[entries[0].key].storeId,first.id);
+ const restored=mergeStoreBackup(root,backup);
+ assert.equal(birthdayGiftChecklist(restored,2026).find(n=>n.storeId===second.id).deliveredByStoreName,first.store);
+ updateBirthdayKeys(root,employee,'1990-11-01');
+ employee.birthDate='1990-11-01';syncEmployeeProfile(root,employee);
+ entries=birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田');
+ assert.equal(entries.every(n=>n.delivered&&n.deliveredByStoreId===first.id),true);
+ unlinkEmployee(root,first.id,employee.id);
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.storeId===first.id).deliveredByStoreName,first.store);
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.storeId===second.id).deliveredByStoreName,first.store);
+ const older=structuredClone(root);
+ delete older.birthdayGiftDeliveryStores;
+ assert.equal(birthdayGiftChecklist(older,2026).find(n=>n.storeId===first.id).deliveredByStoreName,'');
 });
 
 

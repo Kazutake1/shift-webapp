@@ -16,13 +16,18 @@ test('連携従業員は一店舗の勤続年数で対象となり渡し済み�
  await page.reload();
  await page.locator('#settings').click();
  await page.locator('#birthday-list').click();
+ const giver=await page.locator('#store option:checked').innerText();
  const first=page.getByRole('checkbox',{name:/共通従業員 誕生日クオカード渡し済み/});
  await first.check();
+ await expect(first.locator('..').locator('.birthday-gift-status')).toHaveText('渡し済み');
  await page.locator('#store').selectOption('second');
  const second=page.getByRole('checkbox',{name:/B店舗 共通従業員 誕生日クオカード渡し済み/});
  await expect(second).toBeEnabled();
  await expect(second).toBeChecked();
+ await expect(second.locator('..').locator('.birthday-gift-status')).toHaveText(`${giver}で渡し済み`);
  await expect(page.locator('#birthday-gift-summary')).toHaveText(`クオカード渡し済み 1 / 1名（${year}年）`);
+ await page.reload();
+ await expect(page.getByRole('checkbox',{name:/B店舗 共通従業員 誕生日クオカード渡し済み/}).locator('..').locator('.birthday-gift-status')).toHaveText(`${giver}で渡し済み`);
 });
 
 const STORAGE_KEY='shift-ipad-stores-v2';

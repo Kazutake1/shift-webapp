@@ -21,6 +21,7 @@ export function linkEmployees(root,storeId,employeeId,otherStoreId,otherEmployee
  }
  const migrate=field=>{
   const keys=new Set(root[field]||[]);
+  const receipts=field==='birthdayGiftDelivered'?{...(root.birthdayGiftDeliveryStores||{})}:null;
   const years=new Set();
   for(const key of keys){
    try{
@@ -32,15 +33,25 @@ export function linkEmployees(root,storeId,employeeId,otherStoreId,otherEmployee
    const birthday=anniversary(birthDate,year);
    if(!birthday)continue;
    let marked=false;
+   const newKey=JSON.stringify(['person',id,birthday]);
+   let receipt=receipts?.[newKey];
    for(const {store:s,employee:e} of affected){
     const legacy=JSON.stringify([s.id,e.id,anniversary(e.birthDate,year)]);
     const shared=e.sharedId&&JSON.stringify(['person',e.sharedId,anniversary(e.birthDate,year)]);
+    for(const oldKey of [legacy,shared].filter(Boolean)){
+     if(receipts&&keys.has(oldKey)&&!receipt&&receipts[oldKey])receipt=receipts[oldKey];
+     if(receipts&&oldKey!==newKey)delete receipts[oldKey];
+    }
     if(keys.delete(legacy))marked=true;
     if(shared&&keys.delete(shared))marked=true;
    }
-   if(marked)keys.add(JSON.stringify(['person',id,birthday]));
+   if(marked){
+    keys.add(newKey);
+    if(receipts&&receipt)receipts[newKey]=receipt;
+   }
   }
   root[field]=[...keys];
+  if(receipts)root.birthdayGiftDeliveryStores=receipts;
  };
  migrate('birthdayAcknowledgements');
  migrate('birthdayGiftDelivered');
@@ -71,7 +82,12 @@ export function unlinkEmployee(root,storeId,employeeId){
    let parts;try{parts=JSON.parse(key);}catch{continue;}
    if(!Array.isArray(parts)||parts[0]!=='person'||parts[1]!==id)continue;
    keys.delete(key);
-   keys.add(JSON.stringify([storeId,employeeId,parts[2]]));
+   const localKey=JSON.stringify([storeId,employeeId,parts[2]]);
+   keys.add(localKey);
+   if(field==='birthdayGiftDelivered'&&root.birthdayGiftDeliveryStores?.[key]){
+    root.birthdayGiftDeliveryStores[localKey]=root.birthdayGiftDeliveryStores[key];
+    if(!remaining.length)delete root.birthdayGiftDeliveryStores[key];
+   }
    if(remaining.length)keys.add(key);
   }
   root[field]=[...keys];
@@ -99,5 +115,16 @@ export function updateBirthdayKeys(root,employee,newBirthDate){
    return JSON.stringify(['person',employee.sharedId,anniversary(newBirthDate,year)]);
   });
   root[field]=[...new Set(root[field])];
+ }
+ const receipts=root.birthdayGiftDeliveryStores;
+ if(receipts)for(const [key,receipt] of Object.entries({...receipts})){
+  let parts;try{parts=JSON.parse(key);}catch{continue;}
+  if(!Array.isArray(parts)||parts[0]!=='person'||parts[1]!==employee.sharedId)continue;
+  const year=Number(String(parts[2]).slice(0,4));
+  const newKey=JSON.stringify(['person',employee.sharedId,anniversary(newBirthDate,year)]);
+  if(newKey!==key){
+   delete receipts[key];
+   if(!receipts[newKey])receipts[newKey]=receipt;
+  }
  }
 }

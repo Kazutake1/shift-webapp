@@ -8,6 +8,7 @@ export function validateRoot(root){
  check(root?.version===2&&Array.isArray(root.stores)&&root.stores.length>0);
  check(root.birthdayAcknowledgements===undefined||Array.isArray(root.birthdayAcknowledgements)&&root.birthdayAcknowledgements.every(k=>str(k,500)));
  check(root.birthdayGiftDelivered===undefined||Array.isArray(root.birthdayGiftDelivered)&&root.birthdayGiftDelivered.every(k=>str(k,500)));
+ check(root.birthdayGiftDeliveryStores===undefined||root.birthdayGiftDeliveryStores&&typeof root.birthdayGiftDeliveryStores==='object'&&!Array.isArray(root.birthdayGiftDeliveryStores)&&Object.entries(root.birthdayGiftDeliveryStores).every(([key,value])=>str(key,500)&&value&&str(value.storeId)&&value.storeId&&str(value.storeName,40)));
  const ids=new Set();
  for(const s of root.stores){
   check(s&&str(s.id)&&s.id&&!ids.has(s.id));ids.add(s.id);
@@ -65,7 +66,8 @@ export function storeBackupRoot(root,storeId=root.activeStoreId){
   activeStoreId:store.id,
   stores:[structuredClone(store)],
   birthdayAcknowledgements:(root.birthdayAcknowledgements||[]).filter(key=>backupKeyBelongsToStore(key,store.id)||backupKeyForEmployee(key,store)),
-  birthdayGiftDelivered:(root.birthdayGiftDelivered||[]).filter(key=>backupKeyBelongsToStore(key,store.id)||backupKeyForEmployee(key,store))
+  birthdayGiftDelivered:(root.birthdayGiftDelivered||[]).filter(key=>backupKeyBelongsToStore(key,store.id)||backupKeyForEmployee(key,store)),
+  birthdayGiftDeliveryStores:Object.fromEntries(Object.entries(root.birthdayGiftDeliveryStores||{}).filter(([key])=>(root.birthdayGiftDelivered||[]).includes(key)&&(backupKeyBelongsToStore(key,store.id)||backupKeyForEmployee(key,store))))
  });
 }
 export function backupText(root,{scope='all',storeId=root.activeStoreId,exportedAt=new Date().toISOString()}={}){
@@ -129,13 +131,12 @@ export function mergeStoreBackup(currentRoot,storeBackup){
  sourceStore.id=targetStoreId;
  current.stores[index]=sourceStore;
 
- const mergeKeys=(currentKeys=[],sourceKeys=[])=>[
-  ...currentKeys.filter(key=>{
+ const keepCurrentKey=key=>{
    if(backupKeyBelongsToStore(key,targetStoreId))return false;
    if(!backupKeyForEmployee(key,oldStore))return true;
    return current.stores.some(s=>s.id!==targetStoreId&&backupKeyForEmployee(key,s));
-  }),
-  ...sourceKeys.map(key=>{
+ };
+ const mapSourceKey=key=>{
    try{
     const parsed=JSON.parse(key);
     if(parsed[0]==='person'&&sourceStore.employees.some(e=>e.sharedId===parsed[1]||idMap.has(parsed[1]))){
@@ -143,9 +144,20 @@ export function mergeStoreBackup(currentRoot,storeBackup){
     }
    }catch{}
    return remapBackupKey(key,sourceStoreId,targetStoreId);
-  }).filter(Boolean)
+ };
+ const mergeKeys=(currentKeys=[],sourceKeys=[])=>[
+  ...currentKeys.filter(keepCurrentKey),
+  ...sourceKeys.map(mapSourceKey).filter(Boolean)
  ];
  current.birthdayAcknowledgements=mergeKeys(current.birthdayAcknowledgements,source.birthdayAcknowledgements);
  current.birthdayGiftDelivered=mergeKeys(current.birthdayGiftDelivered,source.birthdayGiftDelivered);
+ const delivered=new Set(current.birthdayGiftDelivered);
+ current.birthdayGiftDeliveryStores=Object.fromEntries([
+  ...Object.entries(current.birthdayGiftDeliveryStores||{}).filter(([key])=>keepCurrentKey(key)&&delivered.has(key)),
+  ...Object.entries(source.birthdayGiftDeliveryStores||{}).map(([key,record])=>{
+   const mapped=mapSourceKey(key);
+   return [mapped,{...record,storeId:record.storeId===sourceStoreId?targetStoreId:record.storeId,storeName:record.storeId===sourceStoreId?sourceStore.store:record.storeName}];
+  }).filter(([key])=>key&&delivered.has(key))
+ ]);
  return validateRoot(current);
 }

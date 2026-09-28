@@ -12,7 +12,6 @@ export function linkEmployees(root,storeId,employeeId,otherStoreId,otherEmployee
  if(members.some(item=>item.store.id===storeId&&item.employee.id!==employeeId))throw Error('同じ店舗にすでに連携済みの従業員がいます。');
  const id=target.sharedId||crypto.randomUUID();
  const birthDate=employee.birthDate||target.birthDate||'';
- const hireDate=employee.hireDate||target.hireDate||'';
  const oldIds=new Set([employee.sharedId,target.sharedId].filter(Boolean));
  const affected=root.stores.flatMap(s=>s.employees.filter(e=>e===employee||e===target||e.sharedId&&oldIds.has(e.sharedId)).map(e=>({store:s,employee:e})));
  const seenStores=new Set();
@@ -49,7 +48,6 @@ export function linkEmployees(root,storeId,employeeId,otherStoreId,otherEmployee
   e.sharedId=id;
   e.name=employee.name;
   e.birthDate=birthDate;
-  e.hireDate=hireDate;
  }
 }
 
@@ -87,7 +85,6 @@ export function syncEmployeeProfile(root,employee){
   if(other!==employee&&other.sharedId===employee.sharedId){
    other.name=employee.name;
    other.birthDate=employee.birthDate;
-   other.hireDate=employee.hireDate;
   }
  }
 }

@@ -560,3 +560,13 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
  margin-top:24px;
 }
 .extra-ipad-actions button{margin:0}
+
+
+/* v112: keep the thin horizontal shift-row rules visible on phone Safari. */
+@media screen and (max-width:600px), screen and (orientation:landscape) and (max-height:500px) and (max-width:950px) and (pointer:coarse){
+ #schedule tbody tr:nth-child(5n+2)>td.slot,
+ #schedule tbody tr:nth-child(5n+3)>td.slot,
+ #schedule tbody tr:nth-child(5n+4)>td.slot{
+  border-top:1px solid #bbb;
+ }
+}

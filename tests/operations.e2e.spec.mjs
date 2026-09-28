@@ -827,3 +827,18 @@ test('新規バックアップのファイル名はiPhone互換のshiftbackup.js
  const source=await page.locator('#editor').evaluate(()=>document.documentElement.innerHTML);
  expect(source).toBeTruthy();
 });
+
+
+test('スマホ通常表示でシフト内の薄い横罫線が表示される',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await openApp(page);
+ const rule=page.locator('#schedule tbody tr:nth-child(5n+2)>td.slot').first();
+ await expect(rule).toBeVisible();
+ const style=await rule.evaluate(el=>{
+  const css=getComputedStyle(el);
+  return {width:css.borderTopWidth,style:css.borderTopStyle,color:css.borderTopColor};
+ });
+ expect(style.width).toBe('1px');
+ expect(style.style).toBe('solid');
+ expect(style.color).toBe('rgb(187, 187, 187)');
+});

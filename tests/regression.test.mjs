@@ -756,3 +756,9 @@ test('店舗バックアップは連携情報を保ち、無関係な店舗へ�
  assert.notEqual(safe.stores[0].employees[0].sharedId,other.sharedId);
  assert.equal(safe.birthdayGiftDelivered.some(k=>JSON.parse(k)[1]===safe.stores[0].employees[0].sharedId),true);
 });
+
+
+test('スマホ通常画面ではシフト内の薄い横罫線を1pxで明示表示する',()=>{
+ const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
+ assert.match(css,/@media screen and \(max-width:600px\), screen and \(orientation:landscape\) and \(max-height:500px\) and \(max-width:950px\) and \(pointer:coarse\)\{[\s\S]*#schedule tbody tr:nth-child\(5n\+2\)>td\.slot,[\s\S]*#schedule tbody tr:nth-child\(5n\+3\)>td\.slot,[\s\S]*#schedule tbody tr:nth-child\(5n\+4\)>td\.slot\{[\s\S]*border-top:1px solid #bbb/);
+});

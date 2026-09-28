@@ -723,20 +723,29 @@ test('同名の別人は自動連携せず、明示的連携で誕生日とク�
 test('共通プロフィールの変更と連携解除は店舗固有の番号と過去のシフトを保つ',()=>{
  const {root,first,second,employee,other}=sharedEmployeesFixture();
  employee.employeeNumber='001';other.employeeNumber='002';
+ employee.hireDate='2020-02-01';other.hireDate='2026-01-01';
  linkEmployees(root,first.id,employee.id,second.id,other.id);
+ assert.equal(employee.hireDate,'2020-02-01');
+ assert.equal(other.hireDate,'2026-01-01');
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).eligible,false);
  const oldKey=birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).key;
  root.birthdayGiftDelivered=[oldKey];
  updateBirthdayKeys(root,employee,'1990-11-01');
- employee.birthDate='1990-11-01';employee.name='山田 改';
+ employee.birthDate='1990-11-01';employee.name='山田 改';employee.hireDate='2021-03-01';
  syncEmployeeProfile(root,employee);
  assert.equal(other.birthDate,'1990-11-01');
  assert.equal(other.name,'山田 改');
  assert.equal(other.employeeNumber,'002');
- assert.equal(birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田 改').every(n=>n.delivered),true);
+ assert.equal(employee.employeeNumber,'001');
+ assert.equal(employee.hireDate,'2021-03-01');
+ assert.equal(other.hireDate,'2026-01-01');
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).delivered,true);
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===other.id).eligible,false);
  unlinkEmployee(root,first.id,employee.id);
  assert.equal(employee.sharedId,undefined);
  assert.equal(other.sharedId!==undefined,true);
- assert.equal(birthdayGiftChecklist(root,2026).filter(n=>n.name==='山田 改').every(n=>n.delivered),true);
+ assert.equal(birthdayGiftChecklist(root,2026).find(n=>n.employeeId===employee.id).delivered,true);
+ assert.equal(other.hireDate,'2026-01-01');
  assert.equal(first.weeks[first.current].days[0].shifts[0][0].name,'従業員A');
 });
 

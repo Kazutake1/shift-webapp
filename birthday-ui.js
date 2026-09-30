@@ -59,6 +59,22 @@ export function createBirthdayUi({
   activeTab.setAttribute('aria-selected',String(employeeListMode==='active'));
   retiredTab.setAttribute('aria-selected',String(employeeListMode==='retired'));
 
+  if(employeeListMode==='retired'){
+   giftSummary.textContent=retiredEmployees.length?'退職日の新しい順':'退職者はいません。';
+   for(const employee of retiredEmployees){
+    const row=el('div',{class:'retired-employee-row'});
+    const retiredDate='退職日 '+employee.retirementDate.split('-').join('/');
+    const hireDate=employee.hireDate?'入社日 '+employee.hireDate.split('-').join('/'):'入社日未登録';
+    row.append(
+     el('span',{class:'retired-employee-person'},employee.name),
+     el('span',{class:'retired-employee-date'},retiredDate),
+     el('span',{class:'retired-employee-meta'},hireDate)
+    );
+    giftList.append(row);
+   }
+   return;
+  }
+
   const eligible=entries.filter(entry=>entry.eligible);
   const delivered=eligible.filter(entry=>entry.delivered).length;
   giftSummary.textContent=entries.length

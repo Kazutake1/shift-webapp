@@ -1,4 +1,5 @@
 import {birthdayNotices,birthdayGiftChecklist,japanToday} from './birthdays.js';
+import {employeeRetiredBy} from './model.js';
 
 export function createBirthdayUi({
  getRoot,
@@ -11,6 +12,9 @@ export function createBirthdayUi({
  const giftHost=document.querySelector('#birthday-gifts');
  const giftList=document.querySelector('#birthday-gift-list');
  const giftSummary=document.querySelector('#birthday-gift-summary');
+ const activeTab=document.querySelector('#employee-active-tab');
+ const retiredTab=document.querySelector('#employee-retired-tab');
+ let employeeListMode='active';
 
  function renderNotices(){
   const root=getRoot();

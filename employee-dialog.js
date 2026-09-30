@@ -331,9 +331,11 @@ export function createEmployeeUi({
   });
   const hired=el('input',{type:'date',value:employee?.hireDate||''});
   const birth=el('input',{type:'date',value:employee?.birthDate||''});
+  const retirement=el('input',{type:'date',value:employee?.retirementDate||''});
   const iPad=isIPadDevice();
   const hiredControl=iPad?ipadDateControl(hired,'入社年月日'):hired;
   const birthControl=iPad?ipadDateControl(birth,'生年月日'):birth;
+  const retirementControl=iPad?ipadDateControl(retirement,'退職日'):retirement;
 
   hint(body,'フルネームでは半角・全角スペースを使用できます。登録済みシフトには登録時のシフト表用の名前を保持します。追加情報は未入力でも保存できます。');
  body.append(

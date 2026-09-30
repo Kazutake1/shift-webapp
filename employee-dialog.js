@@ -391,7 +391,7 @@ export function createEmployeeUi({
      return;
     }
 
-    if(!hired.checkValidity()||!birth.checkValidity()){
+    if(!hired.checkValidity()||!birth.checkValidity()||!retirement.checkValidity()){
      error.textContent='年月日を確認してください。';
      return;
     }
@@ -401,7 +401,8 @@ export function createEmployeeUi({
      shiftName:displayName,
      employeeNumber:number.value.trim(),
      hireDate:hired.value,
-     birthDate:birth.value
+     birthDate:birth.value,
+     retirementDate:retirement.value
     };
     const now=new Date();
     const today=`${now.getFullYear()}-${String(now.getMonth()+1).padStart(2,'0')}-${String(now.getDate()).padStart(2,'0')}`;
@@ -412,6 +413,10 @@ export function createEmployeeUi({
     }
     if(details.birthDate&&details.hireDate&&details.birthDate>details.hireDate){
      error.textContent='入社年月日は生年月日以降の日付を入力してください。';
+     return;
+    }
+    if(details.retirementDate&&details.hireDate&&details.retirementDate<details.hireDate){
+     error.textContent='退職日は入社年月日以降の日付を入力してください。';
      return;
     }
 

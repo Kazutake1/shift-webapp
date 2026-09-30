@@ -44,8 +44,11 @@ export function createBirthdayUi({
 
  function renderGiftChecklist(){
   const root=getRoot();
-  const year=Number(japanToday().slice(0,4));
+  const today=japanToday();
+  const year=Number(today.slice(0,4));
+  const store=root.stores.find(item=>item.id===root.activeStoreId);
   const entries=birthdayGiftChecklist(root,year).filter(entry=>entry.storeId===root.activeStoreId);
+  const retiredEmployees=(store?.employees||[]).filter(employee=>employeeRetiredBy(employee,today)).sort((a,b)=>(b.retirementDate||'').localeCompare(a.retirementDate||'')||a.name.localeCompare(b.name));
 
   giftHost.querySelector('h2').textContent='従業員リスト';
   giftList.replaceChildren();

@@ -776,7 +776,7 @@ test('iPadの従業員日付カレンダーはリセットと決定を見切ら�
  await expect(confirm).toBeVisible();
  await confirm.click();
  await expect(page.getByRole('button',{name:'生年月日を選択'})).toHaveText('1990/04/15');
- await expect(page.locator('#dialog-body input[type="date"]').last()).toHaveValue('1990-04-15');
+ await expect(page.locator('#dialog-body input[type="date"]').nth(1)).toHaveValue('1990-04-15');
  await page.getByRole('button',{name:'生年月日を選択'}).click();
  await expect(yearInput).toHaveValue('1990');
  await expect(monthSelect).toHaveValue('4');

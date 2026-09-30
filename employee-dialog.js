@@ -343,7 +343,8 @@ export function createEmployeeUi({
    field('シフト表で使う名前（20文字まで）',shiftName),
    field('従業員番号',number),
    field('入社年月日',hiredControl),
-   field('生年月日',birthControl)
+   field('生年月日',birthControl),
+   field('退職日',retirementControl)
   );
 
   if(employee&&getRoot().stores.length>1){
@@ -351,7 +352,7 @@ export function createEmployeeUi({
    const candidates=root.stores.filter(s=>s.id!==root.activeStoreId).flatMap(s=>s.employees.map(e=>({store:s,employee:e})))
     .filter(item=>item.employee.sharedId!==employee.sharedId||!employee.sharedId);
    const linked=root.stores.flatMap(s=>s.employees.filter(e=>e!==employee&&e.sharedId&&e.sharedId===employee.sharedId).map(e=>`${s.store}：${e.name}`));
-   if(linked.length)body.append(el('p',{class:'hint'},`連携中：${linked.join('、')}。氏名と生年月日を共有し、従業員番号と入社年月日は店舗ごとに管理します。`));
+   if(linked.length)body.append(el('p',{class:'hint'},`連携中：${linked.join('、')}。氏名と生年月日を共有し、従業員番号・入社年月日・退職日は店舗ごとに管理します。`));
    if(candidates.length){
     const select=el('select',{'aria-label':'連携する他店舗の従業員'});
     select.append(el('option',{value:''},'連携する従業員を選択'));
@@ -361,7 +362,7 @@ export function createEmployeeUi({
      const [storeId,id]=JSON.parse(select.value);
      const other=getRoot().stores.find(s=>s.id===storeId)?.employees.find(e=>e.id===id);
      if(!other)return;
-     if(!confirm(`「${employee.name}」と「${other.name}」を同じ従業員として連携しますか？氏名と生年月日は現在編集中の従業員の情報に揃います。従業員番号と入社年月日は各店舗の情報を保持します。`))return;
+     if(!confirm(`「${employee.name}」と「${other.name}」を同じ従業員として連携しますか？氏名と生年月日は現在編集中の従業員の情報に揃います。従業員番号・入社年月日・退職日は各店舗の情報を保持します。`))return;
      try{
       const ok=persistChange(()=>linkEmployees(getRoot(),getState().id,employee.id,storeId,id));
       if(ok){renderBirthdays();employeeForm(employee);}

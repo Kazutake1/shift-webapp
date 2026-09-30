@@ -134,6 +134,8 @@ export function createBirthdayUi({
 
  activeTab.addEventListener('click',()=>{employeeListMode='active';renderGiftChecklist();});
 
+ retiredTab.addEventListener('click',()=>{employeeListMode='retired';renderGiftChecklist();});
+
  function renderBirthdayUi(){
   renderNotices();
   renderGiftChecklist();

@@ -742,7 +742,8 @@ test('iPadの従業員日付カレンダーはリセットと決定を見切ら�
 
  await expect(page.getByRole('button',{name:'入社年月日を選択'})).toBeVisible();
  await expect(page.getByRole('button',{name:'生年月日を選択'})).toBeVisible();
- await expect(page.locator('#dialog-body input[type="date"]')).toHaveCount(2);
+ await expect(page.getByRole('button',{name:'退職日を選択'})).toBeVisible();
+ await expect(page.locator('#dialog-body input[type="date"]')).toHaveCount(3);
  await expect(page.locator('#dialog-body input[type="date"]').first()).toBeHidden();
 
  await page.getByRole('button',{name:'入社年月日を選択'}).click();

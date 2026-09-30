@@ -9,7 +9,7 @@ if(!globalThis.atob)globalThis.atob=value=>Buffer.from(value,'base64').toString(
 
 import {
   initialState,ensureWeek,addDays,monday,shiftLabel,workingTimes,dayInfo,makeShift,
-  employeeShiftName,employeeShiftConflicts,fixedSetting,fixedTextAt,timedTextLabel,bands
+  employeeShiftName,employeeShiftConflicts,employeeAvailableOn,employeeRetiredBy,fixedSetting,fixedTextAt,timedTextLabel,bands
 } from '../model.js';
 import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';

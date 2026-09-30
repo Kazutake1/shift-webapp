@@ -1,6 +1,6 @@
 import {createBirthdayUi} from './birthday-ui.js';
 import {holidayYears} from './holidays.js';
-import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,employeeShiftConflicts,fixedSetting,fixedTextAt} from './model.js';
+import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,employeeShiftConflicts,employeeAvailableOn,fixedSetting,fixedTextAt} from './model.js';
 import {createStoreUi} from './store-dialog.js';
 import {openBackupDialog} from './backup-dialog.js';
 import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';

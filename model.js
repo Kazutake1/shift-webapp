@@ -12,6 +12,8 @@ export function dayInfo(key){const weekday=new Date(key+'T12:00:00Z').getUTCDay(
 export function emptyWeek(key){return {start:key,days:Array.from({length:7},(_,i)=>({date:addDays(key,i),shifts:Array.from({length:3},()=>Array(5).fill(null)),extras:Array(5).fill(null),notes:''}))};}
 export function ensureWeek(state,key){if(state.weeks[key])return false;const w=emptyWeek(key),prev=state.weeks[addDays(key,-7)];if(prev)w.days.forEach((d,i)=>d.shifts=structuredClone(prev.days[i].shifts));state.weeks[key]=w;return !!prev;}
 export function employeeShiftName(employee){return employee?.shiftName?.trim()||employee?.name||'';}
+export function employeeAvailableOn(employee,date){const r=employee?.retirementDate;return !r||r>=date;}
+export function employeeRetiredBy(employee,date){const r=employee?.retirementDate;return !!r&&r<=date;}
 export function makeShift(employee,b,start=bands[b].start,end=bands[b].end){return {employeeId:employee.id,name:employeeShiftName(employee),start,end};}
 export function employeeShiftConflicts(day,candidate,exclude=null){
  const conflicts=[];

@@ -93,13 +93,14 @@ export function createBirthdayUi({
    const date=el('span',{class:'birthday-gift-date'},`${Number(entry.birthday.slice(5,7))}/${Number(entry.birthday.slice(8))}`);
    const person=el('span',{class:'birthday-gift-person'},entry.name);
    const store=el('span',{class:'birthday-gift-store'},entry.store);
-   const statusText=entry.eligible
+   let statusText=entry.eligible
     ?entry.delivered
      ?entry.deliveredByStoreName&&entry.deliveredByStoreId!==entry.storeId
       ?`${entry.deliveredByStoreName}で渡し済み`
       :'渡し済み'
      :'未渡し'
     :entry.eligibilityReason==='hireDateMissing'?'入社日未登録':'対象外（1年未満）';
+   if(entry.retirementDate&&entry.retirementDate>today)statusText+='／'+entry.retirementDate.split('-').join('/')+' 退職予定';
    const status=el('span',{class:'birthday-gift-status'},statusText);
 
    checkbox.onchange=()=>{

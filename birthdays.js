@@ -1,4 +1,4 @@
-import {addDays} from './model.js';
+import {addDays,employeeRetiredBy} from './model.js';
 import {personKey} from './employee-identity.js';
 export function japanToday(now=new Date()){
  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
@@ -11,7 +11,7 @@ export function birthdayNotices(root,today=japanToday()){
  if(!validDate(today))return [];
  const result=[],seen=new Map(),year=Number(today.slice(0,4));
  for(const store of root.stores)for(const e of store.employees){
-  if(e.hidden||!validDate(e.birthDate)||!validDate(e.hireDate)||e.birthDate>today)continue;
+  if(e.hidden||employeeRetiredBy(e,today)||!validDate(e.birthDate)||!validDate(e.hireDate)||e.birthDate>today)continue;
   if(anniversary(e.hireDate,Number(e.hireDate.slice(0,4))+1)>today)continue;
   for(const y of [year,year+1]){
    const birthday=anniversary(e.birthDate,y);
@@ -34,12 +34,13 @@ export function birthdayNotices(root,today=japanToday()){
 
 export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4))){
  if(!Number.isInteger(year)||year<2000||year>9999)return [];
+ const today=japanToday();
  const delivered=new Set(root.birthdayGiftDelivered||[]);
  const result=[];
  const eligiblePeople=new Set();
 
  for(const store of root.stores)for(const employee of store.employees){
-  if(employee.hidden||!validDate(employee.birthDate)||!validDate(employee.hireDate))continue;
+  if(employee.hidden||employeeRetiredBy(employee,today)||!validDate(employee.birthDate)||!validDate(employee.hireDate))continue;
   const birthday=anniversary(employee.birthDate,year);
   const firstAnniversary=anniversary(employee.hireDate,Number(employee.hireDate.slice(0,4))+1);
   if(firstAnniversary<=birthday)eligiblePeople.add(personKey(store,employee,birthday));
@@ -47,7 +48,7 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
 
  for(const store of root.stores){
   for(const employee of store.employees){
-   if(employee.hidden||!validDate(employee.birthDate))continue;
+   if(employee.hidden||employeeRetiredBy(employee,today)||!validDate(employee.birthDate))continue;
 
    const birthday=anniversary(employee.birthDate,year);
    const hasHireDate=validDate(employee.hireDate);

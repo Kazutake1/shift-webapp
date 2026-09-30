@@ -185,7 +185,7 @@ export function createEmployeeUi({
  function employeesList(parent,choose,currentId,filter){
   const state=getState();
   const available=state.employees.filter(
-   employee=>(!filter||filter(employee))&&(!employee.hidden||employee.id===currentId)
+   employee=>(!filter||filter(employee)||employee.id===currentId)&&(!employee.hidden||employee.id===currentId)
   );
   const search=el('input',{
    type:'search',

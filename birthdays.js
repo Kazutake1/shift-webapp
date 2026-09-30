@@ -63,6 +63,7 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
     store:store.store,
     employeeId:employee.id,
     name:employee.name,
+    retirementDate:employee.retirementDate||'',
     birthday,
     eligible,
     eligibilityReason:eligible?'eligible':hasHireDate?'underOneYear':'hireDateMissing',

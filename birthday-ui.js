@@ -52,6 +52,12 @@ export function createBirthdayUi({
 
   giftHost.querySelector('h2').textContent='従業員リスト';
   giftList.replaceChildren();
+  activeTab.textContent='在籍中 '+entries.length+'人';
+  retiredTab.textContent='退職者 '+retiredEmployees.length+'人';
+  activeTab.classList.toggle('active',employeeListMode==='active');
+  retiredTab.classList.toggle('active',employeeListMode==='retired');
+  activeTab.setAttribute('aria-selected',String(employeeListMode==='active'));
+  retiredTab.setAttribute('aria-selected',String(employeeListMode==='retired'));
 
   const eligible=entries.filter(entry=>entry.eligible);
   const delivered=eligible.filter(entry=>entry.delivered).length;

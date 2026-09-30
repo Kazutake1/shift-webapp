@@ -817,3 +817,44 @@ test('スマホ通常画面ではシフト内の薄い横罫線を1pxで明示�
  const css=readFileSync(new URL('../style.css',import.meta.url),'utf8');
  assert.match(css,/@media screen and \(max-width:600px\), screen and \(orientation:landscape\) and \(max-height:500px\) and \(max-width:950px\) and \(pointer:coarse\)\{[\s\S]*#schedule tbody tr:nth-child\(5n\+2\)>td\.slot,[\s\S]*#schedule tbody tr:nth-child\(5n\+3\)>td\.slot,[\s\S]*#schedule tbody tr:nth-child\(5n\+4\)>td\.slot\{[\s\S]*border-top:1px solid #bbb/);
 });
+
+
+test('退職日は最終在籍日として扱い翌日から退職者になる',()=>{
+ const employee={retirementDate:'2026-10-31'};
+ assert.equal(employeeAvailableOn(employee,'2026-10-30'),true);
+ assert.equal(employeeAvailableOn(employee,'2026-10-31'),true);
+ assert.equal(employeeAvailableOn(employee,'2026-11-01'),false);
+ assert.equal(employeeRetiredBy(employee,'2026-10-30'),false);
+ assert.equal(employeeRetiredBy(employee,'2026-10-31'),false);
+ assert.equal(employeeRetiredBy(employee,'2026-11-01'),true);
+});
+
+test('翌週コピーでは退職日を過ぎた従業員だけ除外し既存週は保持する',()=>{
+ const root=migrate(),state=root.stores[0],employee=state.employees[0];
+ const sourceKey=state.current;
+ const source=state.weeks[sourceKey];
+ source.days[0].shifts[0][0]=makeShift(employee,0);
+ employee.retirementDate=addDays(source.days[0].date,7);
+ const nextKey=addDays(sourceKey,7);
+ ensureWeek(state,nextKey);
+ assert.equal(state.weeks[nextKey].days[0].shifts[0][0]?.employeeId,employee.id);
+ assert.equal(source.days[0].shifts[0][0]?.employeeId,employee.id);
+ const laterKey=addDays(nextKey,7);
+ ensureWeek(state,laterKey);
+ assert.equal(state.weeks[laterKey].days[0].shifts[0][0],null);
+ assert.equal(state.weeks[nextKey].days[0].shifts[0][0]?.employeeId,employee.id);
+});
+
+test('従業員編集は退職日を店舗固有情報として保存し従業員リストに在籍者と退職者タブを持つ',()=>{
+ const employeeUi=readFileSync(new URL('../employee-dialog.js',import.meta.url),'utf8');
+ const birthdayUi=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(employeeUi,/const retirement=el\('input',\{type:'date',value:employee\?\.retirementDate\|\|''\}\)/);
+ assert.match(employeeUi,/field\('退職日',retirementControl\)/);
+ assert.match(employeeUi,/従業員番号・入社年月日・退職日は店舗ごとに管理します/);
+ assert.match(employeeUi,/retirementDate:retirement\.value/);
+ assert.match(birthdayUi,/employeeRetiredBy\(employee,today\)/);
+ assert.match(birthdayUi,/entry\.retirementDate>=today/);
+ assert.match(html,/id="employee-active-tab"[^>]*>在籍者<\/button>/);
+ assert.match(html,/id="employee-retired-tab"[^>]*>退職者<\/button>/);
+});

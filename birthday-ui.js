@@ -52,7 +52,7 @@ export function createBirthdayUi({
 
   giftHost.querySelector('h2').textContent='従業員リスト';
   giftList.replaceChildren();
-  activeTab.textContent='在籍中 '+entries.length+'人';
+  activeTab.textContent='在籍者 '+entries.length+'人';
   retiredTab.textContent='退職者 '+retiredEmployees.length+'人';
   activeTab.classList.toggle('active',employeeListMode==='active');
   retiredTab.classList.toggle('active',employeeListMode==='retired');
@@ -100,7 +100,7 @@ export function createBirthdayUi({
       :'渡し済み'
      :'未渡し'
     :entry.eligibilityReason==='hireDateMissing'?'入社日未登録':'対象外（1年未満）';
-   if(entry.retirementDate&&entry.retirementDate>today)statusText+='／'+entry.retirementDate.split('-').join('/')+' 退職予定';
+   if(entry.retirementDate&&entry.retirementDate>=today)statusText+='／'+entry.retirementDate.split('-').join('/')+' 退職予定';
    const status=el('span',{class:'birthday-gift-status'},statusText);
 
    checkbox.onchange=()=>{

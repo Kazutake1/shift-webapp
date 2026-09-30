@@ -890,3 +890,34 @@ test('スマホ通常表示でシフト内の薄い横罫線が表示される',
  expect(style.style).toBe('solid');
  expect(style.color).toBe('rgb(187, 187, 187)');
 });
+
+
+test('退職日を登録した従業員は翌日以降に退職者リストへ表示される',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(s=>s.id===root.activeStoreId);
+  const employee=store.employees[0];
+  employee.name='退職確認従業員';
+  employee.shiftName='退職確認';
+  employee.hireDate='2020-01-01';
+  employee.birthDate='1990-01-01';
+  employee.retirementDate='2000-01-01';
+  employee.hidden=false;
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+
+ await page.locator('#settings').click();
+ await page.locator('#birthday-list').click();
+ await expect(page.getByRole('tab',{name:/退職者/})).toBeVisible();
+ await page.getByRole('tab',{name:/退職者/}).click();
+ await expect(page.locator('#birthday-gift-list')).toContainText('退職確認従業員');
+ await expect(page.locator('#birthday-gift-list')).toContainText('退職日 2000/01/01');
+
+ await page.locator('#birthday-back').click();
+ await page.locator('#employees').click();
+ await page.locator('.employee-row',{hasText:'退職確認従業員'}).getByRole('button',{name:'編集'}).click();
+ const retirement=page.locator('#dialog-body input[type="date"]').nth(2);
+ await expect(retirement).toHaveValue('2000-01-01');
+});

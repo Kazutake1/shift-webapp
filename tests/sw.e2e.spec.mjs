@@ -8,11 +8,12 @@ test('Service Workerのキャッシュ・更新・controllerchange・オフラ�
 
  const cacheState=await page.evaluate(async()=>{
   const keys=await caches.keys();
-  const current=keys.find(key=>key==='shift-ipad-step1-shell-v129');
+  const current=keys.find(key=>key.startsWith('shift-ipad-step1-shell-'));
   const requests=current?await (await caches.open(current)).keys():[];
   return {keys,urls:requests.map(request=>request.url)};
  });
- expect(cacheState.keys).toContain('shift-ipad-step1-shell-v129');
+ expect(cacheState.keys.filter(key=>key.startsWith('shift-ipad-step1-shell-'))).toHaveLength(1);
+ expect(cacheState.keys.find(key=>key.startsWith('shift-ipad-step1-shell-'))).toMatch(/^shift-ipad-step1-shell-v\d+$/);
  expect(cacheState.urls.some(url=>url.endsWith('/index.html'))).toBe(true);
  expect(cacheState.urls.some(url=>url.endsWith('/app.js'))).toBe(true);
 

@@ -164,8 +164,18 @@ test('週操作は店名の右側の上部バーへ移動し、スマホでは�
   await expect(page.locator('#today')).toBeVisible();
   if(width<=600){
    const buttons=await Promise.all(['#store','#prev','#next','#today','#copy-week','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
-   for(const box of buttons){expect(box.height).toBeGreaterThanOrEqual(44);expect(Math.abs(box.y-buttons[0].y)).toBeLessThan(2);}
-   for(let i=1;i<buttons.length;i++)expect(buttons[i].x).toBeGreaterThanOrEqual(buttons[i-1].x+buttons[i-1].width);
+   for(const box of buttons)expect(box.height).toBeGreaterThanOrEqual(44);
+   if(width<=360){
+    expect(buttons[0].width).toBeGreaterThanOrEqual(140);
+    expect(Math.abs(buttons[5].y-buttons[0].y)).toBeLessThan(2);
+    expect(Math.abs(buttons[6].y-buttons[0].y)).toBeLessThan(2);
+    for(let i=1;i<=4;i++)expect(buttons[i].y).toBeGreaterThan(buttons[0].y+buttons[0].height-2);
+    for(let i=2;i<=4;i++)expect(Math.abs(buttons[i].y-buttons[1].y)).toBeLessThan(2);
+    for(let i=2;i<=4;i++)expect(buttons[i].x).toBeGreaterThanOrEqual(buttons[i-1].x+buttons[i-1].width-1);
+   }else{
+    for(const box of buttons)expect(Math.abs(box.y-buttons[0].y)).toBeLessThan(2);
+    for(let i=1;i<buttons.length;i++)expect(buttons[i].x).toBeGreaterThanOrEqual(buttons[i-1].x+buttons[i-1].width);
+   }
    expect(buttons.at(-1).x+buttons.at(-1).width).toBeLessThanOrEqual(width);
    await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(5);
    const todayColors=await page.locator('#today').evaluate(el=>{

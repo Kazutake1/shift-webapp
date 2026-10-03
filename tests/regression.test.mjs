@@ -996,4 +996,5 @@ test('CSPはスクリプトを同一オリジンに制限し既存の動的ス�
  assert.match(html,/style-src 'self' 'unsafe-inline'/);
  assert.match(html,/object-src 'none'/);
  assert.match(html,/worker-src 'self'/);
+ assert.match(html,/connect-src 'self' blob:/);
 });

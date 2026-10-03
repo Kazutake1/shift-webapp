@@ -79,7 +79,7 @@ export function createBirthdayUi({
   const delivered=eligible.filter(entry=>entry.delivered).length;
   giftSummary.textContent=entries.length
    ?`クオカード渡し済み ${delivered} / ${eligible.length}名（${year}年）`
-   :'誕生日が登録されている従業員はいません。';
+   :'在籍者はいません。';
 
   for(const entry of entries){
    const row=el('label',{class:entry.eligible?'birthday-gift-row':'birthday-gift-row birthday-gift-ineligible'});
@@ -90,7 +90,7 @@ export function createBirthdayUi({
    checkbox.checked=entry.delivered;
    checkbox.disabled=!entry.eligible;
 
-   const date=el('span',{class:'birthday-gift-date'},`${Number(entry.birthday.slice(5,7))}/${Number(entry.birthday.slice(8))}`);
+   const date=el('span',{class:'birthday-gift-date'},entry.birthday?`${Number(entry.birthday.slice(5,7))}/${Number(entry.birthday.slice(8))}`:'—');
    const person=el('span',{class:'birthday-gift-person'},entry.name);
    const store=el('span',{class:'birthday-gift-store'},entry.store);
    let statusText=entry.eligible
@@ -99,7 +99,9 @@ export function createBirthdayUi({
       ?`${entry.deliveredByStoreName}で渡し済み`
       :'渡し済み'
      :'未渡し'
-    :entry.eligibilityReason==='hireDateMissing'?'入社日未登録':'対象外（1年未満）';
+    :entry.eligibilityReason==='birthDateMissing'?'生年月日未登録'
+     :entry.eligibilityReason==='hireDateMissing'?'入社日未登録':'対象外（1年未満）';
+   if(entry.hidden)statusText+='／非表示';
    if(entry.retirementDate&&entry.retirementDate>=today)statusText+='／'+entry.retirementDate.split('-').join('/')+' 退職予定';
    const status=el('span',{class:'birthday-gift-status'},statusText);
 

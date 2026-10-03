@@ -418,7 +418,7 @@ test('誕生日通知UIをapp.jsから分離する',()=>{
  assert.match(birthdayUi,/giftHost\.querySelector\('h2'\)\.textContent='従業員リスト'/);
 });
 
-test('誕生日リストは表示中従業員を並べ、入社1年以上だけプレゼント対象にする',async()=>{
+test('従業員リストは生年月日未登録・非表示を含む全在籍者を並べ、入社1年以上だけプレゼント対象にする',async()=>{
  const {birthdayGiftChecklist}=await import('../birthdays.js');
  const root={
   birthdayGiftDelivered:[],
@@ -427,15 +427,20 @@ test('誕生日リストは表示中従業員を並べ、入社1年以上だけ�
     {id:'e1',name:'対象A',hidden:false,birthDate:'1990-12-01',hireDate:'2025-10-01'},
     {id:'e2',name:'一年未満B',hidden:false,birthDate:'1990-09-01',hireDate:'2025-10-01'},
     {id:'e3',name:'入社日なしC',hidden:false,birthDate:'1990-11-01',hireDate:''},
-    {id:'e4',name:'非表示D',hidden:true,birthDate:'1990-08-01',hireDate:'2020-01-01'}
+    {id:'e4',name:'非表示D',hidden:true,birthDate:'1990-08-01',hireDate:'2020-01-01'},
+    {id:'e5',name:'生年月日なしE',hidden:false,birthDate:'',hireDate:'2020-01-01'}
    ]
   }]
  };
  const list=birthdayGiftChecklist(root,2026);
- assert.deepEqual(list.map(item=>item.name),['一年未満B','入社日なしC','対象A']);
+ assert.deepEqual(list.map(item=>item.name),['非表示D','一年未満B','入社日なしC','対象A','生年月日なしE']);
  assert.equal(list.find(item=>item.name==='対象A').eligible,true);
  assert.equal(list.find(item=>item.name==='一年未満B').eligible,false);
  assert.equal(list.find(item=>item.name==='入社日なしC').eligibilityReason,'hireDateMissing');
+ assert.equal(list.find(item=>item.name==='非表示D').hidden,true);
+ assert.equal(list.find(item=>item.name==='非表示D').eligible,true);
+ assert.equal(list.find(item=>item.name==='生年月日なしE').eligibilityReason,'birthDateMissing');
+ assert.equal(list.find(item=>item.name==='生年月日なしE').birthday,'');
 
  const target=list.find(item=>item.name==='対象A');
  root.birthdayGiftDelivered=[target.key];
@@ -925,4 +930,13 @@ test('退職後または入社前の既存勤務は編集画面から再保存�
  assert.equal((app.match(new RegExp(message,'g'))||[]).length,2);
  assert.match(app,/employees\.find\(item=>item\.id===candidate\.employeeId\);if\(!employee\|\|!employeeAvailableOn\(employee,week\(\)\.days\[d\]\.date\)\)/);
  assert.match(app,/employees\.find\(item=>item\.id===draft\.employeeId\);if\(!employee\|\|!employeeAvailableOn\(employee,week\(\)\.days\[d\]\.date\)\)/);
+});
+
+
+test('在籍者UIは生年月日未登録と非表示状態を明示する',()=>{
+ const ui=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ assert.match(ui,/entry\.birthday\?[^:]+:'—'/);
+ assert.match(ui,/birthDateMissing'\?'生年月日未登録'/);
+ assert.match(ui,/if\(entry\.hidden\)statusText\+='／非表示'/);
+ assert.match(ui,/'在籍者はいません。'/);
 });

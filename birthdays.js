@@ -40,7 +40,7 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
  const eligiblePeople=new Set();
 
  for(const store of root.stores)for(const employee of store.employees){
-  if(employee.hidden||employeeRetiredBy(employee,today)||!validDate(employee.birthDate)||!validDate(employee.hireDate))continue;
+  if(employeeRetiredBy(employee,today)||!validDate(employee.birthDate)||!validDate(employee.hireDate))continue;
   const birthday=anniversary(employee.birthDate,year);
   const firstAnniversary=anniversary(employee.hireDate,Number(employee.hireDate.slice(0,4))+1);
   if(firstAnniversary<=birthday)eligiblePeople.add(personKey(store,employee,birthday));
@@ -48,13 +48,14 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
 
  for(const store of root.stores){
   for(const employee of store.employees){
-   if(employee.hidden||employeeRetiredBy(employee,today)||!validDate(employee.birthDate))continue;
+   if(employeeRetiredBy(employee,today))continue;
 
-   const birthday=anniversary(employee.birthDate,year);
+   const hasBirthDate=validDate(employee.birthDate);
+   const birthday=hasBirthDate?anniversary(employee.birthDate,year):'';
    const hasHireDate=validDate(employee.hireDate);
-   const key=personKey(store,employee,birthday);
-   const eligible=eligiblePeople.has(key);
-   const deliveryStore=(root.birthdayGiftDeliveryStores||{})[key];
+   const key=hasBirthDate?personKey(store,employee,birthday):'';
+   const eligible=hasBirthDate&&eligiblePeople.has(key);
+   const deliveryStore=key?(root.birthdayGiftDeliveryStores||{})[key]:null;
    const deliveryStoreName=deliveryStore&&(root.stores.find(s=>s.id===deliveryStore.storeId)?.store||deliveryStore.storeName);
 
    result.push({
@@ -63,10 +64,11 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
     store:store.store,
     employeeId:employee.id,
     name:employee.name,
+    hidden:Boolean(employee.hidden),
     retirementDate:employee.retirementDate||'',
     birthday,
     eligible,
-    eligibilityReason:eligible?'eligible':hasHireDate?'underOneYear':'hireDateMissing',
+    eligibilityReason:eligible?'eligible':!hasBirthDate?'birthDateMissing':hasHireDate?'underOneYear':'hireDateMissing',
     delivered:eligible&&delivered.has(key),
     deliveredByStoreId:deliveryStore?.storeId||'',
     deliveredByStoreName:deliveryStoreName||''
@@ -75,7 +77,7 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
  }
 
  return result.sort((a,b)=>
-  a.birthday.slice(5).localeCompare(b.birthday.slice(5))||
+  (a.birthday?a.birthday.slice(5):'99-99').localeCompare(b.birthday?b.birthday.slice(5):'99-99')||
   a.store.localeCompare(b.store)||
   a.name.localeCompare(b.name)
  );

@@ -947,7 +947,7 @@ test('前週の従業員シフトを作成済み週へ再コピーし5段目と�
  },STORAGE_KEY);
  await page.reload();
 
- await page.getByRole('button',{name:'前週のシフトをコピー'}).click();
+ await page.getByRole('button',{name:'前週シフトをコピー'}).click();
  await expect(page.getByText(/現在週の従業員①・②・予備従業員/)).toHaveCount(0);
  const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
  const store=stored.stores.find(s=>s.id===stored.activeStoreId);
@@ -964,6 +964,6 @@ test('前週コピーは今週へ戻るの右側に表示する',async({page})=>
  const today=await page.locator('#today').boundingBox();
  const copy=await page.locator('#copy-week').boundingBox();
  expect(copy.x).toBeGreaterThanOrEqual(today.x+today.width);
- await expect(page.locator('#copy-week')).toHaveAttribute('aria-label','前週のシフトをコピー');
+ await expect(page.locator('#copy-week')).toHaveAttribute('aria-label','前週シフトをコピー');
  await expect(page.locator('#shift-page #copy-week')).toHaveCount(0);
 });

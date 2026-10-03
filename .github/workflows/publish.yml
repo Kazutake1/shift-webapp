@@ -46,6 +46,12 @@ jobs:
       - name: Syntax check
         if: steps.holidays.outputs.changed == 'true'
         run: npm run check
+      - name: Install lint tools
+        if: steps.holidays.outputs.changed == 'true'
+        run: npm install --no-save --ignore-scripts eslint@9.38.0
+      - name: Lint
+        if: steps.holidays.outputs.changed == 'true'
+        run: npm run lint
       - name: Regression tests
         if: steps.holidays.outputs.changed == 'true'
         run: npm test
@@ -57,6 +63,9 @@ jobs:
       - name: Browser operation tests
         if: steps.holidays.outputs.changed == 'true'
         run: npm run test:e2e
+      - name: Service Worker E2E
+        if: steps.holidays.outputs.changed == 'true'
+        run: npm run test:sw
       - name: Commit verified holiday updates
         if: steps.holidays.outputs.changed == 'true'
         run: |

@@ -988,3 +988,12 @@ test('長期保存容量は4MBから警告し過去週を自動削除しない',
  assert.match(backupUi,/現在の保存データ：約/);
  assert.match(backupUi,/storageBytes>=STORAGE_WARNING_BYTES/);
 });
+
+test('CSPはスクリプトを同一オリジンに制限し既存の動的スタイルを許可する',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ assert.match(html,/http-equiv="Content-Security-Policy"/);
+ assert.match(html,/script-src 'self'/);
+ assert.match(html,/style-src 'self' 'unsafe-inline'/);
+ assert.match(html,/object-src 'none'/);
+ assert.match(html,/worker-src 'self'/);
+});

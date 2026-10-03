@@ -940,3 +940,28 @@ test('在籍者UIは生年月日未登録と非表示状態を明示する',()=>
  assert.match(ui,/if\(entry\.hidden\)statusText\+='／非表示'/);
  assert.match(ui,/'在籍者はいません。'/);
 });
+
+
+test('退職予定者は誕生日当日に在籍する場合だけ通知する',()=>{
+ const r=birthdayRoot(),e=r.stores[0].employees[0];
+ e.retirementDate='2026-09-30';
+ assert.equal(birthdayNotices(r,'2026-09-24').length,0);
+ e.retirementDate='2026-10-01';
+ assert.equal(birthdayNotices(r,'2026-09-24')[0].birthday,'2026-10-01');
+});
+
+test('QUOカード対象は誕生日当日の在籍状態も判定する',()=>{
+ const r=birthdayRoot(),e=r.stores[0].employees[0];
+ e.retirementDate='2026-09-30';
+ let entry=birthdayGiftChecklist(r,2026,'2026-09-24').find(item=>item.employeeId===e.id);
+ assert.equal(entry.eligible,false);
+ assert.equal(entry.eligibilityReason,'notEmployedOnBirthday');
+ e.retirementDate='2026-10-01';
+ entry=birthdayGiftChecklist(r,2026,'2026-09-24').find(item=>item.employeeId===e.id);
+ assert.equal(entry.eligible,true);
+});
+
+test('従業員リストは誕生日当日に在籍しない予定者を明示する',()=>{
+ const ui=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ assert.match(ui,/notEmployedOnBirthday'\?'誕生日当日は在籍対象外'/);
+});

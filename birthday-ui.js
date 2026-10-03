@@ -100,6 +100,7 @@ export function createBirthdayUi({
       :'渡し済み'
      :'未渡し'
     :entry.eligibilityReason==='birthDateMissing'?'生年月日未登録'
+     :entry.eligibilityReason==='notEmployedOnBirthday'?'誕生日当日は在籍対象外'
      :entry.eligibilityReason==='hireDateMissing'?'入社日未登録':'対象外（1年未満）';
    if(entry.hidden)statusText+='／非表示';
    if(entry.retirementDate&&entry.retirementDate>=today)statusText+='／'+entry.retirementDate.split('-').join('/')+' 退職予定';

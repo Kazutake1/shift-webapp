@@ -1,4 +1,4 @@
-import {addDays,employeeRetiredBy} from './model.js';
+import {addDays,employeeAvailableOn,employeeRetiredBy} from './model.js';
 import {personKey} from './employee-identity.js';
 export function japanToday(now=new Date()){
  const parts=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(now);
@@ -15,7 +15,7 @@ export function birthdayNotices(root,today=japanToday()){
   if(anniversary(e.hireDate,Number(e.hireDate.slice(0,4))+1)>today)continue;
   for(const y of [year,year+1]){
    const birthday=anniversary(e.birthDate,y);
-   if(birthday<today||birthday>addDays(today,7))continue;
+   if(birthday<today||birthday>addDays(today,7)||!employeeAvailableOn(e,birthday))continue;
    const key=personKey(store,e,birthday);
    if((root.birthdayAcknowledgements||[]).includes(key))continue;
    const days=Math.round((Date.parse(birthday+'T12:00:00Z')-Date.parse(today+'T12:00:00Z'))/86400000);
@@ -32,9 +32,8 @@ export function birthdayNotices(root,today=japanToday()){
 }
 
 
-export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4))){
+export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)),today=japanToday()){
  if(!Number.isInteger(year)||year<2000||year>9999)return [];
- const today=japanToday();
  const delivered=new Set(root.birthdayGiftDelivered||[]);
  const result=[];
  const eligiblePeople=new Set();
@@ -43,7 +42,7 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
   if(employeeRetiredBy(employee,today)||!validDate(employee.birthDate)||!validDate(employee.hireDate))continue;
   const birthday=anniversary(employee.birthDate,year);
   const firstAnniversary=anniversary(employee.hireDate,Number(employee.hireDate.slice(0,4))+1);
-  if(firstAnniversary<=birthday)eligiblePeople.add(personKey(store,employee,birthday));
+  if(firstAnniversary<=birthday&&employeeAvailableOn(employee,birthday))eligiblePeople.add(personKey(store,employee,birthday));
  }
 
  for(const store of root.stores){
@@ -54,7 +53,8 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
    const birthday=hasBirthDate?anniversary(employee.birthDate,year):'';
    const hasHireDate=validDate(employee.hireDate);
    const key=hasBirthDate?personKey(store,employee,birthday):'';
-   const eligible=hasBirthDate&&eligiblePeople.has(key);
+   const availableOnBirthday=hasBirthDate&&employeeAvailableOn(employee,birthday);
+   const eligible=availableOnBirthday&&eligiblePeople.has(key);
    const deliveryStore=key?(root.birthdayGiftDeliveryStores||{})[key]:null;
    const deliveryStoreName=deliveryStore&&(root.stores.find(s=>s.id===deliveryStore.storeId)?.store||deliveryStore.storeName);
 
@@ -68,7 +68,7 @@ export function birthdayGiftChecklist(root,year=Number(japanToday().slice(0,4)))
     retirementDate:employee.retirementDate||'',
     birthday,
     eligible,
-    eligibilityReason:eligible?'eligible':!hasBirthDate?'birthDateMissing':hasHireDate?'underOneYear':'hireDateMissing',
+    eligibilityReason:eligible?'eligible':!hasBirthDate?'birthDateMissing':!availableOnBirthday?'notEmployedOnBirthday':hasHireDate?'underOneYear':'hireDateMissing',
     delivered:eligible&&delivered.has(key),
     deliveredByStoreId:deliveryStore?.storeId||'',
     deliveredByStoreName:deliveryStoreName||''

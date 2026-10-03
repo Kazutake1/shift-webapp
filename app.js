@@ -1,6 +1,6 @@
 import {createBirthdayUi} from './birthday-ui.js';
 import {holidayYears} from './holidays.js';
-import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,makeShift,employeeShiftName,employeeShiftConflicts,employeeAvailableOn,fixedSetting,fixedTextAt} from './model.js';
+import {monday,bands,addDays,timeLabel,timeValue,workingTimes,shiftLabel,timedTextLabel,dayInfo,ensureWeek,copyPreviousWeekEmployeeShifts,makeShift,employeeShiftName,employeeShiftConflicts,employeeAvailableOn,fixedSetting,fixedTextAt} from './model.js';
 import {createStoreUi} from './store-dialog.js';
 import {openBackupDialog} from './backup-dialog.js';
 import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
@@ -310,6 +310,17 @@ function openFixed(){
   },'primary'));
 }
 function navigate(delta,target){const state=stateManager.getState(),next=target||addDays(state.current,delta),existed=!!state.weeks[next];let copied=false;if(!persistChange(()=>{copied=ensureWeek(state,next);state.current=next;},false))return;render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
+function copyPreviousWeek(){
+ const state=stateManager.getState(),current=state.weeks[state.current],previous=state.weeks[addDays(state.current,-7)];
+ if(!previous){alert('前週のシフトデータがありません。');return;}
+ const hasShifts=current.days.some(day=>day.shifts.some(row=>row.some(Boolean)));
+ if(hasShifts&&!confirm('現在週の従業員①・②・予備従業員のシフトを、前週の内容で上書きします。不定期作業／トレーニングと備考は変更しません。コピーしますか？'))return;
+ let copied=false;
+ if(!persistChange(()=>{copied=copyPreviousWeekEmployeeShifts(state,state.current);} ,false))return;
+ if(!copied)return;
+ render();
+ $('#notice').textContent+=' 前週の従業員①・②・予備従業員をコピーしました。';
+}
 function openBackup(){
  const body=openDialog('バックアップ・復元');
  openBackupDialog({
@@ -348,7 +359,7 @@ $('#settings-back').onclick=()=>{location.hash='';};
 $('#birthday-list').onclick=()=>{location.hash='birthdays';};
 $('#birthday-back').onclick=()=>{location.hash='settings';};
 window.addEventListener('hashchange',showSettings);
-$('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#prev').onclick=()=>navigate(-7);$('#next').onclick=()=>navigate(7);
+$('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#copy-week').onclick=copyPreviousWeek;$('#prev').onclick=()=>navigate(-7);$('#next').onclick=()=>navigate(7);
 $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;navigate(0,monday(key));};
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;

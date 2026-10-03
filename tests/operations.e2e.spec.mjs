@@ -922,3 +922,37 @@ test('退職日を登録した従業員は翌日以降に退職者リストへ�
  const retirement=page.locator('#dialog-body input[type="date"]').nth(2);
  await expect(retirement).toHaveValue('2000-01-01');
 });
+
+
+test('前週の従業員シフトを作成済み週へ再コピーし5段目と備考を保持する',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(s=>s.id===root.activeStoreId);
+  const current=store.current;
+  const next=new Date(current+'T12:00:00Z');next.setUTCDate(next.getUTCDate()+7);
+  const nextKey=next.toISOString().slice(0,10);
+  if(!store.weeks[nextKey]){
+   const add=(date,n)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+   store.weeks[nextKey]={start:nextKey,days:Array.from({length:7},(_,i)=>({date:add(nextKey,i),shifts:Array.from({length:3},()=>Array(5).fill(null)),extras:Array(5).fill(null),notes:''}))};
+  }
+  const source=store.weeks[current],target=store.weeks[nextKey];
+  const employee=store.employees[0];
+  source.days[0].shifts[0][0]={employeeId:employee.id,name:employee.shiftName||employee.name,start:360,end:540};
+  target.days[0].shifts[0][0]=null;
+  target.days[0].extras[0]={type:'task',text:'保持する作業',start:360,end:540};
+  target.days[0].notes='保持する備考';
+  store.current=nextKey;
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+
+ await page.getByRole('button',{name:'前週の従業員シフトをコピー'}).click();
+ await expect(page.getByText(/現在週の従業員①・②・予備従業員/)).toHaveCount(0);
+ const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
+ const store=stored.stores.find(s=>s.id===stored.activeStoreId);
+ const day=store.weeks[store.current].days[0];
+ expect(day.shifts[0][0]).not.toBeNull();
+ expect(day.extras[0].text).toBe('保持する作業');
+ expect(day.notes).toBe('保持する備考');
+});

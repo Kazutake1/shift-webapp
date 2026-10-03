@@ -9,7 +9,7 @@ if(!globalThis.atob)globalThis.atob=value=>Buffer.from(value,'base64').toString(
 
 import {
   initialState,ensureWeek,addDays,monday,shiftLabel,workingTimes,dayInfo,makeShift,
-  employeeShiftName,employeeShiftConflicts,employeeAvailableOn,employeeRetiredBy,fixedSetting,fixedTextAt,timedTextLabel,bands
+  employeeShiftName,employeeShiftConflicts,employeeAvailableOn,employeeRetiredBy,copyPreviousWeekEmployeeShifts,fixedSetting,fixedTextAt,timedTextLabel,bands
 } from '../model.js';
 import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
@@ -857,4 +857,35 @@ test('従業員編集は退職日を店舗固有情報として保存し従業�
  assert.match(birthdayUi,/entry\.retirementDate>=today/);
  assert.match(html,/id="employee-active-tab"[^>]*>在籍者<\/button>/);
  assert.match(html,/id="employee-retired-tab"[^>]*>退職者<\/button>/);
+});
+
+
+test('作成済み週へ前週の従業員3段だけを明示的に再コピーできる',()=>{
+ const s=initialState(),source=s.current,next=addDays(source,7);
+ ensureWeek(s,next);
+ const target=s.weeks[next];
+ target.days[0].shifts[0][0]=null;
+ target.days[0].extras[0]={type:'task',text:'残す',start:360,end:540};
+ target.days[0].notes='残す備考';
+ s.weeks[source].days[0].shifts[0][0]=makeShift(s.employees[2],0);
+ assert.equal(copyPreviousWeekEmployeeShifts(s,next),true);
+ assert.equal(target.days[0].shifts[0][0].employeeId,s.employees[2].id);
+ assert.equal(target.days[0].extras[0].text,'残す');
+ assert.equal(target.days[0].notes,'残す備考');
+});
+
+test('明示的な前週コピーでも退職日を過ぎた従業員は除外する',()=>{
+ const s=initialState(),employee=s.employees[0],next=addDays(s.current,7);
+ ensureWeek(s,next);
+ employee.retirementDate=addDays(s.current,6);
+ assert.equal(copyPreviousWeekEmployeeShifts(s,next),true);
+ assert.equal(s.weeks[next].days[0].shifts[0][0],null);
+});
+
+test('前週コピー用ボタンと上書き確認を備え、5段目と備考を変更しない説明を表示する',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(html,/id="copy-week"[^>]*>前週の従業員シフトをコピー<\/button>/);
+ assert.match(app,/現在週の従業員①・②・予備従業員のシフトを、前週の内容で上書きします。不定期作業／トレーニングと備考は変更しません。コピーしますか？/);
+ assert.match(app,/copyPreviousWeekEmployeeShifts\(state,state\.current\)/);
 });

@@ -10,7 +10,24 @@ export function workingTimes(start,end){let s=toMinutes(start),e=toMinutes(end);
 export function shiftLabel(shift,b){if(!shift)return '';const band=bands[b];let suffix='';if(shift.start!==band.start&&shift.end!==band.end)suffix=`${timeLabel(shift.start)}〜${timeLabel(shift.end)}`;else if(shift.start!==band.start)suffix=`${timeLabel(shift.start)}〜`;else if(shift.end!==band.end)suffix=`〜${timeLabel(shift.end)}`;return shift.name+(suffix?`（${suffix}）`:'');}
 export function dayInfo(key){const weekday=new Date(key+'T12:00:00Z').getUTCDay();return {weekday,holiday:holidays[key]||'',supported:holidayYears.includes(Number(key.slice(0,4))),color:holidays[key]||weekday===0?'red':weekday===6?'blue':''};}
 export function emptyWeek(key){return {start:key,days:Array.from({length:7},(_,i)=>({date:addDays(key,i),shifts:Array.from({length:3},()=>Array(5).fill(null)),extras:Array(5).fill(null),notes:''}))};}
-export function ensureWeek(state,key){if(state.weeks[key])return false;const w=emptyWeek(key),prev=state.weeks[addDays(key,-7)];if(prev)w.days.forEach((d,i)=>{d.shifts=structuredClone(prev.days[i].shifts);d.shifts.forEach(row=>row.forEach((shift,b)=>{if(!shift)return;const employee=state.employees.find(item=>item.id===shift.employeeId);if(employee&&!employeeAvailableOn(employee,d.date))row[b]=null;}));});state.weeks[key]=w;return !!prev;}
+export function copyPreviousWeekEmployeeShifts(state,key){
+ const current=state.weeks[key],prev=state.weeks[addDays(key,-7)];
+ if(!current||!prev)return false;
+ current.days.forEach((day,i)=>{
+  day.shifts=structuredClone(prev.days[i].shifts);
+  day.shifts.forEach(row=>row.forEach((shift,b)=>{
+   if(!shift)return;
+   const employee=state.employees.find(item=>item.id===shift.employeeId);
+   if(employee&&!employeeAvailableOn(employee,day.date))row[b]=null;
+  }));
+ });
+ return true;
+}
+export function ensureWeek(state,key){
+ if(state.weeks[key])return false;
+ state.weeks[key]=emptyWeek(key);
+ return copyPreviousWeekEmployeeShifts(state,key);
+}
 export function employeeShiftName(employee){return employee?.shiftName?.trim()||employee?.name||'';}
 export function employeeAvailableOn(employee,date){const r=employee?.retirementDate;return !r||r>=date;}
 export function employeeRetiredBy(employee,date){const r=employee?.retirementDate;return !!r&&r<date;}

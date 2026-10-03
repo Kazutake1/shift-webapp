@@ -583,3 +583,9 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
 .retired-employee-person{font-weight:700;overflow-wrap:anywhere}
 .retired-employee-date,.retired-employee-meta{font-size:13px;color:var(--ui-muted,#64748b);white-space:nowrap}
 @media(max-width:600px){.retired-employee-row{grid-template-columns:minmax(0,1fr) auto}.retired-employee-meta{grid-column:1/3}.employee-list-tabs button{flex:1}}
+
+
+/* v118: explicit employee-shift recopy control; shift table layout is unchanged. */
+.shift-tools{display:flex;justify-content:flex-end;margin:0 0 8px}
+.shift-tools #copy-week{min-height:40px;padding:8px 14px;font-size:14px}
+@media(max-width:600px){.shift-tools #copy-week{width:100%}}

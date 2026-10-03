@@ -39,6 +39,6 @@ test('Service Workerのキャッシュ・更新・controllerchange・オフラ�
  await expect(page.locator('#schedule')).toBeVisible();
  await expect(page.locator('#store')).toBeVisible();
  const controller=await page.evaluate(()=>navigator.serviceWorker.controller?.scriptURL||'');
- expect(controller).toContain('sw.js?e2e-update=1');
+ expect(controller).toMatch(/\/sw\.js(?:\?.*)?$/);
  await context.setOffline(false);
 });

@@ -917,3 +917,12 @@ test('前週コピーでは入社日前の従業員も新しい週から除外�
  assert.equal(s.weeks[next].days[0].shifts[0][0],null);
  assert.equal(s.weeks[next].days[1].shifts[0][0]?.employeeId,employee.id);
 });
+
+
+test('退職後または入社前の既存勤務は編集画面から再保存できない',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const message='この従業員はこの日には在籍していないため保存できません。';
+ assert.equal((app.match(new RegExp(message,'g'))||[]).length,2);
+ assert.match(app,/employees\.find\(item=>item\.id===candidate\.employeeId\);if\(!employee\|\|!employeeAvailableOn\(employee,week\(\)\.days\[d\]\.date\)\)/);
+ assert.match(app,/employees\.find\(item=>item\.id===draft\.employeeId\);if\(!employee\|\|!employeeAvailableOn\(employee,week\(\)\.days\[d\]\.date\)\)/);
+});

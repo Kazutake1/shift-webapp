@@ -899,3 +899,21 @@ test('削除済み従業員は前週コピーで新しい週へ引き継がな�
  assert.equal(s.weeks[next].days[0].shifts[0][0],null);
  assert.equal(s.weeks[s.current].days[0].shifts[0][0]?.employeeId,employee.id);
 });
+
+
+test('通常シフトの在籍判定は入社日から退職日までを対象にする',()=>{
+ const employee={hireDate:'2026-10-10',retirementDate:'2026-10-31'};
+ assert.equal(employeeAvailableOn(employee,'2026-10-09'),false);
+ assert.equal(employeeAvailableOn(employee,'2026-10-10'),true);
+ assert.equal(employeeAvailableOn(employee,'2026-10-31'),true);
+ assert.equal(employeeAvailableOn(employee,'2026-11-01'),false);
+ assert.equal(employeeAvailableOn({hireDate:'',retirementDate:''},'2026-10-01'),true);
+});
+
+test('前週コピーでは入社日前の従業員も新しい週から除外する',()=>{
+ const s=initialState(),employee=s.employees[0],next=addDays(s.current,7);
+ employee.hireDate=addDays(next,1);
+ assert.equal(ensureWeek(s,next),true);
+ assert.equal(s.weeks[next].days[0].shifts[0][0],null);
+ assert.equal(s.weeks[next].days[1].shifts[0][0]?.employeeId,employee.id);
+});

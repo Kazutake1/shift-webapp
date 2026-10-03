@@ -29,7 +29,7 @@ export function ensureWeek(state,key){
  return copyPreviousWeekEmployeeShifts(state,key);
 }
 export function employeeShiftName(employee){return employee?.shiftName?.trim()||employee?.name||'';}
-export function employeeAvailableOn(employee,date){const r=employee?.retirementDate;return !r||r>=date;}
+export function employeeAvailableOn(employee,date){const h=employee?.hireDate,r=employee?.retirementDate;return (!h||h<=date)&&(!r||r>=date);}
 export function employeeRetiredBy(employee,date){const r=employee?.retirementDate;return !!r&&r<date;}
 export function makeShift(employee,b,start=bands[b].start,end=bands[b].end){return {employeeId:employee.id,name:employeeShiftName(employee),start,end};}
 export function employeeShiftConflicts(day,candidate,exclude=null){

@@ -18,7 +18,7 @@ export function copyPreviousWeekEmployeeShifts(state,key){
   day.shifts.forEach(row=>row.forEach((shift,b)=>{
    if(!shift)return;
    const employee=state.employees.find(item=>item.id===shift.employeeId);
-   if(employee&&!employeeAvailableOn(employee,day.date))row[b]=null;
+   if(!employee||!employeeAvailableOn(employee,day.date))row[b]=null;
   }));
  });
  return true;

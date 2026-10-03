@@ -889,3 +889,13 @@ test('前週コピー用ボタンと上書き確認を備え、5段目と備考�
  assert.match(app,/現在週の従業員①・②・予備従業員のシフトを、前週の内容で上書きします。不定期作業／トレーニングと備考は変更しません。コピーしますか？/);
  assert.match(app,/copyPreviousWeekEmployeeShifts\(state,state\.current\)/);
 });
+
+
+test('削除済み従業員は前週コピーで新しい週へ引き継がない',()=>{
+ const s=initialState(),employee=s.employees[0],next=addDays(s.current,7);
+ assert.equal(s.weeks[s.current].days[0].shifts[0][0]?.employeeId,employee.id);
+ s.employees=s.employees.filter(item=>item.id!==employee.id);
+ assert.equal(ensureWeek(s,next),true);
+ assert.equal(s.weeks[next].days[0].shifts[0][0],null);
+ assert.equal(s.weeks[s.current].days[0].shifts[0][0]?.employeeId,employee.id);
+});

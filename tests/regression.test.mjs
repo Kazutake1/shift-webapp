@@ -885,7 +885,7 @@ test('明示的な前週コピーでも退職日を過ぎた従業員は除外�
 test('前週コピー用ボタンと上書き確認を備え、5段目と備考を変更しない説明を表示する',()=>{
  const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
- assert.match(html,/id="copy-week"[^>]*>前週の従業員シフトをコピー<\/button>/);
+ assert.match(html,/id="today"[\s\S]*id="copy-week"[^>]*aria-label="前週のシフトをコピー"[\s\S]*前週のシフトをコピー/);
  assert.match(app,/現在週の従業員①・②・予備従業員のシフトを、前週の内容で上書きします。不定期作業／トレーニングと備考は変更しません。コピーしますか？/);
  assert.match(app,/copyPreviousWeekEmployeeShifts\(state,state\.current\)/);
 });

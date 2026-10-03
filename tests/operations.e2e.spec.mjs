@@ -163,11 +163,11 @@ test('週操作は店名の右側の上部バーへ移動し、スマホでは�
   await expect(page.locator('#next')).toBeVisible();
   await expect(page.locator('#today')).toBeVisible();
   if(width<=600){
-   const buttons=await Promise.all(['#store','#prev','#next','#today','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
+   const buttons=await Promise.all(['#store','#prev','#next','#today','#copy-week','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
    for(const box of buttons){expect(box.height).toBeGreaterThanOrEqual(44);expect(Math.abs(box.y-buttons[0].y)).toBeLessThan(2);}
    for(let i=1;i<buttons.length;i++)expect(buttons[i].x).toBeGreaterThanOrEqual(buttons[i-1].x+buttons[i-1].width);
    expect(buttons.at(-1).x+buttons.at(-1).width).toBeLessThanOrEqual(width);
-   await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(4);
+   await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(5);
    const todayColors=await page.locator('#today').evaluate(el=>{
     const css=getComputedStyle(el);
     return {background:css.backgroundColor,color:css.color,border:css.borderTopColor};
@@ -190,12 +190,12 @@ test('スマホを横向きにしても上部操作と印刷プレビューの�
  try{
   const page=await context.newPage();
   await openApp(page);
-  await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(4);
+  await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(5);
   await page.setViewportSize({width:844,height:390});
-  await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(4);
+  await expect(page.locator('.appbar .mobile-nav-icon:visible')).toHaveCount(5);
   await expect(page.locator('.appbar .nav-label:visible')).toHaveCount(0);
   await expect(page.locator('#week-label')).toBeHidden();
-  const row=await Promise.all(['#store','#prev','#next','#today','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
+  const row=await Promise.all(['#store','#prev','#next','#today','#copy-week','#preview','#settings'].map(selector=>page.locator(selector).boundingBox()));
   for(const box of row)expect(Math.abs(box.y-row[0].y)).toBeLessThan(2);
   await page.evaluate(()=>{
    Object.defineProperty(navigator,'userAgent',{configurable:true,get:()=> 'iPhone Safari'});
@@ -947,7 +947,7 @@ test('前週の従業員シフトを作成済み週へ再コピーし5段目と�
  },STORAGE_KEY);
  await page.reload();
 
- await page.getByRole('button',{name:'前週の従業員シフトをコピー'}).click();
+ await page.getByRole('button',{name:'前週のシフトをコピー'}).click();
  await expect(page.getByText(/現在週の従業員①・②・予備従業員/)).toHaveCount(0);
  const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
  const store=stored.stores.find(s=>s.id===stored.activeStoreId);
@@ -955,4 +955,15 @@ test('前週の従業員シフトを作成済み週へ再コピーし5段目と�
  expect(day.shifts[0][0]).not.toBeNull();
  expect(day.extras[0].text).toBe('保持する作業');
  expect(day.notes).toBe('保持する備考');
+});
+
+
+test('前週コピーは今週へ戻るの右側に表示する',async({page})=>{
+ await page.setViewportSize({width:1180,height:844});
+ await openApp(page);
+ const today=await page.locator('#today').boundingBox();
+ const copy=await page.locator('#copy-week').boundingBox();
+ expect(copy.x).toBeGreaterThanOrEqual(today.x+today.width);
+ await expect(page.locator('#copy-week')).toHaveAttribute('aria-label','前週のシフトをコピー');
+ await expect(page.locator('#shift-page #copy-week')).toHaveCount(0);
 });

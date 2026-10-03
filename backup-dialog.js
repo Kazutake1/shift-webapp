@@ -1,4 +1,4 @@
-import {backupText,parseBackupInfo,mergeStoreBackup} from './stores.js';
+import {backupText,parseBackupInfo,mergeStoreBackup,STORAGE_WARNING_BYTES,utf8Bytes} from './stores.js';
 import {
   encryptBackupText,
   decryptBackupText,
@@ -40,11 +40,17 @@ export function openBackupDialog({
  const root=getRoot();
  const activeStore=root.stores.find(store=>store.id===root.activeStoreId);
  const safeFilenamePart=value=>String(value||'店舗').trim().replace(/[\\/:*?"<>|]+/g,'_').replace(/\s+/g,' ').slice(0,40)||'店舗';
+ const storageBytes=utf8Bytes(JSON.stringify(root));
+ const storageMb=(storageBytes/1000000).toFixed(2);
+ const storageStatus=el('p',{class:storageBytes>=STORAGE_WARNING_BYTES?'backup-warning':'backup-summary'},storageBytes>=STORAGE_WARNING_BYTES
+  ?`現在の保存データ：約${storageMb}MB。容量上限に備えてバックアップを作成し、今後の保存容量に注意してください。過去週は自動削除しません。`
+  :`現在の保存データ：約${storageMb}MB。過去週は自動削除せず保存します。`);
 
  const createSection=el('section',{class:'backup-section'});
  createSection.append(
   el('h3',{},'1. バックアップを作成'),
-  el('p',{class:'backup-summary'},`選択中の店舗：${activeStore.store}`)
+  el('p',{class:'backup-summary'},`選択中の店舗：${activeStore.store}`),
+  storageStatus
  );
 
  const password=el('input',{type:'password',minlength:8,autocomplete:'new-password'});

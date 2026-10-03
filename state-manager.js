@@ -1,9 +1,10 @@
 import {initialState} from './model.js';
-import {storageKey,validateRoot,migrate} from './stores.js';
+import {storageKey,validateRoot,migrate,STORAGE_WARNING_BYTES,utf8Bytes} from './stores.js';
 
 const LOAD_ERROR='保存データを読み込めません。既存データを上書きせず一時表示しています。';
 const CONFLICT_STATUS='別の画面でデータが変更されました。安全のため保存を停止しています。アプリを開き直してください。';
 const SAVE_ERROR='保存できません。今回の変更は反映していません。空き容量を確認してください。';
+const STORAGE_CAPACITY_WARNING='保存データが4MBを超えています。容量上限に備えてバックアップを作成し、今後の保存容量に注意してください。過去週は自動削除しません。';
 
 export function createStateManager({
  storage=globalThis.localStorage,
@@ -63,7 +64,8 @@ export function createStateManager({
    if(!edit)undoData=null;
    baseline=next;
    notifyUndo();
-   onStatus(success);
+   const capacityWarning=utf8Bytes(next)>=STORAGE_WARNING_BYTES?STORAGE_CAPACITY_WARNING:'';
+   onStatus([success,capacityWarning].filter(Boolean).join(' '));
    return true;
   }catch{
    onStatus(SAVE_ERROR);

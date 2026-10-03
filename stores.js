@@ -1,7 +1,8 @@
 import {addDays,monday,emptyWeek,initialState} from './model.js';
 export const storageKey='shift-ipad-stores-v2';
 export const MAX_BACKUP_PLAIN_BYTES=10000000;
-const utf8Bytes=value=>new TextEncoder().encode(value).byteLength;
+export const STORAGE_WARNING_BYTES=4000000;
+export const utf8Bytes=value=>new TextEncoder().encode(value).byteLength;
 const check=(ok)=>{if(!ok)throw Error('データの形式を確認できません。対応するバックアップを選んでください。');};
 const str=(v,max=100)=>typeof v==='string'&&v.length<=max;
 const date=v=>str(v,10)&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&addDays(v,0)===v;

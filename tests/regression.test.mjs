@@ -11,7 +11,7 @@ import {
   initialState,ensureWeek,addDays,monday,shiftLabel,workingTimes,dayInfo,makeShift,
   employeeShiftName,employeeShiftConflicts,employeeAvailableOn,employeeRetiredBy,copyPreviousWeekEmployeeShifts,fixedSetting,fixedTextAt,timedTextLabel,bands
 } from '../model.js';
-import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup,MAX_BACKUP_PLAIN_BYTES} from '../stores.js';
+import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup,MAX_BACKUP_PLAIN_BYTES,STORAGE_WARNING_BYTES,utf8Bytes} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
 import {birthdayGiftChecklist} from '../birthdays.js';
 import {linkEmployees,unlinkEmployee,syncEmployeeProfile,updateBirthdayKeys} from '../employee-identity.js';
@@ -975,4 +975,16 @@ test('バックアップの平文10MB・暗号化15MB制限を作成と復元で
  assert.match(backupUi,/selected\.size>MAX_ENCRYPTED_BACKUP_BYTES/);
  const cryptoSource=readFileSync(new URL('../crypto-backup.js',import.meta.url),'utf8');
  assert.match(cryptoSource,/encoder\.encode\(text\)\.byteLength>MAX_ENCRYPTED_BACKUP_BYTES/);
+});
+
+
+test('長期保存容量は4MBから警告し過去週を自動削除しない',()=>{
+ assert.equal(STORAGE_WARNING_BYTES,4000000);
+ assert.equal(utf8Bytes('あ'),3);
+ const manager=readFileSync(new URL('../state-manager.js',import.meta.url),'utf8');
+ assert.match(manager,/utf8Bytes\(next\)>=STORAGE_WARNING_BYTES/);
+ assert.match(manager,/過去週は自動削除しません/);
+ const backupUi=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
+ assert.match(backupUi,/現在の保存データ：約/);
+ assert.match(backupUi,/storageBytes>=STORAGE_WARNING_BYTES/);
 });

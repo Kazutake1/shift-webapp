@@ -11,12 +11,12 @@ import {
   initialState,ensureWeek,addDays,monday,shiftLabel,workingTimes,dayInfo,makeShift,
   employeeShiftName,employeeShiftConflicts,employeeAvailableOn,employeeRetiredBy,copyPreviousWeekEmployeeShifts,fixedSetting,fixedTextAt,timedTextLabel,bands
 } from '../model.js';
-import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup} from '../stores.js';
+import {migrate,newStore,validateRoot,backupText,parseBackup,parseBackupInfo,mergeStoreBackup,MAX_BACKUP_PLAIN_BYTES} from '../stores.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
 import {birthdayGiftChecklist} from '../birthdays.js';
 import {linkEmployees,unlinkEmployee,syncEmployeeProfile,updateBirthdayKeys} from '../employee-identity.js';
 import {
-  encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText
+  encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText,MAX_ENCRYPTED_BACKUP_BYTES
 } from '../crypto-backup.js';
 import {holidays} from '../holidays.js';
 import {generateHolidays,parseOfficialCsv,nextCacheVersion} from '../scripts/update-holidays.mjs';
@@ -964,4 +964,15 @@ test('QUOカード対象は誕生日当日の在籍状態も判定する',()=>{
 test('従業員リストは誕生日当日に在籍しない予定者を明示する',()=>{
  const ui=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
  assert.match(ui,/notEmployedOnBirthday'\?'誕生日当日は在籍対象外'/);
+});
+
+
+test('バックアップの平文10MB・暗号化15MB制限を作成と復元で共通化する',()=>{
+ assert.equal(MAX_BACKUP_PLAIN_BYTES,10000000);
+ assert.equal(MAX_ENCRYPTED_BACKUP_BYTES,15000000);
+ assert.throws(()=>parseBackupInfo('x'.repeat(MAX_BACKUP_PLAIN_BYTES+1)),/10MB以下/);
+ const backupUi=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
+ assert.match(backupUi,/selected\.size>MAX_ENCRYPTED_BACKUP_BYTES/);
+ const cryptoSource=readFileSync(new URL('../crypto-backup.js',import.meta.url),'utf8');
+ assert.match(cryptoSource,/encoder\.encode\(text\)\.byteLength>MAX_ENCRYPTED_BACKUP_BYTES/);
 });

@@ -3,7 +3,8 @@ import {
   encryptBackupText,
   decryptBackupText,
   encryptedBackupInfo,
-  isEncryptedBackupText
+  isEncryptedBackupText,
+  MAX_ENCRYPTED_BACKUP_BYTES
 } from './crypto-backup.js';
 
 const el=(tag,attrs={},text='')=>{
@@ -217,7 +218,7 @@ export function openBackupDialog({
   if(!selected)return;
 
   try{
-   if(selected.size>15000000)throw Error('15MB以下のバックアップを選んでください。');
+   if(selected.size>MAX_ENCRYPTED_BACKUP_BYTES)throw Error('15MB以下のバックアップを選んでください。');
    selectedText=await selected.text();
    if(file.files[0]!==selected)return;
 

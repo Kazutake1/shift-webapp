@@ -4,7 +4,7 @@ const ITERATIONS=600000;
 const SALT_BYTES=16;
 const IV_BYTES=12;
 const AAD='shift-ipad-backup-encrypted:v1';
-const MAX_FILE_CHARS=15000000;
+export const MAX_ENCRYPTED_BACKUP_BYTES=15000000;
 
 const encoder=new TextEncoder();
 const decoder=new TextDecoder();
@@ -33,7 +33,7 @@ async function deriveKey(password,salt,iterations){
  return subtle.deriveKey({name:'PBKDF2',hash:'SHA-256',salt,iterations},material,{name:'AES-GCM',length:256},false,['encrypt','decrypt']);
 }
 function parseEnvelope(text){
- if(typeof text!=='string'||text.length>MAX_FILE_CHARS)throw Error('15MB以下の暗号化バックアップを選んでください。');
+ if(typeof text!=='string'||encoder.encode(text).byteLength>MAX_ENCRYPTED_BACKUP_BYTES)throw Error('15MB以下の暗号化バックアップを選んでください。');
  let data;try{data=JSON.parse(text);}catch{throw Error('暗号化バックアップの形式を確認できません。');}
  const e=data?.encryption;
  if(data?.format!==FORMAT||data.version!==VERSION||typeof data.exportedAt!=='string'||
@@ -57,13 +57,15 @@ export async function encryptBackupText(plainText,password,exportedAt=new Date()
  const iv=crypto.getRandomValues(new Uint8Array(IV_BYTES));
  const key=await deriveKey(password,salt,ITERATIONS);
  const encrypted=await cryptoApi().encrypt({name:'AES-GCM',iv,additionalData:encoder.encode(AAD)},key,encoder.encode(plainText));
- return JSON.stringify({
+ const text=JSON.stringify({
   format:FORMAT,
   version:VERSION,
   exportedAt,
   encryption:{algorithm:'AES-256-GCM',kdf:'PBKDF2-HMAC-SHA-256',iterations:ITERATIONS,salt:toBase64(salt),iv:toBase64(iv)},
   ciphertext:toBase64(new Uint8Array(encrypted))
  },null,2);
+ if(encoder.encode(text).byteLength>MAX_ENCRYPTED_BACKUP_BYTES)throw Error('暗号化バックアップが15MBを超えるため作成できません。');
+ return text;
 }
 export async function decryptBackupText(text,password){
  if(typeof password!=='string'||!password)throw Error('バックアップ用パスワードを入力してください。');

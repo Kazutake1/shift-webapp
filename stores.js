@@ -1,5 +1,7 @@
 import {addDays,monday,emptyWeek,initialState} from './model.js';
 export const storageKey='shift-ipad-stores-v2';
+export const MAX_BACKUP_PLAIN_BYTES=10000000;
+const utf8Bytes=value=>new TextEncoder().encode(value).byteLength;
 const check=(ok)=>{if(!ok)throw Error('データの形式を確認できません。対応するバックアップを選んでください。');};
 const str=(v,max=100)=>typeof v==='string'&&v.length<=max;
 const date=v=>str(v,10)&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&addDays(v,0)===v;
@@ -75,7 +77,7 @@ export function backupText(root,{scope='all',storeId=root.activeStoreId,exported
  check(scope==='all'||scope==='store');
  const data=scope==='store'?storeBackupRoot(validated,storeId):validated;
  const store=data.stores.find(item=>item.id===data.activeStoreId);
- return JSON.stringify({
+ const text=JSON.stringify({
   format:'shift-ipad-backup',
   version:2,
   scope,
@@ -84,9 +86,11 @@ export function backupText(root,{scope='all',storeId=root.activeStoreId,exported
   exportedAt,
   data
  },null,2);
+ if(utf8Bytes(text)>MAX_BACKUP_PLAIN_BYTES)throw Error('バックアップデータが10MBを超えています。古い週の整理を検討してください。');
+ return text;
 }
 export function parseBackupInfo(text){
- check(typeof text==='string'&&text.length<=10000000);
+ if(typeof text!=='string'||utf8Bytes(text)>MAX_BACKUP_PLAIN_BYTES)throw Error('10MB以下のバックアップデータを選んでください。');
  let backup;try{backup=JSON.parse(text);}catch{check(false);}
  check(backup?.format==='shift-ipad-backup');
  if(backup.version===1){

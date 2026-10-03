@@ -21,7 +21,6 @@ export default [
    'no-loss-of-precision':'error',
    'no-new-native-nonconstructor':'error',
    'no-obj-calls':'error',
-   'no-promise-executor-return':'error',
    'no-redeclare':'error',
    'no-self-assign':'error',
    'no-setter-return':'error',

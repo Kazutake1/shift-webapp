@@ -998,3 +998,12 @@ test('CSPはスクリプトを同一オリジンに制限し既存の動的ス�
  assert.match(html,/worker-src 'self'/);
  assert.match(html,/connect-src 'self' blob:/);
 });
+
+test('Cloudflare Pages用のセキュリティヘッダーを維持する',()=>{
+ const headers=readFileSync(new URL('../_headers',import.meta.url),'utf8');
+ assert.match(headers,/Content-Security-Policy: .*script-src 'self'/);
+ assert.match(headers,/connect-src 'self' blob:/);
+ assert.match(headers,/frame-ancestors 'none'/);
+ assert.match(headers,/X-Frame-Options: DENY/);
+ assert.match(headers,/X-Robots-Tag: noindex/);
+});

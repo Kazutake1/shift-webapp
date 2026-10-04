@@ -28,6 +28,8 @@ jobs:
         run: npm run lint
       - name: Regression tests
         run: npm test
+      - name: Cloudflare Pages build
+        run: npm run build:cloudflare
       - name: Install browser test tools
         run: |
           npm install --no-save --ignore-scripts @playwright/test@1.55.0

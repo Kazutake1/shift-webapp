@@ -335,7 +335,7 @@ test('シフト表下の案内文と通常保存メッセージを表示しな�
  assert.equal(html.includes('データはこのブラウザーに保存されます。初回表示はサンプルです。'),false);
  assert.equal(html.includes('この端末に保存</span>'),false);
  assert.match(html,/id="save-status"[^>]*hidden/);
- assert.match(manager,/function writeRoot\(candidate,\{edit=true,allowStorageError=false,success=''\}=\{\}\)/);
+ assert.match(manager,/function writeRoot\(candidate,\{edit=true,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''\}=\{\}\)/);
  assert.equal(manager.includes("success='この端末に保存しました'"),false);
 });
 

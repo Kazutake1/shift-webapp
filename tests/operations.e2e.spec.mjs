@@ -1176,3 +1176,115 @@ test('編集中に別端末更新を検知した場合は自動反映せず競�
  await expect(page.locator('#dialog-body textarea')).toHaveValue('入力途中');
  await expect(page.locator('td.notes-cell button').first()).not.toHaveText('別端末から更新');
 });
+
+
+test('通信失敗中の編集は端末保存と未同期状態を維持し復旧後に自動再同期する',async({page})=>{
+ let cloudPayload=null,remoteRevision=0,networkDown=false,patchCount=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'offline-access',refresh_token:'offline-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'55555555-5555-5555-5555-555555555555',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   if(networkDown)return route.abort('failed');
+   if(!cloudPayload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:04:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);remoteRevision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:cloudPayload,updated_at:'2026-10-06T00:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
+   patchCount++;
+   if(networkDown)return route.abort('failed');
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);remoteRevision=body.revision;
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:05:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await page.locator('#settings-back').click();
+
+ networkDown=true;
+ await page.locator('td.notes-cell button').first().click();
+ await page.locator('#dialog-body textarea').fill('オフライン編集を保持');
+ await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
+ const localBeforeReload=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
+ const localStore=localBeforeReload.stores.find(item=>item.id===localBeforeReload.activeStoreId);
+ expect(localStore.weeks[localStore.current].days[0].notes).toBe('オフライン編集を保持');
+
+ await page.reload();
+ await expect(page.locator('td.notes-cell button').first()).toHaveText('オフライン編集を保持');
+ await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
+
+ networkDown=false;
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ await expect.poll(()=>remoteRevision).toBe(2);
+ expect(cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId).weeks[localStore.current].days[0].notes).toBe('オフライン編集を保持');
+ await expect(page.locator('#cloud-sync-alert')).toBeHidden();
+ expect(patchCount).toBeGreaterThanOrEqual(2);
+});
+
+test('未同期中に別端末が更新した場合は復旧時に上書きせず競合停止する',async({page})=>{
+ let cloudPayload=null,remoteRevision=0,networkDown=false;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'offline-conflict-access',refresh_token:'offline-conflict-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'66666666-6666-6666-6666-666666666666',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   if(networkDown)return route.abort('failed');
+   if(!cloudPayload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:06:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);remoteRevision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:cloudPayload,updated_at:'2026-10-06T00:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
+   if(networkDown)return route.abort('failed');
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);remoteRevision=body.revision;
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:07:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await page.locator('#settings-back').click();
+
+ networkDown=true;
+ await page.locator('td.notes-cell button').first().click();
+ await page.locator('#dialog-body textarea').fill('この端末の未同期変更');
+ await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
+
+ const remoteStore=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
+ remoteStore.weeks[remoteStore.current].days[0].notes='別端末の変更';
+ remoteRevision=2;
+ networkDown=false;
+
+ const warning=new Promise(resolve=>page.once('dialog',async dialog=>{
+  const message=dialog.message();await dialog.accept();resolve(message);
+ }));
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ const message=await warning;
+ expect(message).toContain('別の端末でシフトが更新されています');
+ await expect(page.locator('td.notes-cell button').first()).toHaveText('この端末の未同期変更');
+ await expect(page.locator('#cloud-sync-alert')).toContainText('別の端末で更新されています');
+});

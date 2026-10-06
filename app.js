@@ -370,7 +370,14 @@ document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
 
 function updateCloudSyncStatus(text){
- const host=$('#cloud-sync-status');if(host)host.textContent=text||'複数端末共有：未接続';
+ const message=text||'複数端末共有：未接続';
+ const host=$('#cloud-sync-status');if(host)host.textContent=message;
+ const alertHost=$('#cloud-sync-alert');
+ if(alertHost){
+  const important=/クラウド未同期|接続できません|更新確認に失敗|別の端末で更新されています/.test(message);
+  alertHost.textContent=important?message:'';
+  alertHost.hidden=!important;
+ }
 }
 async function runCloudAction(buttonEl,action,errorEl){
  buttonEl.disabled=true;errorEl.textContent='';
@@ -380,10 +387,17 @@ function openCloudSync(){
  const body=openDialog('複数端末共有'),current=cloudSync.getStatus();
  if(current.signedIn){
   hint(body,`ログイン中：${current.email||'管理者'}`);
-  hint(body,current.conflicted?'別端末の更新を検出しています。クラウドから最新データを読み込んでください。':`クラウド同期：${current.enabled?'有効':'接続確認中'}${current.revision?`（rev.${current.revision}）`:''}`);
+  hint(body,current.conflicted
+   ?'別端末の更新を検出しています。クラウドから最新データを読み込んでください。'
+   :current.unsynced
+    ?`クラウド未同期です。端末には保存済みです。${current.revision?` 最終同期 rev.${current.revision}`:''}`
+    :`クラウド同期：${current.enabled?'有効':'接続確認中'}${current.revision?`（rev.${current.revision}）`:''}`);
   const error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
   const reloadButton=button('クラウドから最新を読み込む',async()=>{
-   if(!confirm('この端末の現在データをクラウドの最新データで置き換えますか？'))return;
+   const warning=current.unsynced
+    ?'この端末にはクラウド未同期の変更があります。最新データを読み込むと、この端末の未同期変更は失われます。続けますか？'
+    :'この端末の現在データをクラウドの最新データで置き換えますか？';
+   if(!confirm(warning))return;
    const ok=await runCloudAction(reloadButton,()=>cloudSync.reloadFromCloud(),error);
    if(ok){stateManager.clearCloudConflict();render();close();}
   });
@@ -539,6 +553,8 @@ cloudSync=createCloudSync({
 render();stateManager.save(false);showSettings();
 cloudSync.initialize();
 const checkCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate();};
+const retryCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate({force:true});};
+window.addEventListener('online',retryCloudUpdate);
 window.addEventListener('focus',checkCloudUpdate);
 window.addEventListener('pageshow',checkCloudUpdate);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkCloudUpdate();});

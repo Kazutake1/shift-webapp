@@ -609,3 +609,5 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
  .appbar:has(#header-week-nav:not([hidden])) .appbar-context .week-nav{grid-template-columns:repeat(4,minmax(0,1fr));width:100%;min-width:0}
  .appbar:has(#header-week-nav:not([hidden])) .appbar-context :is(#prev,#next,#today,#copy-week){width:100%;min-width:0}
 }
+
+.cloud-sync-alert{margin:8px 0 12px;padding:10px 12px;border:1px solid #c9b77a;border-radius:8px;background:#fffaf0;color:#654f16;font-size:13px;line-height:1.6}

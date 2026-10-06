@@ -1067,22 +1067,28 @@ test('クラウド競合時は検知時と保存拒否時に警告を表示す�
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
  await page.locator('#settings-back').click();
 
- const firstWarning=page.waitForEvent('dialog');
+ const firstWarning=new Promise(resolve=>page.once('dialog',async dialog=>{
+  const message=dialog.message();
+  await dialog.accept();
+  resolve(message);
+ }));
  await page.locator('td.notes-cell button').first().click();
  await page.locator('#dialog-body textarea').fill('競合を発生させる');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
- const firstDialog=await firstWarning;
- expect(firstDialog.message()).toContain('別の端末でシフトが更新されています');
- expect(firstDialog.message()).toContain('クラウドから最新を読み込む');
- await firstDialog.accept();
+ const firstMessage=await firstWarning;
+ expect(firstMessage).toContain('別の端末でシフトが更新されています');
+ expect(firstMessage).toContain('クラウドから最新を読み込む');
  await expect.poll(()=>patchCount).toBe(1);
 
- const secondWarning=page.waitForEvent('dialog');
+ const secondWarning=new Promise(resolve=>page.once('dialog',async dialog=>{
+  const message=dialog.message();
+  await dialog.accept();
+  resolve(message);
+ }));
  await page.locator('td.notes-cell button').nth(1).click();
  await page.locator('#dialog-body textarea').fill('拒否される変更');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
- const secondDialog=await secondWarning;
- expect(secondDialog.message()).toContain('保存・削除は停止しました');
- await secondDialog.accept();
+ const secondMessage=await secondWarning;
+ expect(secondMessage).toContain('保存・削除は停止しました');
  await expect(page.locator('#editor')).toBeVisible();
 });

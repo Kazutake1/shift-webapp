@@ -34,7 +34,7 @@ export function createBirthdayUi({
       ...(candidate.birthdayAcknowledgements||[]),
       notice.key
      ];
-     if(!replaceRoot(candidate,{edit:false,success:'誕生日の確認済みを保存しました'}))return;
+     if(!replaceRoot(candidate,{edit:false,sync:true,success:'誕生日の確認済みを保存しました'}))return;
      renderBirthdayUi();
     })
    );

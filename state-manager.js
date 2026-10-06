@@ -50,7 +50,7 @@ export function createStateManager({
   onRollback();
  };
 
- function writeRoot(candidate,{edit=true,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''}={}){
+ function writeRoot(candidate,{edit=true,sync=edit,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''}={}){
   if(storageError&&!allowStorageError){
    onStatus(storageError);
    return false;
@@ -75,7 +75,7 @@ export function createStateManager({
    notifyUndo();
    const capacityWarning=utf8Bytes(next)>=STORAGE_WARNING_BYTES?STORAGE_CAPACITY_WARNING:'';
    onStatus([success,capacityWarning].filter(Boolean).join(' '));
-   if(notifySaved)onSaved(candidate,{edit});
+   if(notifySaved)onSaved(candidate,{edit,sync});
    return true;
   }catch{
    onStatus(SAVE_ERROR);
@@ -91,11 +91,11 @@ export function createStateManager({
   return true;
  }
 
- function save(edit=true){
-  return writeRoot(root,{edit});
+ function save(edit=true,sync=edit){
+  return writeRoot(root,{edit,sync});
  }
 
- function persistChange(change,edit=true){
+ function persistChange(change,edit=true,sync=edit){
   const before=JSON.stringify(root);
   const beforeBaseline=baseline;
   const beforeUndo=undoData;
@@ -108,7 +108,7 @@ export function createStateManager({
    throw error;
   }
 
-  if(save(edit))return true;
+  if(save(edit,sync))return true;
   restoreSnapshot(before,beforeBaseline,beforeUndo);
   return false;
  }
@@ -118,7 +118,7 @@ export function createStateManager({
 
   try{
    const candidate=JSON.parse(undoData);
-   if(!replaceRoot(candidate,{edit:false,success:'直前の操作を取り消しました'})){
+   if(!replaceRoot(candidate,{edit:false,sync:true,success:'直前の操作を取り消しました'})){
     return {
      ok:false,
      reason:externalChangeDetected?'external':storageError?'storage':'save',

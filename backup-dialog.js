@@ -151,7 +151,7 @@ export function openBackupDialog({
   const source=candidateInfo.data.stores[0];
   if(!confirm(`${target.store}の現在のデータを、バックアップ「${source.store}」の内容で置き換えます。他の店舗は変更されません。復元しますか？`))return;
   const merged=mergeStoreBackup(current,candidateInfo.data);
-  if(!replaceRoot(merged,{edit:false,allowStorageError:true,success:'選択中の店舗を復元しました'})){
+  if(!replaceRoot(merged,{edit:false,sync:true,allowStorageError:true,success:'選択中の店舗を復元しました'})){
    error.textContent=isExternalChangeDetected()
     ?'別の画面でデータが変更されています。安全のため復元を停止しました。アプリを開き直してから、もう一度復元してください。'
     :'保存できないため復元しませんでした。空き容量を確認してください。';
@@ -165,7 +165,7 @@ export function openBackupDialog({
   if(!candidateInfo||candidateInfo.scope!=='all')return;
   const candidate=candidateInfo.data;
   if(!confirm(`現在の全店舗データを、選択したバックアップの${candidate.stores.length}店舗に置き換えます。現在の内容は先にバックアップしてください。復元しますか？`))return;
-  if(!replaceRoot(candidate,{edit:false,allowStorageError:true,success:'全店舗を復元しました'})){
+  if(!replaceRoot(candidate,{edit:false,sync:true,allowStorageError:true,success:'全店舗を復元しました'})){
    error.textContent=isExternalChangeDetected()
     ?'別の画面でデータが変更されています。安全のため復元を停止しました。アプリを開き直してから、もう一度復元してください。'
     :'保存できないため復元しませんでした。空き容量を確認してください。';

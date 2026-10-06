@@ -1288,3 +1288,58 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await expect(page.locator('td.notes-cell button').first()).toHaveText('この端末の未同期変更');
  await expect(page.locator('#cloud-sync-alert')).toContainText('別の端末で更新されています');
 });
+
+
+test('Undo対象外の前週コピーもクラウドへ同期する',async({page})=>{
+ let cloudPayload=null,revision=0,patchCount=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'copy-sync-access',refresh_token:'copy-sync-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'77777777-7777-7777-7777-777777777777',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   if(!cloudPayload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload:cloudPayload,updated_at:'2026-10-07T00:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);revision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision,payload:cloudPayload,updated_at:'2026-10-07T00:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
+   const body=request.postDataJSON();patchCount++;cloudPayload=structuredClone(body.payload);revision=body.revision;
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload:cloudPayload,updated_at:'2026-10-07T00:01:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(s=>s.id===root.activeStoreId);
+  const source=store.current;
+  const nextDate=new Date(source+'T12:00:00Z');nextDate.setUTCDate(nextDate.getUTCDate()+7);
+  const next=nextDate.toISOString().slice(0,10);
+  const add=(date,n)=>{const d=new Date(date+'T12:00:00Z');d.setUTCDate(d.getUTCDate()+n);return d.toISOString().slice(0,10);};
+  if(!store.weeks[next])store.weeks[next]={start:next,days:Array.from({length:7},(_,i)=>({date:add(next,i),shifts:Array.from({length:3},()=>Array(5).fill(null)),extras:Array(5).fill(null),notes:''}))};
+  store.weeks[source].days[0].shifts[0][0]={employeeId:store.employees[0].id,name:store.employees[0].name,start:360,end:540};
+  store.weeks[next].days[0].shifts[0][0]=null;
+  store.current=next;
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await page.locator('#settings-back').click();
+
+ await page.getByRole('button',{name:'前週シフトをコピー'}).click();
+ await expect.poll(()=>patchCount).toBe(1);
+ const store=cloudPayload.stores.find(s=>s.id===cloudPayload.activeStoreId);
+ expect(store.weeks[store.current].days[0].shifts[0][0]).not.toBeNull();
+});

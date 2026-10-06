@@ -35,11 +35,11 @@ const stateManager=createStateManager({
  onUndoChange:setUndoAvailable,
  onRollback:()=>render(),
  onSaveFailure:()=>alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。'),
- onSaved:(root,{edit})=>{if(edit)cloudSync?.queueSave(root);},
+ onSaved:(root,{sync})=>{if(sync)cloudSync?.queueSave(root);},
  onCloudConflictBlocked:()=>alert(CLOUD_CONFLICT_MESSAGE)
 });
 
-const persistChange=(change,edit=true)=>stateManager.persistChange(change,edit);
+const persistChange=(change,edit=true,sync=edit)=>stateManager.persistChange(change,edit,sync);
 const replaceRoot=(candidate,options)=>stateManager.replaceRoot(candidate,options);
 
 function undo(){
@@ -314,14 +314,14 @@ function openFixed(){
     if(confirm('固定作業の設定を変更しますか？選択した曜日に、過去を含む全週で反映します。'))commit(()=>state.fixed=values);
   },'primary'));
 }
-function navigate(delta,target){const state=stateManager.getState(),next=target||addDays(state.current,delta),existed=!!state.weeks[next];let copied=false;if(!persistChange(()=>{copied=ensureWeek(state,next);state.current=next;},false))return;render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
+function navigate(delta,target){const state=stateManager.getState(),next=target||addDays(state.current,delta),existed=!!state.weeks[next];let copied=false;if(!persistChange(()=>{copied=ensureWeek(state,next);state.current=next;},false,!existed))return;render();if(!existed)$('#notice').textContent+=(copied?' 前週の従業員①・②・予備従業員だけをコピーしました。':' 空の週を作成しました。');}
 function copyPreviousWeek(){
  const state=stateManager.getState(),current=state.weeks[state.current],previous=state.weeks[addDays(state.current,-7)];
  if(!previous){alert('前週のシフトデータがありません。');return;}
  const hasShifts=current.days.some(day=>day.shifts.some(row=>row.some(Boolean)));
  if(hasShifts&&!confirm('現在週の従業員①・②・予備従業員のシフトを、前週の内容で上書きします。不定期作業／トレーニングと備考は変更しません。コピーしますか？'))return;
  let copied=false;
- if(!persistChange(()=>{copied=copyPreviousWeekEmployeeShifts(state,state.current);} ,false))return;
+ if(!persistChange(()=>{copied=copyPreviousWeekEmployeeShifts(state,state.current);} ,false,true))return;
  if(!copied)return;
  render();
  $('#notice').textContent+=' 前週の従業員①・②・予備従業員をコピーしました。';

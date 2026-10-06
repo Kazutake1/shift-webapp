@@ -335,7 +335,7 @@ test('シフト表下の案内文と通常保存メッセージを表示しな�
  assert.equal(html.includes('データはこのブラウザーに保存されます。初回表示はサンプルです。'),false);
  assert.equal(html.includes('この端末に保存</span>'),false);
  assert.match(html,/id="save-status"[^>]*hidden/);
- assert.match(manager,/function writeRoot\(candidate,\{edit=true,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''\}=\{\}\)/);
+ assert.match(manager,/function writeRoot\(candidate,\{edit=true,sync=edit,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''\}=\{\}\)/);
  assert.equal(manager.includes("success='この端末に保存しました'"),false);
 });
 
@@ -350,11 +350,13 @@ test('state-managerは保存・Undo・競合を一元管理',async()=>{
  const statuses=[];
  let undoAvailable=false;
  let rollbackCount=0;
+ const savedEvents=[];
  const manager=createStateManager({
   storage,
   onStatus:text=>statuses.push(text),
   onUndoChange:value=>{undoAvailable=value;},
-  onRollback:()=>{rollbackCount++;}
+  onRollback:()=>{rollbackCount++;},
+  onSaved:(_root,meta)=>savedEvents.push(meta)
  });
 
  const state=manager.getState();
@@ -362,8 +364,10 @@ test('state-managerは保存・Undo・競合を一元管理',async()=>{
  assert.equal(manager.persistChange(()=>{state.store='変更店';}),true);
  assert.equal(manager.getState().store,'変更店');
  assert.equal(undoAvailable,true);
+ assert.deepEqual(savedEvents.at(-1),{edit:true,sync:true});
 
  assert.equal(manager.undoLast().ok,true);
+ assert.deepEqual(savedEvents.at(-1),{edit:false,sync:true});
  assert.equal(manager.getState().store,originalName);
  assert.equal(undoAvailable,false);
 
@@ -1032,4 +1036,34 @@ test('Supabase共有設定はpublishable keyのみを公開する',()=>{
  assert.doesNotMatch(config,/service_role|sb_secret_/);
  assert.match(index,/connect-src[^"]*wpyhkewwzsdcstypcbmq\.supabase\.co/);
  assert.match(headers,/connect-src[^\n]*wpyhkewwzsdcstypcbmq\.supabase\.co/);
+});
+
+
+test('Undo対象外の共有データ変更と端末UI操作でクラウド同期対象を分離する',async()=>{
+ const {createStateManager}=await import('../state-manager.js');
+ const data=new Map();
+ const events=[];
+ const storage={
+  getItem:key=>data.has(key)?data.get(key):null,
+  setItem:(key,value)=>data.set(key,value)
+ };
+ const manager=createStateManager({storage,onSaved:(_root,meta)=>events.push(meta)});
+
+ assert.equal(manager.persistChange(()=>{manager.getState().store='同期する変更';},false,true),true);
+ assert.deepEqual(events.at(-1),{edit:false,sync:true});
+
+ assert.equal(manager.persistChange(()=>{manager.getState().current=manager.getState().current;},false,false),true);
+ assert.deepEqual(events.at(-1),{edit:false,sync:false});
+
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const backup=readFileSync(new URL('../backup-dialog.js',import.meta.url),'utf8');
+ const birthdays=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ const stores=readFileSync(new URL('../store-dialog.js',import.meta.url),'utf8');
+
+ assert.match(app,/onSaved:\(root,\{sync\}\)=>\{if\(sync\)cloudSync\?\.queueSave\(root\);\}/);
+ assert.match(app,/persistChange\(\(\)=>\{copied=copyPreviousWeekEmployeeShifts\(state,state\.current\);\}\s*,false,true\)/);
+ assert.match(app,/persistChange\(\(\)=>\{copied=ensureWeek\(state,next\);state\.current=next;\},false,!existed\)/);
+ assert.match(backup,/edit:false,sync:true,allowStorageError:true/);
+ assert.match(birthdays,/edit:false,sync:true,success:'誕生日の確認済みを保存しました'/);
+ assert.match(stores,/persistChange\(\(\)=>\{[\s\S]*activeStoreId=id;[\s\S]*\},false\)/);
 });

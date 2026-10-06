@@ -269,7 +269,7 @@ test('保存失敗時のロールバック処理を維持',()=>{
  assert.match(manager,/function persistChange\(/);
  assert.match(manager,/const before=JSON\.stringify\(root\)/);
  assert.match(manager,/restoreSnapshot\(before,beforeBaseline,beforeUndo\)/);
- assert.match(manager,/if\(save\(edit\)\)return true/);
+ assert.match(manager,/if\(save\(edit,sync\)\)return true/);
 });
 
 test('HTML印刷後の画面復帰処理を維持',()=>{

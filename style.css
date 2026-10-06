@@ -574,6 +574,14 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
  }
 }
 
+/* v136: the A4 preview iframe is wider than a phone viewport, so retain the same
+   thin shift-row rules when the preview was opened from a phone. */
+.phone-print-preview body.print-layout #schedule tbody tr:nth-child(5n+2)>td.slot,
+.phone-print-preview body.print-layout #schedule tbody tr:nth-child(5n+3)>td.slot,
+.phone-print-preview body.print-layout #schedule tbody tr:nth-child(5n+4)>td.slot{
+ border-top:1px solid #bbb;
+}
+
 /* Employee list retirement tabs */
 .employee-list-tabs{display:flex;gap:8px;margin:18px 0 10px;border-bottom:1px solid var(--ui-line,#dfe8e1);padding-bottom:8px}
 .employee-list-tabs button{min-height:40px;padding:8px 14px;border-radius:999px}

@@ -903,6 +903,28 @@ test('スマホ通常表示でシフト内の薄い横罫線が表示される',
 });
 
 
+test('スマホ印刷プレビューでもシフト内の薄い横罫線が表示される',async({browser})=>{
+ const context=await browser.newContext({viewport:{width:390,height:844},isMobile:true,hasTouch:true,serviceWorkers:'block'});
+ const page=await context.newPage();
+ try{
+  await openApp(page);
+  await page.locator('#preview').click();
+  const preview=page.frameLocator('.preview-sheet');
+  await expect(preview.locator('#schedule')).toBeVisible();
+  const previewRoot=preview.locator('html');
+  await expect(previewRoot).toHaveClass(/phone-print-preview/);
+  const rule=preview.locator('#schedule tbody tr:nth-child(5n+2)>td.slot').first();
+  const ruleStyle=await rule.evaluate(el=>{
+   const css=getComputedStyle(el);
+   return {width:css.borderTopWidth,style:css.borderTopStyle,color:css.borderTopColor};
+  });
+  expect(ruleStyle).toEqual({width:'1px',style:'solid',color:'rgb(187, 187, 187)'});
+ }finally{
+  await context.close();
+ }
+});
+
+
 test('退職日を登録した従業員は翌日以降に退職者リストへ表示される',async({page})=>{
  await openApp(page);
  await page.evaluate(key=>{

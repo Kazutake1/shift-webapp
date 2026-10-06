@@ -427,6 +427,8 @@ function openPreview(){
   css=[...document.styleSheets].flatMap(sheet=>[...sheet.cssRules].map(rule=>rule.cssText)).join('\n');
  }finally{finishPrint();}
  const doc=document.implementation.createHTMLDocument('週間シフト表の印刷プレビュー');
+ const phonePrintPreview=matchMedia('(max-width:600px), (orientation:landscape) and (max-height:500px) and (max-width:950px) and (pointer:coarse)').matches;
+ if(phonePrintPreview)doc.documentElement.classList.add('phone-print-preview');
  const style=doc.createElement('style');
  style.textContent=css+'\nhtml{width:297mm;height:210mm;padding:0;overflow:hidden;background:white}body.print-layout{width:297mm;height:210mm;display:flex;align-items:center}body.print-layout main{width:281mm;margin-left:25mm!important;transform:scale(.9145907473);transform-origin:left center}';
  doc.head.append(style);doc.body.className='print-layout';

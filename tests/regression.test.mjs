@@ -350,13 +350,11 @@ test('state-managerは保存・Undo・競合を一元管理',async()=>{
  const statuses=[];
  let undoAvailable=false;
  let rollbackCount=0;
- let cloudBlockedMessage='';
  const manager=createStateManager({
   storage,
   onStatus:text=>statuses.push(text),
   onUndoChange:value=>{undoAvailable=value;},
-  onRollback:()=>{rollbackCount++;},
-  onCloudConflictBlocked:message=>{cloudBlockedMessage=message;}
+  onRollback:()=>{rollbackCount++;}
  });
 
  const state=manager.getState();
@@ -375,10 +373,20 @@ test('state-managerは保存・Undo・競合を一元管理',async()=>{
  assert.equal(rollbackCount,1);
  assert.match(statuses.at(-1),/安全のため保存を停止/);
 
- manager.clearCloudConflict();
- manager.setCloudConflict();
- assert.equal(manager.persistChange(()=>{manager.getState().store='クラウド競合変更';}),false);
- assert.equal(manager.getState().store,originalName);
+ const cloudData=new Map(data);
+ const cloudStorage={
+  getItem:key=>cloudData.has(key)?cloudData.get(key):null,
+  setItem:(key,value)=>cloudData.set(key,value)
+ };
+ let cloudBlockedMessage='';
+ const cloudManager=createStateManager({
+  storage:cloudStorage,
+  onCloudConflictBlocked:message=>{cloudBlockedMessage=message;}
+ });
+ const cloudOriginalName=cloudManager.getState().store;
+ cloudManager.setCloudConflict();
+ assert.equal(cloudManager.persistChange(()=>{cloudManager.getState().store='クラウド競合変更';}),false);
+ assert.equal(cloudManager.getState().store,cloudOriginalName);
  assert.match(cloudBlockedMessage,/クラウドの最新データを読み込んでください/);
 });
 

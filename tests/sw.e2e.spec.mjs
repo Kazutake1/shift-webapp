@@ -34,6 +34,9 @@ test('Service Workerのキャッシュ・更新・controllerchange・オフラ�
 
  await page.goto('/');
  await expect(page.locator('#schedule')).toBeVisible();
+ // The app re-registers the canonical worker after the temporary update worker.
+ // Wait for that controller transition to finish before testing an offline reload.
+ await page.waitForFunction(()=>navigator.serviceWorker.controller?.scriptURL.endsWith('/sw.js'));
  await context.setOffline(true);
  await page.reload({waitUntil:'domcontentloaded'});
  await expect(page.locator('#schedule')).toBeVisible();

@@ -999,3 +999,41 @@ test('前週コピーは今週へ戻るの右側に表示する',async({page})=>
  await expect(page.locator('#copy-week')).toHaveAttribute('aria-label','前週シフトをコピー');
  await expect(page.locator('#shift-page #copy-week')).toHaveCount(0);
 });
+
+test('複数端末共有はログイン後に初期アップロードし編集をrevision付きで同期する',async({page})=>{
+ let revision=0,posted=null,patched=null;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'11111111-1111-1111-1111-111111111111',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   posted=request.postDataJSON();revision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:posted.payload,updated_at:'2026-10-06T00:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
+   patched=request.postDataJSON();revision=patched.revision;
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload:patched.payload,updated_at:'2026-10-06T00:01:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#cloud-sync-status')).toContainText('rev.1');
+ expect(posted?.payload?.version).toBe(2);
+ expect(posted?.owner_id).toBe('11111111-1111-1111-1111-111111111111');
+ await page.locator('#settings-back').click();
+ await page.locator('td.notes-cell button').first().click();
+ await page.locator('#dialog-body textarea').fill('複数端末同期テスト');
+ await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ await expect.poll(()=>revision).toBe(2);
+ expect(patched?.payload?.stores?.some(store=>Object.values(store.weeks).some(week=>week.days.some(day=>day.notes==='複数端末同期テスト')))).toBe(true);
+});

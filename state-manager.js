@@ -11,12 +11,14 @@ export function createStateManager({
  onStatus=()=>{},
  onUndoChange=()=>{},
  onRollback=()=>{},
- onSaveFailure=()=>{}
+ onSaveFailure=()=>{},
+ onSaved=()=>{}
 }={}){
  let root;
  let state;
  let storageError='';
  let externalChangeDetected=false;
+ let cloudConflictDetected=false;
  let undoData=null;
 
  try{
@@ -47,13 +49,17 @@ export function createStateManager({
   onRollback();
  };
 
- function writeRoot(candidate,{edit=true,allowStorageError=false,success=''}={}){
+ function writeRoot(candidate,{edit=true,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''}={}){
   if(storageError&&!allowStorageError){
    onStatus(storageError);
    return false;
   }
   if(externalChangeDetected){
    onStatus(CONFLICT_STATUS);
+   return false;
+  }
+  if(cloudConflictDetected&&!allowCloudConflict){
+   onStatus('別の端末でクラウドデータが更新されています。最新データを読み込むまで保存を停止しています。');
    return false;
   }
 
@@ -66,6 +72,7 @@ export function createStateManager({
    notifyUndo();
    const capacityWarning=utf8Bytes(next)>=STORAGE_WARNING_BYTES?STORAGE_CAPACITY_WARNING:'';
    onStatus([success,capacityWarning].filter(Boolean).join(' '));
+   if(notifySaved)onSaved(candidate,{edit});
    return true;
   }catch{
    onStatus(SAVE_ERROR);
@@ -137,6 +144,9 @@ export function createStateManager({
   getState:()=>state,
   getStorageError:()=>storageError,
   isExternalChangeDetected:()=>externalChangeDetected,
+  isCloudConflictDetected:()=>cloudConflictDetected,
+  setCloudConflict:()=>{cloudConflictDetected=true;},
+  clearCloudConflict:()=>{cloudConflictDetected=false;},
   canUndo:()=>Boolean(undoData),
   save,
   persistChange,

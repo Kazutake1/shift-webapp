@@ -6,6 +6,7 @@ import {openBackupDialog} from './backup-dialog.js';
 import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
 import {createStateManager} from './state-manager.js';
 import {createPrintPdf} from './print-pdf.js';
+import {createCloudSync} from './cloud-sync.js';
 const $=s=>document.querySelector(s);
 let preview=false,activeCell=null,backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
@@ -27,11 +28,13 @@ function setUndoAvailable(available){
  document.querySelectorAll('[data-undo]').forEach(button=>button.disabled=!available);
 }
 
+let cloudSync=null;
 const stateManager=createStateManager({
  onStatus:setSaveStatus,
  onUndoChange:setUndoAvailable,
  onRollback:()=>render(),
- onSaveFailure:()=>alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。')
+ onSaveFailure:()=>alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。'),
+ onSaved:(root,{edit})=>{if(edit)cloudSync?.queueSave(root);}
 });
 
 const persistChange=(change,edit=true)=>stateManager.persistChange(change,edit);
@@ -363,6 +366,44 @@ $('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#copy-wee
 $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;navigate(0,monday(key));};
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
 $('#stores').onclick=openStores;$('#backup').onclick=openBackup;
+
+function updateCloudSyncStatus(text){
+ const host=$('#cloud-sync-status');if(host)host.textContent=text||'複数端末共有：未接続';
+}
+async function runCloudAction(buttonEl,action,errorEl){
+ buttonEl.disabled=true;errorEl.textContent='';
+ try{return await action();}catch(error){errorEl.textContent=error.message;return false;}finally{buttonEl.disabled=false;}
+}
+function openCloudSync(){
+ const body=openDialog('複数端末共有'),current=cloudSync.getStatus();
+ if(current.signedIn){
+  hint(body,`ログイン中：${current.email||'管理者'}`);
+  hint(body,current.conflicted?'別端末の更新を検出しています。クラウドから最新データを読み込んでください。':`クラウド同期：${current.enabled?'有効':'接続確認中'}${current.revision?`（rev.${current.revision}）`:''}`);
+  const error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
+  const reloadButton=button('クラウドから最新を読み込む',async()=>{
+   if(!confirm('この端末の現在データをクラウドの最新データで置き換えますか？'))return;
+   const ok=await runCloudAction(reloadButton,()=>cloudSync.reloadFromCloud(),error);
+   if(ok){stateManager.clearCloudConflict();render();close();}
+  });
+  const logoutButton=button('ログアウト',async()=>{await runCloudAction(logoutButton,()=>cloudSync.signOut(),error);close();});
+  actions.append(logoutButton,reloadButton);body.append(error,actions);return;
+ }
+ hint(body,'同じ管理者アカウントでログインした端末同士で、同じシフトデータを共有します。未ログイン時は従来どおりこの端末だけに保存されます。');
+ const email=el('input',{type:'email',autocomplete:'username',required:'',placeholder:'メールアドレス'});
+ const password=el('input',{type:'password',autocomplete:'current-password',required:'',minlength:'8',placeholder:'8文字以上'});
+ body.append(field('メールアドレス',email),field('パスワード',password));
+ const message=el('p',{class:'hint',role:'status'}),error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
+ const signup=button('管理者アカウントを作成',async()=>{
+  if(password.value.length<8){error.textContent='パスワードは8文字以上にしてください。';return;}
+  const result=await runCloudAction(signup,()=>cloudSync.signUp(email.value.trim(),password.value),error);
+  if(result?.signedIn){close();return;}if(result?.message)message.textContent=result.message;
+ });
+ const login=button('ログイン',async()=>{
+  const ok=await runCloudAction(login,()=>cloudSync.signIn(email.value.trim(),password.value),error);if(ok)close();
+ },'primary');
+ actions.append(signup,login);body.append(message,error,actions);
+}
+$('#cloud-sync').onclick=openCloudSync;
 $('#store').onchange=e=>selectStore(e.target.value);
 let previewObserver=null;
 function closePreview(){
@@ -482,7 +523,18 @@ function openPreview(){
  fitPreview();toolbar.firstElementChild.focus();
 }
 $('#preview').onclick=openPreview;
+cloudSync=createCloudSync({
+ getRoot:()=>stateManager.getRoot(),
+ replaceRoot:candidate=>{
+  const ok=stateManager.replaceRoot(candidate,{edit:false,allowCloudConflict:true,notifySaved:false});
+  if(ok)stateManager.clearCloudConflict();return ok;
+ },
+ onStatus:updateCloudSyncStatus,
+ onConflict:()=>stateManager.setCloudConflict(),
+ onRemoteLoaded:()=>render()
+});
 render();stateManager.save(false);showSettings();
+cloudSync.initialize();
 function showOfflineStatus(message){
  const status=$('#offline-status');
  status.textContent=message;

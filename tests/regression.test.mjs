@@ -1007,3 +1007,13 @@ test('Cloudflare Pages用のセキュリティヘッダーを維持する',()=>{
  assert.match(headers,/X-Frame-Options: DENY/);
  assert.match(headers,/X-Robots-Tag: noindex/);
 });
+
+test('Supabase共有設定はpublishable keyのみを公開する',()=>{
+ const config=readFileSync(new URL('../supabase-config.js',import.meta.url),'utf8');
+ const index=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const headers=readFileSync(new URL('../_headers',import.meta.url),'utf8');
+ assert.match(config,/sb_publishable_/);
+ assert.doesNotMatch(config,/service_role|sb_secret_/);
+ assert.match(index,/connect-src[^"]*wpyhkewwzsdcstypcbmq\.supabase\.co/);
+ assert.match(headers,/connect-src[^\n]*wpyhkewwzsdcstypcbmq\.supabase\.co/);
+});

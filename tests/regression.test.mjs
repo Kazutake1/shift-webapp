@@ -1067,3 +1067,15 @@ test('Undo対象外の共有データ変更と端末UI操作でクラウド同�
  assert.match(birthdays,/edit:false,sync:true,success:'誕生日の確認済みを保存しました'/);
  assert.match(stores,/persistChange\(\(\)=>\{[\s\S]*activeStoreId=id;[\s\S]*\},false\)/);
 });
+
+
+test('複数端末共有は端末を最初の管理者アカウントへ固定する',()=>{
+ const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(cloud,/const OWNER_KEY='shift-supabase-owner-v1'/);
+ assert.match(cloud,/function bindOrVerifyOwner\(userId\)/);
+ assert.match(cloud,/既存のシフトデータ保護のため、別アカウントではログインできません/);
+ assert.match(cloud,/await rejectForeignSession\(data\);throw error/);
+ assert.match(app,/クラウド同期からログアウト/);
+ assert.match(app,/管理者アカウントの紐付けは保持されます/);
+});

@@ -401,7 +401,8 @@ function openCloudSync(){
    const ok=await runCloudAction(reloadButton,()=>cloudSync.reloadFromCloud(),error);
    if(ok){stateManager.clearCloudConflict();render();close();}
   });
-  const logoutButton=button('ログアウト',async()=>{await runCloudAction(logoutButton,()=>cloudSync.signOut(),error);close();});
+  const logoutButton=button('クラウド同期からログアウト',async()=>{await runCloudAction(logoutButton,()=>cloudSync.signOut(),error);close();});
+  hint(body,'ログアウトしても、この端末のシフトデータと管理者アカウントの紐付けは保持されます。');
   actions.append(logoutButton,reloadButton);body.append(error,actions);return;
  }
  hint(body,'同じ管理者アカウントでログインした端末同士で、同じシフトデータを共有します。未ログイン時は従来どおりこの端末だけに保存されます。');

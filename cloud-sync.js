@@ -3,6 +3,7 @@ import {validateRoot} from './stores.js';
 
 const SESSION_KEY='shift-supabase-session-v1';
 const SYNC_META_KEY='shift-supabase-sync-v1';
+const OWNER_KEY='shift-supabase-owner-v1';
 const UNSYNCED_STATUS='複数端末共有：クラウド未同期（端末には保存済み）。通信復旧後に自動再同期します。';
 
 const readJson=(storage,key)=>{try{return JSON.parse(storage.getItem(key)||'null');}catch{return null;}};
@@ -11,6 +12,15 @@ const readStoredSession=storage=>readJson(storage,SESSION_KEY);
 const writeStoredSession=(storage,session)=>writeJson(storage,SESSION_KEY,session);
 const readStoredSyncMeta=storage=>readJson(storage,SYNC_META_KEY);
 const writeStoredSyncMeta=(storage,meta)=>writeJson(storage,SYNC_META_KEY,meta);
+const readStoredOwner=storage=>{try{return storage.getItem(OWNER_KEY)||'';}catch{return '';}};
+const writeStoredOwner=(storage,userId)=>{
+ try{
+  storage.setItem(OWNER_KEY,userId);
+  if(storage.getItem(OWNER_KEY)!==userId)throw Error('owner binding write failed');
+ }catch{
+  throw Error('この端末の管理者アカウント情報を保存できません。空き容量を確認してください。');
+ }
+};
 
 async function responseJson(response){
  const text=await response.text();
@@ -26,6 +36,15 @@ export function createCloudSync({
 }={}){
  let session=readStoredSession(storage);
  let storedMeta=readStoredSyncMeta(storage);
+ let ownerUserId=readStoredOwner(storage);
+ let ownerMismatchDetected=false;
+ if(!ownerUserId&&storedMeta?.userId)ownerUserId=storedMeta.userId;
+ if(!ownerUserId&&session?.user?.id)ownerUserId=session.user.id;
+ if(ownerUserId&&session?.user?.id&&ownerUserId!==session.user.id){
+  ownerMismatchDetected=true;
+  session=null;
+  writeStoredSession(storage,null);
+ }
  if(storedMeta?.userId!==session?.user?.id)storedMeta=null;
 
  let revision=Number.isFinite(Number(storedMeta?.revision))?Number(storedMeta.revision):null;
@@ -36,6 +55,24 @@ export function createCloudSync({
 
  const status=message=>onStatus(message);
  const authHeaders=token=>({apikey:SUPABASE_PUBLISHABLE_KEY,...(token?{Authorization:`Bearer ${token}`}:{})});
+
+ function bindOrVerifyOwner(userId){
+  if(!userId)throw Error('管理者アカウントを確認できません。');
+  const metaOwner=readStoredSyncMeta(storage)?.userId||'';
+  const bound=ownerUserId||readStoredOwner(storage)||metaOwner;
+  if(bound&&bound!==userId){
+   throw Error('この端末は別の管理者アカウントに紐づいています。既存のシフトデータ保護のため、別アカウントではログインできません。');
+  }
+  if(!bound)writeStoredOwner(storage,userId);
+  else if(!readStoredOwner(storage))writeStoredOwner(storage,bound);
+  ownerUserId=bound||userId;
+  ownerMismatchDetected=false;
+ }
+ async function rejectForeignSession(data){
+  try{
+   if(data?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(data.access_token)});
+  }catch{}
+ }
 
  function persistSyncMeta(){
   if(!session?.user?.id)return;
@@ -162,6 +199,8 @@ export function createCloudSync({
   const data=await responseJson(await fetchImpl(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
    method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({email,password})
   }));
+  try{bindOrVerifyOwner(data?.user?.id);}
+  catch(error){await rejectForeignSession(data);throw error;}
   const previousUserId=session?.user?.id;
   session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
   writeStoredSession(storage,session);
@@ -187,6 +226,8 @@ export function createCloudSync({
    method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({email,password})
   }));
   if(data?.access_token){
+   try{bindOrVerifyOwner(data?.user?.id);}
+   catch(error){await rejectForeignSession(data);throw error;}
    session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
    revision=null;unsynced=false;conflicted=false;enabled=false;
    writeStoredSession(storage,session);
@@ -246,8 +287,13 @@ export function createCloudSync({
  }
 
  async function initialize(){
+  if(ownerMismatchDetected){
+   status('複数端末共有：この端末は別の管理者アカウントに紐づいているため、保存済みセッションを解除しました。');
+   return false;
+  }
   if(!session?.access_token){status('複数端末共有：未接続');return false;}
   try{
+   bindOrVerifyOwner(session.user?.id);
    if(unsynced&&revision!==null){enabled=true;await resumePendingSync();return true;}
    return await bootstrap();
   }catch(error){
@@ -263,7 +309,7 @@ export function createCloudSync({
   initialize,signIn,signUp,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
-   enabled,revision,conflicted,pendingSaves,unsynced
+   enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId)
   })
  };
 }

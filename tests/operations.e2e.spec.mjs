@@ -1343,3 +1343,60 @@ test('Undo対象外の前週コピーもクラウドへ同期する',async({page
  const store=cloudPayload.stores.find(s=>s.id===cloudPayload.activeStoreId);
  expect(store.weeks[store.current].days[0].shifts[0][0]).not.toBeNull();
 });
+
+
+test('ログアウト後に別管理者でログインしても既存データを別アカウントへアップロードしない',async({page})=>{
+ const ownerA='88888888-8888-8888-8888-888888888888';
+ const ownerB='99999999-9999-9999-9999-999999999999';
+ const postedOwners=[];
+ let logoutCount=0;
+
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   const body=request.postDataJSON();
+   const isB=body.email==='other@example.com';
+   const userId=isB?ownerB:ownerA;
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:isB?'account-b-access':'account-a-access',
+    refresh_token:isB?'account-b-refresh':'account-a-refresh',
+    expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:userId,email:body.email}
+   })});
+  }
+  if(url.pathname==='/auth/v1/logout'){
+   logoutCount++;
+   return route.fulfill({status:204,body:''});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();postedOwners.push(body.owner_id);
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:body.payload,updated_at:'2026-10-07T00:10:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#cloud-sync-status')).toContainText('rev.1');
+
+ await page.locator('#cloud-sync').click();
+ await page.getByRole('button',{name:'クラウド同期からログアウト'}).click();
+
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('other@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#dialog-body .error')).toContainText('別の管理者アカウントに紐づいています');
+
+ expect(postedOwners).toEqual([ownerA]);
+ expect(logoutCount).toBeGreaterThanOrEqual(2);
+ const binding=await page.evaluate(()=>localStorage.getItem('shift-supabase-owner-v1'));
+ expect(binding).toBe(ownerA);
+});

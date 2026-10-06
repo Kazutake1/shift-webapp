@@ -1092,3 +1092,87 @@ test('クラウド競合時は検知時と保存拒否時に警告を表示す�
  expect(secondMessage).toContain('保存・削除は停止しました');
  await expect(page.locator('#editor')).toBeVisible();
 });
+
+
+test('別端末の更新は画面復帰時に安全なら自動反映する',async({page})=>{
+ let cloudPayload=null,remoteRevision=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'auto-access',refresh_token:'auto-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'33333333-3333-3333-3333-333333333333',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   if(!cloudPayload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:02:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();
+   cloudPayload=structuredClone(body.payload);remoteRevision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:cloudPayload,updated_at:'2026-10-06T00:00:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await page.locator('#settings-back').click();
+
+ const store=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
+ store.weeks[store.current].days[0].notes='別端末から更新';
+ remoteRevision=2;
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+
+ await expect(page.locator('td.notes-cell button').first()).toHaveText('別端末から更新');
+ const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
+ expect(stored.stores.find(item=>item.id===stored.activeStoreId).weeks[store.current].days[0].notes).toBe('別端末から更新');
+});
+
+test('編集中に別端末更新を検知した場合は自動反映せず競合警告にする',async({page})=>{
+ let cloudPayload=null,remoteRevision=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'edit-access',refresh_token:'edit-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'44444444-4444-4444-4444-444444444444',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   if(!cloudPayload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:03:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);remoteRevision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:cloudPayload,updated_at:'2026-10-06T00:00:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await page.locator('#settings-back').click();
+
+ await page.locator('td.notes-cell button').first().click();
+ await page.locator('#dialog-body textarea').fill('入力途中');
+ const store=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
+ store.weeks[store.current].days[0].notes='別端末から更新';
+ remoteRevision=2;
+
+ const warning=new Promise(resolve=>page.once('dialog',async dialog=>{
+  const message=dialog.message();await dialog.accept();resolve(message);
+ }));
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ const message=await warning;
+ expect(message).toContain('別の端末でシフトが更新されています');
+ await expect(page.locator('#dialog-body textarea')).toHaveValue('入力途中');
+ await expect(page.locator('td.notes-cell button').first()).not.toHaveText('別端末から更新');
+});

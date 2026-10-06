@@ -8,8 +8,9 @@ async function responseJson(response){
  if(!response.ok)throw Error(data?.msg||data?.message||data?.error_description||data?.error||`通信エラー（${response.status}）`);
  return data;
 }
-export function createCloudSync({getRoot,replaceRoot,storage=globalThis.localStorage,fetchImpl=globalThis.fetch,onStatus=()=>{},onConflict=()=>{},onRemoteLoaded=()=>{}}={}){
+export function createCloudSync({getRoot,replaceRoot,storage=globalThis.localStorage,fetchImpl=globalThis.fetch,onStatus=()=>{},onConflict=()=>{},onRemoteLoaded=()=>{},canAutoApply=()=>true}={}){
  let session=readStoredSession(storage),enabled=false,revision=null,conflicted=false,saveQueue=Promise.resolve();
+ let pendingSaves=0,lastRemoteCheckAt=0,checkPromise=null;
  const status=message=>onStatus(message);
  const authHeaders=token=>({apikey:SUPABASE_PUBLISHABLE_KEY,...(token?{Authorization:`Bearer ${token}`}:{})});
  async function refreshSession(){
@@ -44,7 +45,13 @@ export function createCloudSync({getRoot,replaceRoot,storage=globalThis.localSto
   if(!Array.isArray(rows)||rows.length===0){conflicted=true;enabled=false;onConflict();status('複数端末共有：別の端末で更新されています。クラウドから最新データを読み込んでください。');return false;}
   revision=Number(rows[0].revision||next);status(`複数端末共有：同期済み（rev.${revision}）`);return true;
  }
- function queueSave(root){if(!enabled||conflicted)return;const snapshot=structuredClone(root);status('複数端末共有：保存中…');saveQueue=saveQueue.then(()=>saveSnapshot(snapshot)).catch(error=>status(`複数端末共有：保存できませんでした（${error.message}）`));}
+ function queueSave(root){
+  if(!enabled||conflicted)return;
+  const snapshot=structuredClone(root);pendingSaves++;status('複数端末共有：保存中…');
+  saveQueue=saveQueue.then(()=>saveSnapshot(snapshot))
+   .catch(error=>status(`複数端末共有：保存できませんでした（${error.message}）`))
+   .finally(()=>{pendingSaves=Math.max(0,pendingSaves-1);});
+ }
  async function signIn(email,password){
   const data=await responseJson(await fetchImpl(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({email,password})}));
   session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};writeStoredSession(storage,session);await bootstrap();return true;
@@ -56,6 +63,36 @@ export function createCloudSync({getRoot,replaceRoot,storage=globalThis.localSto
  }
  async function signOut(){try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}session=null;enabled=false;revision=null;conflicted=false;writeStoredSession(storage,null);status('複数端末共有：未接続');}
  async function reloadFromCloud(){await ensureSession();const row=await readCloud();if(!row)throw Error('クラウドに共有データがありません。');await loadRemote(row);return true;}
+
+ async function checkForRemoteUpdate({force=false}={}){
+  if(!session?.access_token||!enabled||conflicted||revision===null)return {checked:false,updated:false};
+  const now=Date.now();
+  if(!force&&now-lastRemoteCheckAt<5000)return {checked:false,updated:false};
+  if(checkPromise)return checkPromise;
+  checkPromise=(async()=>{
+   lastRemoteCheckAt=Date.now();
+   try{
+    const row=await readCloud();
+    if(!row)return {checked:true,updated:false};
+    const remoteRevision=Number(row.revision);
+    if(!Number.isFinite(remoteRevision)||remoteRevision<=revision)return {checked:true,updated:false};
+    if(pendingSaves===0&&canAutoApply()){
+     await loadRemote(row);
+     status(`複数端末共有：別端末の更新を反映しました（rev.${revision}）`);
+     return {checked:true,updated:true,autoApplied:true};
+    }
+    conflicted=true;enabled=false;onConflict();
+    status('複数端末共有：別の端末で更新されています。クラウドから最新データを読み込んでください。');
+    return {checked:true,updated:true,autoApplied:false,conflicted:true};
+   }catch(error){
+    status(`複数端末共有：更新確認に失敗しました（${error.message}）`);
+    return {checked:false,updated:false,error:error.message};
+   }finally{
+    checkPromise=null;
+   }
+  })();
+  return checkPromise;
+ }
  async function initialize(){if(!session?.access_token){status('複数端末共有：未接続');return false;}try{return await bootstrap();}catch(error){enabled=false;status(`複数端末共有：接続できませんでした（${error.message}）`);return false;}}
- return {initialize,signIn,signUp,signOut,reloadFromCloud,queueSave,getStatus:()=>({signedIn:Boolean(session?.access_token),email:session?.user?.email||'',enabled,revision,conflicted})};
+ return {initialize,signIn,signUp,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,getStatus:()=>({signedIn:Boolean(session?.access_token),email:session?.user?.email||'',enabled,revision,conflicted,pendingSaves})};
 }

@@ -533,10 +533,16 @@ cloudSync=createCloudSync({
  },
  onStatus:updateCloudSyncStatus,
  onConflict:()=>{stateManager.setCloudConflict();alert(CLOUD_CONFLICT_MESSAGE);},
- onRemoteLoaded:()=>render()
+ onRemoteLoaded:()=>render(),
+ canAutoApply:()=>!$('#editor')?.open&&!preview&&!printLayoutActive
 });
 render();stateManager.save(false);showSettings();
 cloudSync.initialize();
+const checkCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate();};
+window.addEventListener('focus',checkCloudUpdate);
+window.addEventListener('pageshow',checkCloudUpdate);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkCloudUpdate();});
+setInterval(checkCloudUpdate,60000);
 function showOfflineStatus(message){
  const status=$('#offline-status');
  status.textContent=message;

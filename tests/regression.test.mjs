@@ -295,10 +295,10 @@ test('シフトデータの書き込み経路をstate-managerへ共通化',()=>{
  assert.match(manager,/function writeRoot\(/);
  assert.match(manager,/function replaceRoot\(/);
  assert.equal((manager.match(/storage\.setItem\(storageKey,/g)||[]).length,1);
- assert.match(manager,/function save\(edit=true\)/);
- assert.match(manager,/replaceRoot\(candidate,\{edit:false,success:'直前の操作を取り消しました'\}\)/);
- assert.match(birthdayUi,/replaceRoot\(candidate,\{edit:false,success:'誕生日の確認済みを保存しました'\}\)/);
- assert.match(backup,/replaceRoot\(candidate,\{edit:false,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
+ assert.match(manager,/function save\(edit=true,sync=edit\)/);
+ assert.match(manager,/replaceRoot\(candidate,\{edit:false,sync:true,success:'直前の操作を取り消しました'\}\)/);
+ assert.match(birthdayUi,/replaceRoot\(candidate,\{edit:false,sync:true,success:'誕生日の確認済みを保存しました'\}\)/);
+ assert.match(backup,/replaceRoot\(candidate,\{edit:false,sync:true,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
 });
 
 test('別タブ更新を検知したらstate-managerが保存を停止する',()=>{

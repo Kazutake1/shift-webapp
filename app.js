@@ -8,6 +8,7 @@ import {createStateManager} from './state-manager.js';
 import {createPrintPdf} from './print-pdf.js';
 import {createCloudSync} from './cloud-sync.js';
 const $=s=>document.querySelector(s);
+const CLOUD_CONFLICT_MESSAGE='別の端末でシフトが更新されています。\n\nこの端末からの保存・削除は停止しました。\n設定 → 複数端末共有 →「クラウドから最新を読み込む」を実行してください。';
 let preview=false,activeCell=null,backupAt='';
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
 
@@ -34,7 +35,8 @@ const stateManager=createStateManager({
  onUndoChange:setUndoAvailable,
  onRollback:()=>render(),
  onSaveFailure:()=>alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。'),
- onSaved:(root,{edit})=>{if(edit)cloudSync?.queueSave(root);}
+ onSaved:(root,{edit})=>{if(edit)cloudSync?.queueSave(root);},
+ onCloudConflictBlocked:()=>alert(CLOUD_CONFLICT_MESSAGE)
 });
 
 const persistChange=(change,edit=true)=>stateManager.persistChange(change,edit);
@@ -530,7 +532,7 @@ cloudSync=createCloudSync({
   if(ok)stateManager.clearCloudConflict();return ok;
  },
  onStatus:updateCloudSyncStatus,
- onConflict:()=>stateManager.setCloudConflict(),
+ onConflict:()=>{stateManager.setCloudConflict();alert(CLOUD_CONFLICT_MESSAGE);},
  onRemoteLoaded:()=>render()
 });
 render();stateManager.save(false);showSettings();

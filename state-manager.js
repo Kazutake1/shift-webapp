@@ -12,7 +12,8 @@ export function createStateManager({
  onUndoChange=()=>{},
  onRollback=()=>{},
  onSaveFailure=()=>{},
- onSaved=()=>{}
+ onSaved=()=>{},
+ onCloudConflictBlocked=()=>{}
 }={}){
  let root;
  let state;
@@ -59,7 +60,9 @@ export function createStateManager({
    return false;
   }
   if(cloudConflictDetected&&!allowCloudConflict){
-   onStatus('別の端末でクラウドデータが更新されています。最新データを読み込むまで保存を停止しています。');
+   const message='別の端末でクラウドデータが更新されています。設定の「複数端末共有」からクラウドの最新データを読み込んでください。';
+   onStatus(message);
+   onCloudConflictBlocked(message);
    return false;
   }
 

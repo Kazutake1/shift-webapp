@@ -1037,3 +1037,52 @@ test('複数端末共有はログイン後に初期アップロードし編集�
  await expect.poll(()=>revision).toBe(2);
  expect(patched?.payload?.stores?.some(store=>Object.values(store.weeks).some(week=>week.days.some(day=>day.notes==='複数端末同期テスト')))).toBe(true);
 });
+
+test('クラウド競合時は検知時と保存拒否時に警告を表示する',async({page})=>{
+ let patchCount=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'22222222-2222-2222-2222-222222222222',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:body.payload,updated_at:'2026-10-06T00:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
+   patchCount++;
+   return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await page.locator('#settings-back').click();
+
+ const firstWarning=page.waitForEvent('dialog');
+ await page.locator('td.notes-cell button').first().click();
+ await page.locator('#dialog-body textarea').fill('競合を発生させる');
+ await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ const firstDialog=await firstWarning;
+ expect(firstDialog.message()).toContain('別の端末でシフトが更新されています');
+ expect(firstDialog.message()).toContain('クラウドから最新を読み込む');
+ await firstDialog.accept();
+ await expect.poll(()=>patchCount).toBe(1);
+
+ const secondWarning=page.waitForEvent('dialog');
+ await page.locator('td.notes-cell button').nth(1).click();
+ await page.locator('#dialog-body textarea').fill('拒否される変更');
+ await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ const secondDialog=await secondWarning;
+ expect(secondDialog.message()).toContain('保存・削除は停止しました');
+ await secondDialog.accept();
+ await expect(page.locator('#editor')).toBeVisible();
+});

@@ -1235,7 +1235,7 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
 });
 
 test('未同期中に別端末が更新した場合は復旧時に上書きせず競合停止する',async({page})=>{
- let cloudPayload=null,remoteRevision=0,networkDown=false;
+ let cloudPayload=null,remoteRevision=0,networkDown=false,failedPatchCount=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
@@ -1254,7 +1254,7 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
    return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:cloudPayload,updated_at:'2026-10-06T00:00:00Z'}])});
   }
   if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
-   if(networkDown)return route.abort('failed');
+   if(networkDown){failedPatchCount++;return route.abort('failed');}
    const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);remoteRevision=body.revision;
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision:remoteRevision,payload:cloudPayload,updated_at:'2026-10-06T00:07:00Z'}])});
   }
@@ -1273,6 +1273,7 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await page.locator('#dialog-body textarea').fill('この端末の未同期変更');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
+ await expect.poll(()=>failedPatchCount).toBe(1);
 
  const remoteStore=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
  remoteStore.weeks[remoteStore.current].days[0].notes='別端末の変更';

@@ -47,5 +47,5 @@ jobs:
             echo 'package-lock.json is already current'
             exit 0
           fi
-          git commit -m 'Lock CI dependencies (v160)'
+          git commit -m 'Lock CI dependencies (v161)'
           git push origin HEAD:main

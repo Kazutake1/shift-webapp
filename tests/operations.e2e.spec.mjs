@@ -1472,7 +1472,8 @@ test('画面復帰の更新確認は変更がなければpayloadを取得しな�
  await page.getByLabel('パスワード').fill('password123');
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
  const payloadReadsAfterLogin=payloadReads;
- await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ await page.waitForTimeout(5100);
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
  await expect.poll(()=>revisionReads).toBeGreaterThan(0);
  expect(payloadReads).toBe(payloadReadsAfterLogin);
 });

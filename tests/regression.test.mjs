@@ -1158,6 +1158,71 @@ test('管理者共有は既存アカウントのログイン専用で新規signu
 });
 
 
+test('クラウドログイン情報を端末保存できない場合はログイン成功扱いにしない',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const values=new Map();
+ const userId='session-storage-test-user';
+ let logoutCount=0,stateRequests=0;
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem:(key,value)=>{
+   if(key==='shift-supabase-session-v1')throw Error('quota exceeded');
+   values.set(key,value);
+  },
+  removeItem:key=>values.delete(key)
+ };
+ const response=(body,status=200)=>({
+  ok:status>=200&&status<300,
+  status,
+  text:async()=>JSON.stringify(body)
+ });
+ const fetchImpl=async url=>{
+  if(url.includes('/auth/v1/token?grant_type=password'))return response({
+   access_token:'test-access',refresh_token:'test-refresh',expires_at:4102444800,
+   user:{id:userId,email:'manager@test.invalid'}
+  });
+  if(url.includes('/rest/v1/shift_app_admins?'))return response([{user_id:userId}]);
+  if(url.includes('/auth/v1/logout')){logoutCount++;return response({});}
+  if(url.includes('/rest/v1/shift_app_state')){stateRequests++;return response([]);}
+  throw Error(`unexpected request: ${url}`);
+ };
+ const cloud=createCloudSync({getRoot:()=>initialState(),replaceRoot:()=>true,storage,fetchImpl});
+ await assert.rejects(()=>cloud.signIn('manager@test.invalid','test-password-123'),/ログイン情報を端末に保存できません/);
+ assert.equal(cloud.getStatus().signedIn,false);
+ assert.equal(cloud.getStatus().sessionStorageWriteFailed,true);
+ assert.equal(stateRequests,0);
+ assert.equal(logoutCount,1);
+});
+
+test('クラウドログアウト時に端末セッション削除へ失敗した場合は警告する',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const userId='session-clear-test-user';
+ const session={access_token:'test-access',refresh_token:'test-refresh',expires_at:4102444800,user:{id:userId,email:'manager@test.invalid'}};
+ const values=new Map([['shift-supabase-session-v1',JSON.stringify(session)]]);
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem:(key,value)=>values.set(key,value),
+  removeItem:key=>{
+   if(key==='shift-supabase-session-v1')throw Error('remove failed');
+   values.delete(key);
+  }
+ };
+ const response=(body,status=200)=>({
+  ok:status>=200&&status<300,
+  status,
+  text:async()=>JSON.stringify(body)
+ });
+ const fetchImpl=async url=>{
+  if(url.includes('/auth/v1/logout'))return response({});
+  throw Error(`unexpected request: ${url}`);
+ };
+ const cloud=createCloudSync({getRoot:()=>initialState(),replaceRoot:()=>true,storage,fetchImpl});
+ await assert.rejects(()=>cloud.signOut(),/ログイン情報を端末から削除できません/);
+ assert.equal(cloud.getStatus().signedIn,false);
+ assert.equal(cloud.getStatus().sessionStorageWriteFailed,true);
+ assert.notEqual(storage.getItem('shift-supabase-session-v1'),null);
+});
+
 test('クラウド同期は保存中の更新確認を延期し同期メタ保存失敗を明示する',()=>{
  const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');

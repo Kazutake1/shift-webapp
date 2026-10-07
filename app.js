@@ -374,7 +374,7 @@ function updateCloudSyncStatus(text){
  const host=$('#cloud-sync-status');if(host)host.textContent=message;
  const alertHost=$('#cloud-sync-alert');
  if(alertHost){
-  const important=/クラウド未同期|接続できません|更新確認に失敗|別の端末で更新されています|同期状態を保存できません/.test(message);
+  const important=/クラウド未同期|接続できません|更新確認に失敗|別の端末で更新されています|同期状態を保存できません|ログイン情報を.*できません/.test(message);
   alertHost.textContent=important?message:'';
   alertHost.hidden=!important;
  }

@@ -5,11 +5,22 @@ const SESSION_KEY='shift-supabase-session-v1';
 const SYNC_META_KEY='shift-supabase-sync-v1';
 const OWNER_KEY='shift-supabase-owner-v1';
 const UNSYNCED_STATUS='複数端末共有：クラウド未同期（端末には保存済み）。通信復旧後に自動再同期します。';
+const SESSION_STORE_ERROR='ログイン情報を端末に保存できません。空き容量を確認してください。';
+const SESSION_CLEAR_ERROR='ログイン情報を端末から削除できません。再読み込みせず、空き容量を確認してください。';
 
 const readJson=(storage,key)=>{try{return JSON.parse(storage.getItem(key)||'null');}catch{return null;}};
-const writeJson=(storage,key,value)=>{try{if(value)storage.setItem(key,JSON.stringify(value));else storage.removeItem(key);}catch{}};
 const readStoredSession=storage=>readJson(storage,SESSION_KEY);
-const writeStoredSession=(storage,session)=>writeJson(storage,SESSION_KEY,session);
+const writeStoredSession=(storage,session)=>{
+ try{
+  if(session){
+   const value=JSON.stringify(session);
+   storage.setItem(SESSION_KEY,value);
+   return storage.getItem(SESSION_KEY)===value;
+  }
+  storage.removeItem(SESSION_KEY);
+  return storage.getItem(SESSION_KEY)===null;
+ }catch{return false;}
+};
 const readStoredSyncMeta=storage=>readJson(storage,SYNC_META_KEY);
 const writeStoredSyncMeta=(storage,meta)=>{
  try{
@@ -54,11 +65,12 @@ export function createCloudSync({
  let storedMeta=readStoredSyncMeta(storage);
  let ownerUserId=readStoredOwner(storage);
  let ownerMismatchDetected=false;
+ let sessionStorageWriteFailed=false;
  if(!ownerUserId&&storedMeta?.userId)ownerUserId=storedMeta.userId;
  if(ownerUserId&&session?.user?.id&&ownerUserId!==session.user.id){
   ownerMismatchDetected=true;
   session=null;
-  writeStoredSession(storage,null);
+  sessionStorageWriteFailed=!writeStoredSession(storage,null);
  }
  if(storedMeta?.userId!==session?.user?.id)storedMeta=null;
 
@@ -69,9 +81,11 @@ export function createCloudSync({
  let syncMetaWriteFailed=false;
  let saveQueue=Promise.resolve(),pendingSaves=0,lastRemoteCheckAt=0,checkPromise=null,deferredRemoteCheck=false;
 
- const status=message=>onStatus(syncMetaWriteFailed
-  ?`${message} 端末の同期状態を保存できません。再読み込みせず、空き容量を確認してください。`
-  :message);
+ const status=message=>onStatus([
+  message,
+  sessionStorageWriteFailed?'端末のログイン情報を保存・削除できません。再読み込みせず、空き容量を確認してください。':'',
+  syncMetaWriteFailed?'端末の同期状態を保存できません。再読み込みせず、空き容量を確認してください。':''
+ ].filter(Boolean).join(' '));
  const authHeaders=token=>({apikey:SUPABASE_PUBLISHABLE_KEY,...(token?{Authorization:`Bearer ${token}`}:{})});
 
  function bindOrVerifyOwner(userId){
@@ -120,8 +134,13 @@ export function createCloudSync({
    method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},
    body:JSON.stringify({refresh_token:session.refresh_token})
   }));
-  session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
-  writeStoredSession(storage,session);
+  const nextSession={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
+  if(!writeStoredSession(storage,nextSession)){
+   sessionStorageWriteFailed=true;
+   throw Error(SESSION_STORE_ERROR);
+  }
+  sessionStorageWriteFailed=false;
+  session=nextSession;
   return session;
  }
  async function ensureSession(){
@@ -241,8 +260,15 @@ export function createCloudSync({
    bindOrVerifyOwner(data?.user?.id);
   }catch(error){await rejectForeignSession(data);throw error;}
   const previousUserId=session?.user?.id;
-  session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
-  writeStoredSession(storage,session);
+  const nextSession={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
+  if(!writeStoredSession(storage,nextSession)){
+   sessionStorageWriteFailed=true;
+   writeStoredSession(storage,null);
+   await rejectForeignSession(data);
+   throw Error(SESSION_STORE_ERROR);
+  }
+  sessionStorageWriteFailed=false;
+  session=nextSession;
   if(previousUserId!==session.user?.id){
    const meta=readStoredSyncMeta(storage);
    if(meta?.userId===session.user?.id){
@@ -262,9 +288,12 @@ export function createCloudSync({
  }
  async function signOut(){
   try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}
+  const cleared=writeStoredSession(storage,null);
   session=null;enabled=false;revision=null;conflicted=false;unsynced=false;
-  writeStoredSession(storage,null);
+  sessionStorageWriteFailed=!cleared;
   status('複数端末共有：未接続');
+  if(!cleared)throw Error(SESSION_CLEAR_ERROR);
+  return true;
  }
  async function reloadFromCloud(){
   await ensureSession();
@@ -325,7 +354,7 @@ export function createCloudSync({
    if(!await verifyAdminMembership(session)){
     await rejectForeignSession(session);
     session=null;enabled=false;revision=null;conflicted=false;unsynced=false;
-    writeStoredSession(storage,null);
+    sessionStorageWriteFailed=!writeStoredSession(storage,null);
     status('複数端末共有：このアカウントは管理者として登録されていないため、保存済みセッションを解除しました。');
     return false;
    }
@@ -345,7 +374,7 @@ export function createCloudSync({
   initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
-   enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed
+   enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed,sessionStorageWriteFailed
   })
  };
 }

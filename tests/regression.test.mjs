@@ -1140,6 +1140,7 @@ test('複数端末共有は端末を最初の管理者アカウントへ固定�
  const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  assert.match(cloud,/const OWNER_KEY='shift-supabase-owner-v1'/);
+ assert.match(cloud,/function verifyOwnerBinding\(userId\)/);
  assert.match(cloud,/function bindOrVerifyOwner\(userId\)/);
  assert.match(cloud,/既存のシフトデータ保護のため、別アカウントではログインできません/);
  assert.match(cloud,/await rejectForeignSession\(data\);throw error/);
@@ -1190,6 +1191,8 @@ test('クラウドログイン情報を端末保存できない場合はログ�
  await assert.rejects(()=>cloud.signIn('manager@test.invalid','test-password-123'),/ログイン情報を端末に保存できません/);
  assert.equal(cloud.getStatus().signedIn,false);
  assert.equal(cloud.getStatus().sessionStorageWriteFailed,true);
+ assert.equal(cloud.getStatus().ownerBound,false);
+ assert.equal(storage.getItem('shift-supabase-owner-v1'),null);
  assert.equal(stateRequests,0);
  assert.equal(logoutCount,1);
 });

@@ -88,16 +88,19 @@ export function createCloudSync({
  ].filter(Boolean).join(' '));
  const authHeaders=token=>({apikey:SUPABASE_PUBLISHABLE_KEY,...(token?{Authorization:`Bearer ${token}`}:{})});
 
- function bindOrVerifyOwner(userId){
+ function verifyOwnerBinding(userId){
   if(!userId)throw Error('管理者アカウントを確認できません。');
   const metaOwner=readStoredSyncMeta(storage)?.userId||'';
   const bound=ownerUserId||readStoredOwner(storage)||metaOwner;
   if(bound&&bound!==userId){
    throw Error('この端末は別の管理者アカウントに紐づいています。既存のシフトデータ保護のため、別アカウントではログインできません。');
   }
-  if(!bound)writeStoredOwner(storage,userId);
-  else if(!readStoredOwner(storage))writeStoredOwner(storage,bound);
-  ownerUserId=bound||userId;
+  return bound||userId;
+ }
+ function bindOrVerifyOwner(userId){
+  const owner=verifyOwnerBinding(userId);
+  if(!readStoredOwner(storage))writeStoredOwner(storage,owner);
+  ownerUserId=owner;
   ownerMismatchDetected=false;
  }
  async function verifyAdminMembership(data){
@@ -257,7 +260,7 @@ export function createCloudSync({
   }));
   try{
    if(!await verifyAdminMembership(data))throw Error('このアカウントは管理者として登録されていません。');
-   bindOrVerifyOwner(data?.user?.id);
+   verifyOwnerBinding(data?.user?.id);
   }catch(error){await rejectForeignSession(data);throw error;}
   const previousUserId=session?.user?.id;
   const nextSession={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
@@ -266,6 +269,12 @@ export function createCloudSync({
    writeStoredSession(storage,null);
    await rejectForeignSession(data);
    throw Error(SESSION_STORE_ERROR);
+  }
+  try{bindOrVerifyOwner(data?.user?.id);}
+  catch(error){
+   sessionStorageWriteFailed=!writeStoredSession(storage,null);
+   await rejectForeignSession(data);
+   throw error;
   }
   sessionStorageWriteFailed=false;
   session=nextSession;

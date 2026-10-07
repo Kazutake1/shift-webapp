@@ -1171,3 +1171,15 @@ test('通常Regression CIはlockfileを読むだけでリポジトリ書込権�
  assert.doesNotMatch(workflow,/Commit verified dependency lock/);
  assert.doesNotMatch(workflow,/git push origin/);
 });
+
+
+test('GitHub ActionsはNode24対応のcheckout/setup-node v7を使用する',()=>{
+ const regression=readFileSync(new URL('../.github/workflows/regression-tests.yml',import.meta.url),'utf8');
+ const publish=readFileSync(new URL('../.github/workflows/publish.yml',import.meta.url),'utf8');
+ for(const workflow of [regression,publish]){
+  assert.match(workflow,/actions\/checkout@v7/);
+  assert.match(workflow,/actions\/setup-node@v7/);
+  assert.doesNotMatch(workflow,/actions\/checkout@v4/);
+  assert.doesNotMatch(workflow,/actions\/setup-node@v4/);
+ }
+});

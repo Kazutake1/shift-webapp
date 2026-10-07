@@ -43,23 +43,21 @@ jobs:
           else
             echo 'changed=true' >> "$GITHUB_OUTPUT"
           fi
+      - name: Install locked tools
+        if: steps.holidays.outputs.changed == 'true'
+        run: npm ci --ignore-scripts
       - name: Syntax check
         if: steps.holidays.outputs.changed == 'true'
         run: npm run check
-      - name: Install lint tools
-        if: steps.holidays.outputs.changed == 'true'
-        run: npm install --no-save --ignore-scripts eslint@10.12.0
       - name: Lint
         if: steps.holidays.outputs.changed == 'true'
         run: npm run lint
       - name: Regression tests
         if: steps.holidays.outputs.changed == 'true'
         run: npm test
-      - name: Install browser test tools
+      - name: Install browser engines
         if: steps.holidays.outputs.changed == 'true'
-        run: |
-          npm install --no-save --ignore-scripts @playwright/test@1.63.0
-          npx playwright install --with-deps chromium webkit
+        run: npx playwright install --with-deps chromium webkit
       - name: Browser operation tests
         if: steps.holidays.outputs.changed == 'true'
         run: npm run test:e2e

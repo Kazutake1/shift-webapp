@@ -9,5 +9,9 @@
     "lint": "eslint . --max-warnings=0",
     "test:sw": "playwright test --config=playwright.sw.config.mjs",
     "build:cloudflare": "node scripts/build-cloudflare.mjs"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "eslint": "10.12.0"
   }
 }

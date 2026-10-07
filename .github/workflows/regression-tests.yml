@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   test:
@@ -20,21 +20,32 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
+      - name: Generate dependency lock
+        run: npm install --package-lock-only --ignore-scripts
+      - name: Install locked tools
+        run: npm ci --ignore-scripts
       - name: Syntax check
         run: npm run check
-      - name: Install lint tools
-        run: npm install --no-save --ignore-scripts eslint@10.12.0
       - name: Lint
         run: npm run lint
       - name: Regression tests
         run: npm test
       - name: Cloudflare Pages build
         run: npm run build:cloudflare
-      - name: Install browser test tools
-        run: |
-          npm install --no-save --ignore-scripts @playwright/test@1.63.0
-          npx playwright install --with-deps chromium webkit
+      - name: Install browser engines
+        run: npx playwright install --with-deps chromium webkit
       - name: Browser operation tests
         run: npm run test:e2e
       - name: Service Worker E2E
         run: npm run test:sw
+      - name: Commit verified dependency lock
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add package-lock.json
+          if git diff --cached --quiet; then
+            echo 'package-lock.json is already current'
+            exit 0
+          fi
+          git commit -m 'Lock CI dependencies (v159)'
+          git push origin HEAD:main

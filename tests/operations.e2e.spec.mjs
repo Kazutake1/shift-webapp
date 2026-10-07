@@ -1527,7 +1527,7 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  await page.locator('#settings-back').click();
 
  const initialLabel=await page.locator('#week-label').textContent();
- await page.getByRole('button',{name:'前週'}).click();
+ await page.getByRole('button',{name:'前週',exact:true}).click();
  const localLabel=await page.locator('#week-label').textContent();
  expect(localLabel).not.toBe(initialLabel);
 

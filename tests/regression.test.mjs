@@ -1079,3 +1079,13 @@ test('複数端末共有は端末を最初の管理者アカウントへ固定�
  assert.match(app,/クラウド同期からログアウト/);
  assert.match(app,/管理者アカウントの紐付けは保持されます/);
 });
+
+
+test('管理者共有は既存アカウントのログイン専用で新規signup UIを持たない',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
+ assert.equal(app.includes('管理者アカウントを作成'),false);
+ assert.equal(app.includes('cloudSync.signUp'),false);
+ assert.equal(cloud.includes('async function signUp('),false);
+ assert.match(app,/登録済みの管理者アカウントでログイン/);
+});

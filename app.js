@@ -405,20 +405,15 @@ function openCloudSync(){
   hint(body,'ログアウトしても、この端末のシフトデータと管理者アカウントの紐付けは保持されます。');
   actions.append(logoutButton,reloadButton);body.append(error,actions);return;
  }
- hint(body,'同じ管理者アカウントでログインした端末同士で、同じシフトデータを共有します。未ログイン時は従来どおりこの端末だけに保存されます。');
+ hint(body,'登録済みの管理者アカウントでログインすると、同じシフトデータを複数端末で共有します。未ログイン時は従来どおりこの端末だけに保存されます。');
  const email=el('input',{type:'email',autocomplete:'username',required:'',placeholder:'メールアドレス'});
  const password=el('input',{type:'password',autocomplete:'current-password',required:'',minlength:'8',placeholder:'8文字以上'});
  body.append(field('メールアドレス',email),field('パスワード',password));
- const message=el('p',{class:'hint',role:'status'}),error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
- const signup=button('管理者アカウントを作成',async()=>{
-  if(password.value.length<8){error.textContent='パスワードは8文字以上にしてください。';return;}
-  const result=await runCloudAction(signup,()=>cloudSync.signUp(email.value.trim(),password.value),error);
-  if(result?.signedIn){close();return;}if(result?.message)message.textContent=result.message;
- });
+ const error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
  const login=button('ログイン',async()=>{
   const ok=await runCloudAction(login,()=>cloudSync.signIn(email.value.trim(),password.value),error);if(ok)close();
  },'primary');
- actions.append(signup,login);body.append(message,error,actions);
+ actions.append(login);body.append(error,actions);
 }
 $('#cloud-sync').onclick=openCloudSync;
 $('#store').onchange=e=>selectStore(e.target.value);

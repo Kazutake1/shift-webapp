@@ -221,21 +221,6 @@ export function createCloudSync({
   await bootstrap();
   return true;
  }
- async function signUp(email,password){
-  const data=await responseJson(await fetchImpl(`${SUPABASE_URL}/auth/v1/signup`,{
-   method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({email,password})
-  }));
-  if(data?.access_token){
-   try{bindOrVerifyOwner(data?.user?.id);}
-   catch(error){await rejectForeignSession(data);throw error;}
-   session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
-   revision=null;unsynced=false;conflicted=false;enabled=false;
-   writeStoredSession(storage,session);
-   await bootstrap();
-   return {signedIn:true,message:''};
-  }
-  return {signedIn:false,message:'確認メールを送信しました。メール確認後にログインしてください。'};
- }
  async function signOut(){
   try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}
   session=null;enabled=false;revision=null;conflicted=false;unsynced=false;
@@ -306,7 +291,7 @@ export function createCloudSync({
  }
 
  return {
-  initialize,signIn,signUp,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
+  initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
    enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId)

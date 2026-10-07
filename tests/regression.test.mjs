@@ -1320,3 +1320,17 @@ test('GitHub Actionsはcheckout/setup-nodeの公式v7コミットSHAへ固定す
   assert.deepEqual(actions,expected);
  }
 });
+
+test('GitHub Pages ActionsはNode24対応版の公式コミットSHAへ固定する',()=>{
+ const pages=readFileSync(new URL('../.github/workflows/pages.yml',import.meta.url),'utf8');
+ const publish=readFileSync(new URL('../.github/workflows/publish.yml',import.meta.url),'utf8');
+ const expected=[
+  'actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d',
+  'actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9',
+  'actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346'
+ ];
+ for(const workflow of [pages,publish]){
+  const actions=[...workflow.matchAll(/^\s*-?\s*uses:\s*(actions\/(?:configure-pages|upload-pages-artifact|deploy-pages)@[^\s#]+)/gm)].map(match=>match[1]);
+  assert.deepEqual(actions,expected);
+ }
+});

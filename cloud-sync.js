@@ -57,7 +57,7 @@ export function createCloudSync({
  let enabled=Boolean(session?.access_token&&revision!==null);
  let conflicted=false;
  let syncMetaWriteFailed=false;
- let saveQueue=Promise.resolve(),pendingSaves=0,lastRemoteCheckAt=0,checkPromise=null;
+ let saveQueue=Promise.resolve(),pendingSaves=0,lastRemoteCheckAt=0,checkPromise=null,deferredRemoteCheck=false;
 
  const status=message=>onStatus(syncMetaWriteFailed
   ?`${message} 端末の同期状態を保存できません。再読み込みせず、空き容量を確認してください。`
@@ -191,6 +191,10 @@ export function createCloudSync({
     unsynced=false;persistSyncMeta();
     status(`複数端末共有：同期済み（rev.${revision}）`);
    }
+   if(pendingSaves===0&&deferredRemoteCheck&&!conflicted){
+    deferredRemoteCheck=false;
+    queueMicrotask(()=>checkForRemoteUpdate({force:true}));
+   }
   });
  }
 
@@ -251,7 +255,10 @@ export function createCloudSync({
 
  async function checkForRemoteUpdate({force=false}={}){
   if(!session?.access_token||conflicted)return {checked:false,updated:false};
-  if(pendingSaves>0)return {checked:false,updated:false,deferred:true};
+  if(pendingSaves>0){
+   deferredRemoteCheck=true;
+   return {checked:false,updated:false,deferred:true};
+  }
   const now=Date.now();
   if(!force&&now-lastRemoteCheckAt<5000)return {checked:false,updated:false};
   if(checkPromise)return checkPromise;

@@ -1125,3 +1125,11 @@ test('CIはサポート中のNode.js 24 LTSと固定したPlaywright 1.63.0を�
  assert.match(regression,/npm ci --ignore-scripts/);
  assert.match(publish,/npm ci --ignore-scripts/);
 });
+
+
+test('保存中に延期したクラウド更新確認は保存終了後に再実行する',()=>{
+ const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
+ assert.match(cloud,/deferredRemoteCheck=false/);
+ assert.match(cloud,/if\(pendingSaves>0\)\{[\s\S]*deferredRemoteCheck=true;[\s\S]*deferred:true/);
+ assert.match(cloud,/if\(pendingSaves===0&&deferredRemoteCheck&&!conflicted\)\{[\s\S]*queueMicrotask\(\(\)=>checkForRemoteUpdate\(\{force:true\}\)\)/);
+});

@@ -1004,6 +1004,10 @@ test('複数端末共有はログイン後に初期アップロードし編集�
  let revision=0,posted=null,patched=null;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1042,6 +1046,10 @@ test('クラウド競合時は検知時と保存拒否時に警告を表示す�
  let patchCount=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'test-access',refresh_token:'test-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1098,6 +1106,10 @@ test('別端末の更新は画面復帰時に安全なら自動反映する',asy
  let cloudPayload=null,remoteRevision=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'auto-access',refresh_token:'auto-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1137,6 +1149,10 @@ test('編集中に別端末更新を検知した場合は自動反映せず競�
  let cloudPayload=null,remoteRevision=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'edit-access',refresh_token:'edit-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1182,6 +1198,10 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
  let cloudPayload=null,remoteRevision=0,networkDown=false,patchCount=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'offline-access',refresh_token:'offline-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1238,6 +1258,10 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  let cloudPayload=null,remoteRevision=0,networkDown=false,failedPatchCount=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'offline-conflict-access',refresh_token:'offline-conflict-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1295,6 +1319,10 @@ test('Undo対象外の前週コピーもクラウドへ同期する',async({page
  let cloudPayload=null,revision=0,patchCount=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'copy-sync-access',refresh_token:'copy-sync-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1354,6 +1382,10 @@ test('ログアウト後に別管理者でログインしても既存データ�
 
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    const body=request.postDataJSON();
    const isB=body.email==='other@example.com';
@@ -1413,6 +1445,10 @@ test('同期メタデータを端末へ保存できない場合は警告を表�
  });
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'meta-fail-access',refresh_token:'meta-fail-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1444,6 +1480,10 @@ test('画面復帰の更新確認は変更がなければpayloadを取得しな�
  let payload=null,revision=1,revisionReads=0,payloadReads=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'light-read-access',refresh_token:'light-read-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
@@ -1486,6 +1526,10 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  let cloudPayload=null,revision=0;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
   if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
     access_token:'view-local-access',refresh_token:'view-local-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,

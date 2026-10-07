@@ -1109,3 +1109,15 @@ test('定期更新確認と未同期復旧はrevisionだけを先に取得する
  assert.match(cloud,/const remoteRevision=await readCloudRevision\(\)/);
  assert.match(cloud,/const row=await readCloud\(\);[\s\S]*await loadRemote\(row\)/);
 });
+
+
+test('CIはサポート中のNode.js 24 LTSとPlaywright 1.63.0を使用する',()=>{
+ const regression=readFileSync(new URL('../.github/workflows/regression-tests.yml',import.meta.url),'utf8');
+ const publish=readFileSync(new URL('../.github/workflows/publish.yml',import.meta.url),'utf8');
+ for(const workflow of [regression,publish]){
+  assert.match(workflow,/node-version: '24'/);
+  assert.match(workflow,/@playwright\/test@1\.63\.0/);
+  assert.doesNotMatch(workflow,/node-version: '20'/);
+  assert.doesNotMatch(workflow,/@playwright\/test@1\.55\.0/);
+ }
+});

@@ -1305,13 +1305,15 @@ test('通常Regression CIはlockfileを読むだけでリポジトリ書込権�
 });
 
 
-test('GitHub ActionsはNode24対応のcheckout/setup-node v7を使用する',()=>{
+test('GitHub Actionsはcheckout/setup-nodeの公式v7コミットSHAへ固定する',()=>{
  const regression=readFileSync(new URL('../.github/workflows/regression-tests.yml',import.meta.url),'utf8');
  const publish=readFileSync(new URL('../.github/workflows/publish.yml',import.meta.url),'utf8');
+ const expected=[
+  'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1',
+  'actions/setup-node@820762786026740c76f36085b0efc47a31fe5020'
+ ];
  for(const workflow of [regression,publish]){
-  assert.match(workflow,/actions\/checkout@v7/);
-  assert.match(workflow,/actions\/setup-node@v7/);
-  assert.doesNotMatch(workflow,/actions\/checkout@v4/);
-  assert.doesNotMatch(workflow,/actions\/setup-node@v4/);
+  const actions=[...workflow.matchAll(/^\s*-?\s*uses:\s*(actions\/(?:checkout|setup-node)@[^\s#]+)/gm)].map(match=>match[1]);
+  assert.deepEqual(actions,expected);
  }
 });

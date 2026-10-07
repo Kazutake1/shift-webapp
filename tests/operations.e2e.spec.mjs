@@ -1400,3 +1400,40 @@ test('ログアウト後に別管理者でログインしても既存データ�
  const binding=await page.evaluate(()=>localStorage.getItem('shift-supabase-owner-v1'));
  expect(binding).toBe(ownerA);
 });
+
+
+test('同期メタデータを端末へ保存できない場合は警告を表示する',async({page})=>{
+ await page.addInitScript(()=>{
+  const original=Storage.prototype.setItem;
+  Storage.prototype.setItem=function(key,value){
+   if(key==='shift-supabase-sync-v1')throw new DOMException('Quota exceeded','QuotaExceededError');
+   return original.call(this,key,value);
+  };
+ });
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'meta-fail-access',refresh_token:'meta-fail-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision:1,payload:body.payload,updated_at:'2026-10-07T00:20:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#cloud-sync-status')).toContainText('同期状態を保存できません');
+ await page.locator('#settings-back').click();
+ await expect(page.locator('#cloud-sync-alert')).toContainText('同期状態を保存できません');
+});

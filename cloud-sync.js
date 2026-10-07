@@ -11,7 +11,12 @@ const writeJson=(storage,key,value)=>{try{if(value)storage.setItem(key,JSON.stri
 const readStoredSession=storage=>readJson(storage,SESSION_KEY);
 const writeStoredSession=(storage,session)=>writeJson(storage,SESSION_KEY,session);
 const readStoredSyncMeta=storage=>readJson(storage,SYNC_META_KEY);
-const writeStoredSyncMeta=(storage,meta)=>writeJson(storage,SYNC_META_KEY,meta);
+const writeStoredSyncMeta=(storage,meta)=>{
+ try{
+  storage.setItem(SYNC_META_KEY,JSON.stringify(meta));
+  return storage.getItem(SYNC_META_KEY)!==null;
+ }catch{return false;}
+};
 const readStoredOwner=storage=>{try{return storage.getItem(OWNER_KEY)||'';}catch{return '';}};
 const writeStoredOwner=(storage,userId)=>{
  try{
@@ -51,9 +56,12 @@ export function createCloudSync({
  let unsynced=Boolean(storedMeta?.unsynced);
  let enabled=Boolean(session?.access_token&&revision!==null);
  let conflicted=false;
+ let syncMetaWriteFailed=false;
  let saveQueue=Promise.resolve(),pendingSaves=0,lastRemoteCheckAt=0,checkPromise=null;
 
- const status=message=>onStatus(message);
+ const status=message=>onStatus(syncMetaWriteFailed
+  ?`${message} 端末の同期状態を保存できません。再読み込みせず、空き容量を確認してください。`
+  :message);
  const authHeaders=token=>({apikey:SUPABASE_PUBLISHABLE_KEY,...(token?{Authorization:`Bearer ${token}`}:{})});
 
  function bindOrVerifyOwner(userId){
@@ -75,8 +83,10 @@ export function createCloudSync({
  }
 
  function persistSyncMeta(){
-  if(!session?.user?.id)return;
-  writeStoredSyncMeta(storage,{userId:session.user.id,revision,unsynced,updatedAt:new Date().toISOString()});
+  if(!session?.user?.id)return true;
+  const ok=writeStoredSyncMeta(storage,{userId:session.user.id,revision,unsynced,updatedAt:new Date().toISOString()});
+  syncMetaWriteFailed=!ok;
+  return ok;
  }
  function setUnsynced(message=UNSYNCED_STATUS){
   unsynced=true;persistSyncMeta();status(message);
@@ -237,6 +247,7 @@ export function createCloudSync({
 
  async function checkForRemoteUpdate({force=false}={}){
   if(!session?.access_token||conflicted)return {checked:false,updated:false};
+  if(pendingSaves>0)return {checked:false,updated:false,deferred:true};
   const now=Date.now();
   if(!force&&now-lastRemoteCheckAt<5000)return {checked:false,updated:false};
   if(checkPromise)return checkPromise;
@@ -294,7 +305,7 @@ export function createCloudSync({
   initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
-   enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId)
+   enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed
   })
  };
 }

@@ -1069,6 +1069,73 @@ test('Undo対象外の共有データ変更と端末UI操作でクラウド同�
 });
 
 
+test('管理者ホワイトリスト確認前に端末所有者を確定しない',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const values=new Map();
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem:(key,value)=>values.set(key,value),
+  removeItem:key=>values.delete(key)
+ };
+ const user={id:'not-admin',email:'not-admin@example.com'};
+ const session={access_token:'token',refresh_token:'refresh',expires_at:4102444800,user};
+ const response=(body,status=200)=>({
+  ok:status>=200&&status<300,
+  status,
+  text:async()=>JSON.stringify(body)
+ });
+ const requests=[];
+ const fetchImpl=async(url,options={})=>{
+  requests.push({url,options});
+  if(url.includes('/auth/v1/token?grant_type=password'))return response(session);
+  if(url.includes('/rest/v1/shift_app_admins?'))return response([]);
+  if(url.includes('/auth/v1/logout'))return response({});
+  throw Error(`unexpected request: ${url}`);
+ };
+ const cloud=createCloudSync({
+  getRoot:()=>initialState(),
+  replaceRoot:()=>true,
+  storage,
+  fetchImpl
+ });
+ await assert.rejects(()=>cloud.signIn('not-admin@example.com','password88'),/管理者として登録されていません/);
+ assert.equal(storage.getItem('shift-supabase-owner-v1'),null);
+ assert.equal(storage.getItem('shift-supabase-session-v1'),null);
+ assert.equal(requests.some(item=>item.url.includes('/rest/v1/shift_app_admins?')),true);
+});
+
+test('保存済みの非管理者セッションも端末所有者へ昇格させない',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const values=new Map();
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem:(key,value)=>values.set(key,value),
+  removeItem:key=>values.delete(key)
+ };
+ const user={id:'not-admin',email:'not-admin@example.com'};
+ const session={access_token:'token',refresh_token:'refresh',expires_at:4102444800,user};
+ storage.setItem('shift-supabase-session-v1',JSON.stringify(session));
+ const response=(body,status=200)=>({
+  ok:status>=200&&status<300,
+  status,
+  text:async()=>JSON.stringify(body)
+ });
+ const fetchImpl=async(url)=>{
+  if(url.includes('/rest/v1/shift_app_admins?'))return response([]);
+  if(url.includes('/auth/v1/logout'))return response({});
+  throw Error(`unexpected request: ${url}`);
+ };
+ const cloud=createCloudSync({
+  getRoot:()=>initialState(),
+  replaceRoot:()=>true,
+  storage,
+  fetchImpl
+ });
+ assert.equal(await cloud.initialize(),false);
+ assert.equal(storage.getItem('shift-supabase-owner-v1'),null);
+ assert.equal(storage.getItem('shift-supabase-session-v1'),null);
+});
+
 test('複数端末共有は端末を最初の管理者アカウントへ固定する',()=>{
  const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');

@@ -55,7 +55,6 @@ export function createCloudSync({
  let ownerUserId=readStoredOwner(storage);
  let ownerMismatchDetected=false;
  if(!ownerUserId&&storedMeta?.userId)ownerUserId=storedMeta.userId;
- if(!ownerUserId&&session?.user?.id)ownerUserId=session.user.id;
  if(ownerUserId&&session?.user?.id&&ownerUserId!==session.user.id){
   ownerMismatchDetected=true;
   session=null;
@@ -86,6 +85,14 @@ export function createCloudSync({
   else if(!readStoredOwner(storage))writeStoredOwner(storage,bound);
   ownerUserId=bound||userId;
   ownerMismatchDetected=false;
+ }
+ async function verifyAdminMembership(data){
+  const userId=data?.user?.id,token=data?.access_token;
+  if(!userId||!token)throw Error('管理者アカウントを確認できません。');
+  const rows=await responseJson(await fetchImpl(`${SUPABASE_URL}/rest/v1/shift_app_admins?select=user_id&user_id=eq.${encodeURIComponent(userId)}&limit=1`,{
+   headers:authHeaders(token)
+  }));
+  return Array.isArray(rows)&&rows.some(row=>row?.user_id===userId);
  }
  async function rejectForeignSession(data){
   try{
@@ -229,8 +236,10 @@ export function createCloudSync({
   const data=await responseJson(await fetchImpl(`${SUPABASE_URL}/auth/v1/token?grant_type=password`,{
    method:'POST',headers:{...authHeaders(),'Content-Type':'application/json'},body:JSON.stringify({email,password})
   }));
-  try{bindOrVerifyOwner(data?.user?.id);}
-  catch(error){await rejectForeignSession(data);throw error;}
+  try{
+   if(!await verifyAdminMembership(data))throw Error('このアカウントは管理者として登録されていません。');
+   bindOrVerifyOwner(data?.user?.id);
+  }catch(error){await rejectForeignSession(data);throw error;}
   const previousUserId=session?.user?.id;
   session={...data,expires_at:data.expires_at||Math.floor(Date.now()/1000)+(data.expires_in||3600)};
   writeStoredSession(storage,session);
@@ -312,6 +321,14 @@ export function createCloudSync({
   }
   if(!session?.access_token){status('複数端末共有：未接続');return false;}
   try{
+   await ensureSession();
+   if(!await verifyAdminMembership(session)){
+    await rejectForeignSession(session);
+    session=null;enabled=false;revision=null;conflicted=false;unsynced=false;
+    writeStoredSession(storage,null);
+    status('複数端末共有：このアカウントは管理者として登録されていないため、保存済みセッションを解除しました。');
+    return false;
+   }
    bindOrVerifyOwner(session.user?.id);
    if(unsynced&&revision!==null){enabled=true;await resumePendingSync();return true;}
    return await bootstrap();

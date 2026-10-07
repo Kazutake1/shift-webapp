@@ -1100,3 +1100,12 @@ test('クラウド同期は保存中の更新確認を延期し同期メタ保�
  assert.match(cloud,/端末の同期状態を保存できません。再読み込みせず、空き容量を確認してください/);
  assert.match(app,/同期状態を保存できません/);
 });
+
+
+test('定期更新確認と未同期復旧はrevisionだけを先に取得する',()=>{
+ const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
+ assert.match(cloud,/async function readCloudRevision\(\)/);
+ assert.match(cloud,/shift_app_state\?select=revision&owner_id=eq/);
+ assert.match(cloud,/const remoteRevision=await readCloudRevision\(\)/);
+ assert.match(cloud,/const row=await readCloud\(\);[\s\S]*await loadRemote\(row\)/);
+});

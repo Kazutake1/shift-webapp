@@ -126,6 +126,12 @@ export function createCloudSync({
   const rows=await dataRequest(`shift_app_state?select=payload,revision,updated_at&owner_id=eq.${encodeURIComponent(userId)}`);
   return Array.isArray(rows)&&rows.length?rows[0]:null;
  }
+ async function readCloudRevision(){
+  const userId=session?.user?.id;
+  if(!userId)throw Error('ログイン情報を確認できません。');
+  const rows=await dataRequest(`shift_app_state?select=revision&owner_id=eq.${encodeURIComponent(userId)}`);
+  return Array.isArray(rows)&&rows.length?Number(rows[0].revision):null;
+ }
  async function createCloud(){
   const payload=validateRoot(structuredClone(getRoot()));
   const rows=await dataRequest('shift_app_state',{
@@ -191,9 +197,7 @@ export function createCloudSync({
  async function resumePendingSync(){
   if(!unsynced||revision===null||pendingSaves>0||conflicted)return {checked:false,synced:false};
   enabled=true;
-  const row=await readCloud();
-  if(!row){setConflict();return {checked:true,synced:false,conflicted:true};}
-  const remoteRevision=Number(row.revision);
+  const remoteRevision=await readCloudRevision();
   if(!Number.isFinite(remoteRevision)||remoteRevision!==revision){
    setConflict();
    return {checked:true,synced:false,conflicted:true};
@@ -260,11 +264,11 @@ export function createCloudSync({
      return {...result,updated:false};
     }
     if(!enabled||revision===null)return {checked:false,updated:false};
-    const row=await readCloud();
-    if(!row)return {checked:true,updated:false};
-    const remoteRevision=Number(row.revision);
+    const remoteRevision=await readCloudRevision();
     if(!Number.isFinite(remoteRevision)||remoteRevision<=revision)return {checked:true,updated:false};
     if(pendingSaves===0&&canAutoApply()){
+     const row=await readCloud();
+     if(!row){setConflict();return {checked:true,updated:true,autoApplied:false,conflicted:true};}
      await loadRemote(row);
      status(`複数端末共有：別端末の更新を反映しました（rev.${revision}）`);
      return {checked:true,updated:true,autoApplied:true};

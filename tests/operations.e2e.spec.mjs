@@ -1437,3 +1437,42 @@ test('同期メタデータを端末へ保存できない場合は警告を表�
  await page.locator('#settings-back').click();
  await expect(page.locator('#cloud-sync-alert')).toContainText('同期状態を保存できません');
 });
+
+
+test('画面復帰の更新確認は変更がなければpayloadを取得しない',async({page})=>{
+ let payload=null,revision=1,revisionReads=0,payloadReads=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'light-read-access',refresh_token:'light-read-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   const select=url.searchParams.get('select')||'';
+   if(select==='revision'){
+    revisionReads++;
+    return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision}])});
+   }
+   payloadReads++;
+   if(!payload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload,updated_at:'2026-10-07T00:30:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();payload=structuredClone(body.payload);revision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision,payload,updated_at:'2026-10-07T00:30:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ const payloadReadsAfterLogin=payloadReads;
+ await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
+ await expect.poll(()=>revisionReads).toBeGreaterThan(0);
+ expect(payloadReads).toBe(payloadReadsAfterLogin);
+});

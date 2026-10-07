@@ -1480,3 +1480,62 @@ test('画面復帰の更新確認は変更がなければpayloadを取得しな�
  await expect.poll(()=>revisionReads).toBeGreaterThan(0);
  expect(payloadReads).toBe(payloadReadsAfterLogin);
 });
+
+
+test('別端末更新を反映してもこの端末の表示週を勝手に切り替えない',async({page})=>{
+ let cloudPayload=null,revision=0;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'view-local-access',refresh_token:'view-local-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'cccccccc-cccc-cccc-cccc-cccccccccccc',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET'){
+   const select=url.searchParams.get('select')||'';
+   if(select==='revision')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision}])});
+   if(!cloudPayload)return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload:cloudPayload,updated_at:'2026-10-07T01:00:00Z'}])});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='POST'){
+   const body=request.postDataJSON();cloudPayload=structuredClone(body.payload);revision=1;
+   return route.fulfill({status:201,contentType:'application/json',body:JSON.stringify([{revision,payload:cloudPayload,updated_at:'2026-10-07T01:00:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const store=root.stores.find(item=>item.id===root.activeStoreId);
+  const current=store.current;
+  const d=new Date(current+'T12:00:00Z');d.setUTCDate(d.getUTCDate()-7);
+  const prior=d.toISOString().slice(0,10);
+  const add=(date,n)=>{const value=new Date(date+'T12:00:00Z');value.setUTCDate(value.getUTCDate()+n);return value.toISOString().slice(0,10);};
+  store.weeks[prior]={start:prior,days:Array.from({length:7},(_,i)=>({date:add(prior,i),shifts:Array.from({length:3},()=>Array(5).fill(null)),extras:Array(5).fill(null),notes:''}))};
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#cloud-sync-status')).toContainText('rev.1');
+ await page.locator('#settings-back').click();
+
+ const initialLabel=await page.locator('#week-label').textContent();
+ await page.getByRole('button',{name:'前週'}).click();
+ const localLabel=await page.locator('#week-label').textContent();
+ expect(localLabel).not.toBe(initialLabel);
+
+ const remoteStore=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
+ remoteStore.daysMarker='ignored';
+ remoteStore.weeks[remoteStore.current].days[0].notes='別端末更新';
+ revision=2;
+ await page.evaluate(()=>window.dispatchEvent(new Event('online')));
+ await expect(page.locator('#cloud-sync-status')).toContainText('rev.2');
+ await expect(page.locator('#week-label')).toHaveText(localLabel);
+});

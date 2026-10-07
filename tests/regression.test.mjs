@@ -1133,3 +1133,30 @@ test('保存中に延期したクラウド更新確認は保存終了後に再�
  assert.match(cloud,/if\(pendingSaves>0\)\{[\s\S]*deferredRemoteCheck=true;[\s\S]*deferred:true/);
  assert.match(cloud,/if\(pendingSaves===0&&deferredRemoteCheck&&!conflicted\)\{[\s\S]*queueMicrotask\(\(\)=>checkForRemoteUpdate\(\{force:true\}\)\)/);
 });
+
+
+test('同期済み端末はクラウド更新でも選択店舗と表示週を保持する',async()=>{
+ const {preserveLocalView}=await import('../cloud-sync.js');
+ const {initialState,emptyWeek}=await import('../model.js');
+ const {migrate,newStore}=await import('../stores.js');
+ const local=migrate(initialState());
+ const first=local.stores[0];
+ const second=newStore('2号店',first.current,'second-store');
+ local.stores.push(second);
+ local.activeStoreId=second.id;
+
+ const prior=addDays(first.current,-7);
+ first.weeks[prior]=emptyWeek(prior);
+ first.current=prior;
+
+ const remote=structuredClone(local);
+ remote.activeStoreId=first.id;
+ const remoteFirst=remote.stores.find(store=>store.id===first.id);
+ const remoteCurrent=addDays(prior,7);
+ remoteFirst.weeks[remoteCurrent]??=emptyWeek(remoteCurrent);
+ remoteFirst.current=remoteCurrent;
+
+ const merged=preserveLocalView(remote,local);
+ assert.equal(merged.activeStoreId,second.id);
+ assert.equal(merged.stores.find(store=>store.id===first.id).current,prior);
+});

@@ -27,6 +27,17 @@ const writeStoredOwner=(storage,userId)=>{
  }
 };
 
+export function preserveLocalView(remoteRoot,localRoot){
+ const remote=validateRoot(structuredClone(remoteRoot));
+ if(!localRoot||localRoot.version!==2||!Array.isArray(localRoot.stores))return remote;
+ if(remote.stores.some(store=>store.id===localRoot.activeStoreId))remote.activeStoreId=localRoot.activeStoreId;
+ for(const store of remote.stores){
+  const localStore=localRoot.stores.find(item=>item.id===store.id);
+  if(localStore?.current&&Object.hasOwn(store.weeks,localStore.current))store.current=localStore.current;
+ }
+ return remote;
+}
+
 async function responseJson(response){
  const text=await response.text();
  let data=null;
@@ -143,7 +154,8 @@ export function createCloudSync({
   status(`複数端末共有：同期済み（rev.${revision}）`);
  }
  async function loadRemote(row){
-  const payload=validateRoot(structuredClone(row.payload));
+  const remote=validateRoot(structuredClone(row.payload));
+  const payload=revision===null?remote:preserveLocalView(remote,getRoot());
   if(!replaceRoot(payload))throw Error('クラウドのデータを端末へ保存できませんでした。');
   revision=Number(row.revision);
   enabled=true;conflicted=false;unsynced=false;persistSyncMeta();

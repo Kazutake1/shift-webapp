@@ -1160,3 +1160,14 @@ test('同期済み端末はクラウド更新でも選択店舗と表示週を�
  assert.equal(merged.activeStoreId,second.id);
  assert.equal(merged.stores.find(store=>store.id===first.id).current,prior);
 });
+
+
+test('通常Regression CIはlockfileを読むだけでリポジトリ書込権限を持たない',()=>{
+ const workflow=readFileSync(new URL('../.github/workflows/regression-tests.yml',import.meta.url),'utf8');
+ assert.match(workflow,/permissions:\n  contents: read/);
+ assert.match(workflow,/npm ci --ignore-scripts/);
+ assert.doesNotMatch(workflow,/contents: write/);
+ assert.doesNotMatch(workflow,/Generate dependency lock/);
+ assert.doesNotMatch(workflow,/Commit verified dependency lock/);
+ assert.doesNotMatch(workflow,/git push origin/);
+});

@@ -7,7 +7,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   test:
@@ -20,8 +20,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - name: Generate dependency lock
-        run: npm install --package-lock-only --ignore-scripts
       - name: Install locked tools
         run: npm ci --ignore-scripts
       - name: Syntax check
@@ -38,14 +36,3 @@ jobs:
         run: npm run test:e2e
       - name: Service Worker E2E
         run: npm run test:sw
-      - name: Commit verified dependency lock
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add package-lock.json
-          if git diff --cached --quiet; then
-            echo 'package-lock.json is already current'
-            exit 0
-          fi
-          git commit -m 'Lock CI dependencies (v161)'
-          git push origin HEAD:main

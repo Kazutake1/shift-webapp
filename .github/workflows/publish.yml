@@ -14,6 +14,7 @@ on:
 permissions:
   contents: write
   pages: write
+  id-token: write
 
 concurrency:
   group: shift-webapp-holidays
@@ -21,8 +22,10 @@ concurrency:
 
 jobs:
   update:
+    outputs:
+      changed: ${{ steps.holidays.outputs.changed }}
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
       - name: Setup Node.js
@@ -55,6 +58,9 @@ jobs:
       - name: Regression tests
         if: steps.holidays.outputs.changed == 'true'
         run: npm test
+      - name: Static Pages build
+        if: steps.holidays.outputs.changed == 'true'
+        run: npm run build:cloudflare
       - name: Install browser engines
         if: steps.holidays.outputs.changed == 'true'
         run: npx playwright install --with-deps chromium webkit
@@ -72,28 +78,27 @@ jobs:
           git add holidays.js sw.js
           git commit -m 'Update official Japanese holidays'
           git push origin HEAD:main
-      - name: Request GitHub Pages build
+      - name: Configure GitHub Pages
         if: steps.holidays.outputs.changed == 'true'
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          curl --fail --location --show-error --silent --retry 3 \
-            -X POST -H 'Accept: application/vnd.github+json' \
-            -H "Authorization: Bearer $GH_TOKEN" \
-            "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds" \
-            --output "$RUNNER_TEMP/pages-build.json"
-          expected_commit=$(git rev-parse HEAD)
-          for attempt in $(seq 1 30); do
-            build=$(curl --fail --location --show-error --silent \
-              -H 'Accept: application/vnd.github+json' \
-              -H "Authorization: Bearer $GH_TOKEN" \
-              "https://api.github.com/repos/$GITHUB_REPOSITORY/pages/builds/latest")
-            status=$(echo "$build" | jq -r '.status')
-            build_commit=$(echo "$build" | jq -r '.commit')
-            if [ "$build_commit" != "$expected_commit" ]; then sleep 10; continue; fi
-            if [ "$status" = built ]; then echo 'GitHub Pages build succeeded'; exit 0; fi
-            if [ "$status" = errored ]; then echo 'GitHub Pages build failed'; exit 1; fi
-            sleep 10
-          done
-          echo 'GitHub Pages build timed out'
-          exit 1
+        uses: actions/configure-pages@983d7736d9b0ae728b81ab479565c72886d7745b # v5
+      - name: Upload GitHub Pages artifact
+        if: steps.holidays.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@7b1f4a764d45c48632c6b24a0339c27f5614fb0b # v4
+        with:
+          path: dist
+
+  deploy:
+    if: needs.update.outputs.changed == 'true'
+    needs: update
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    concurrency:
+      group: github-pages
+      cancel-in-progress: false
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@d6db90164ac5ed86f2b6aed7e0febac5b3c0c03e # v4

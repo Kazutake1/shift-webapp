@@ -1111,13 +1111,17 @@ test('定期更新確認と未同期復旧はrevisionだけを先に取得する
 });
 
 
-test('CIはサポート中のNode.js 24 LTSとPlaywright 1.63.0を使用する',()=>{
+test('CIはサポート中のNode.js 24 LTSと固定したPlaywright 1.63.0を使用する',()=>{
  const regression=readFileSync(new URL('../.github/workflows/regression-tests.yml',import.meta.url),'utf8');
  const publish=readFileSync(new URL('../.github/workflows/publish.yml',import.meta.url),'utf8');
+ const pkg=JSON.parse(readFileSync(new URL('../package.json',import.meta.url),'utf8'));
  for(const workflow of [regression,publish]){
   assert.match(workflow,/node-version: '24'/);
-  assert.match(workflow,/@playwright\/test@1\.63\.0/);
   assert.doesNotMatch(workflow,/node-version: '20'/);
   assert.doesNotMatch(workflow,/@playwright\/test@1\.55\.0/);
  }
+ assert.equal(pkg.devDependencies?.['@playwright/test'],'1.63.0');
+ assert.equal(pkg.devDependencies?.eslint,'10.12.0');
+ assert.match(regression,/npm ci --ignore-scripts/);
+ assert.match(publish,/npm ci --ignore-scripts/);
 });

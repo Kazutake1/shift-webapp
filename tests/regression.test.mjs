@@ -1095,7 +1095,7 @@ test('クラウド同期は保存中の更新確認を延期し同期メタ保�
  const cloud=readFileSync(new URL('../cloud-sync.js',import.meta.url),'utf8');
  const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
  assert.match(cloud,/if\(pendingSaves>0\)return \{checked:false,updated:false,deferred:true\}/);
- assert.match(cloud,/const writeStoredSyncMeta=.*storage\.setItem\(SYNC_META_KEY/);
+ assert.match(cloud,/const writeStoredSyncMeta=[\s\S]*storage\.setItem\(SYNC_META_KEY/);
  assert.match(cloud,/syncMetaWriteFailed=!ok/);
  assert.match(cloud,/端末の同期状態を保存できません。再読み込みせず、空き容量を確認してください/);
  assert.match(app,/同期状態を保存できません/);

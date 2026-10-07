@@ -1471,6 +1471,7 @@ test('画面復帰の更新確認は変更がなければpayloadを取得しな�
  await page.getByLabel('メールアドレス').fill('manager@example.com');
  await page.getByLabel('パスワード').fill('password123');
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#cloud-sync-status')).toContainText('rev.1');
  const payloadReadsAfterLogin=payloadReads;
  await page.waitForTimeout(5100);
  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));

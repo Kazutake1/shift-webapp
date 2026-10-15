@@ -30,6 +30,27 @@ test('連携従業員は一店舗の勤続年数で対象となり渡し済み�
  await expect(page.getByRole('checkbox',{name:/B店舗 共通従業員 誕生日クオカード渡し済み/}).locator('..').locator('.birthday-gift-status')).toHaveText(`${giver}で渡し済み`);
 });
 
+test('自動確定後の編集セルと変更履歴がリロード後も残る',async({page})=>{
+ await openApp(page);
+ await expect(page.locator('#week-confirm-status')).toContainText('確定済み');
+ const cell=page.locator('#schedule td.employee-slot').first();
+ await cell.locator('button').click();
+ const times=page.locator('#editor input[type=time]');
+ await expect(times).toHaveCount(2);
+ await times.last().fill('08:00');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ await expect(cell).toHaveClass(/post-confirm-change/);
+ await expect(page.locator('#week-confirm-status')).toContainText('変更：1か所');
+ await page.locator('#week-confirm-history').click();
+ await expect(page.locator('#editor')).toContainText('変更前：従業員A');
+ await expect(page.locator('#editor')).toContainText('変更後：従業員A');
+ await page.locator('#close').click();
+ await page.reload();
+ await expect(page.locator('#schedule td.employee-slot').first()).toHaveClass(/post-confirm-change/);
+ await expect(page.locator('#week-confirm-history')).toContainText('1件');
+});
+
 const STORAGE_KEY='shift-ipad-stores-v2';
 
 test('PDFの横方向の細線を重複描画しない',async({page,context,browserName})=>{

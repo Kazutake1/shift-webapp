@@ -7,6 +7,25 @@ const check=(ok)=>{if(!ok)throw Error('データの形式を確認できませ�
 const str=(v,max=100)=>typeof v==='string'&&v.length<=max;
 const date=v=>str(v,10)&&/^\d{4}-\d{2}-\d{2}$/.test(v)&&addDays(v,0)===v;
 const person=v=>v&&str(v.employeeId)&&str(v.name,20)&&v.name.trim();
+const validShift=shift=>shift===null||person(shift)&&Number.isInteger(shift.start)&&Number.isInteger(shift.end)&&shift.start>=360&&shift.end<=1800&&shift.end>shift.start;
+const validExtra=e=>e===null||e?.type==='training'&&person(e)&&((e.start===undefined&&e.end===undefined)||(Number.isInteger(e.start)&&Number.isInteger(e.end)&&e.start>=360&&e.end<=1800&&e.end>e.start))||e?.type==='task'&&str(e.text,40)&&((e.start===undefined&&e.end===undefined)||(Number.isInteger(e.start)&&Number.isInteger(e.end)&&e.start>=360&&e.end<=1800&&e.end>e.start));
+function validateWeekConfirmation(confirmation){
+ check(confirmation&&str(confirmation.confirmedAt,40)&&!Number.isNaN(Date.parse(confirmation.confirmedAt)));
+ check(confirmation.snapshot&&Array.isArray(confirmation.snapshot.days)&&confirmation.snapshot.days.length===7);
+ for(const day of confirmation.snapshot.days){
+  check(day&&str(day.notes,180)&&Array.isArray(day.shifts)&&day.shifts.length===3&&Array.isArray(day.extras)&&day.extras.length===5);
+  for(const row of day.shifts)check(Array.isArray(row)&&row.length===5&&row.every(validShift));
+  check(day.extras.every(validExtra));
+ }
+ check(Array.isArray(confirmation.changes));
+ for(const item of confirmation.changes){
+  check(item&&str(item.at,40)&&!Number.isNaN(Date.parse(item.at))&&Number.isInteger(item.day)&&item.day>=0&&item.day<7);
+  if(item.kind==='shift')check(Number.isInteger(item.row)&&item.row>=0&&item.row<3&&Number.isInteger(item.band)&&item.band>=0&&item.band<5&&validShift(item.before)&&validShift(item.after));
+  else if(item.kind==='extra')check(Number.isInteger(item.band)&&item.band>=0&&item.band<5&&validExtra(item.before)&&validExtra(item.after));
+  else if(item.kind==='notes')check(str(item.before,180)&&str(item.after,180));
+  else check(false);
+ }
+}
 export function validateRoot(root){
  check(root?.version===2&&Array.isArray(root.stores)&&root.stores.length>0);
  check(root.birthdayAcknowledgements===undefined||Array.isArray(root.birthdayAcknowledgements)&&root.birthdayAcknowledgements.every(k=>str(k,500)));
@@ -22,6 +41,7 @@ export function validateRoot(root){
   check(date(s.current)&&monday(s.current)===s.current&&s.weeks&&typeof s.weeks==='object'&&!Array.isArray(s.weeks)&&Object.hasOwn(s.weeks,s.current));
   for(const [key,w] of Object.entries(s.weeks)){
    check(date(key)&&monday(key)===key&&w?.start===key&&Array.isArray(w.days)&&w.days.length===7);
+   if(w.confirmation!==undefined)validateWeekConfirmation(w.confirmation);
    w.days.forEach((d,i)=>{
     check(d?.date===addDays(key,i)&&str(d.notes,180)&&Array.isArray(d.shifts)&&d.shifts.length===3&&Array.isArray(d.extras)&&d.extras.length===5);
     for(const row of d.shifts){check(Array.isArray(row)&&row.length===5);for(const shift of row)check(shift===null||person(shift)&&Number.isInteger(shift.start)&&Number.isInteger(shift.end)&&shift.start>=360&&shift.end<=1800&&shift.end>shift.start);}

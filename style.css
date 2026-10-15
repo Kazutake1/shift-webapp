@@ -611,3 +611,16 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
 }
 
 .cloud-sync-alert{margin:8px 0 12px;padding:10px 12px;border:1px solid #c9b77a;border-radius:8px;background:#fffaf0;color:#654f16;font-size:13px;line-height:1.6}
+
+/* Auto-finalized weekly shifts: screen-only controls and changed cells. */
+.week-confirm-bar{display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;margin:8px 0 12px;padding:8px 12px;background:#e9eff2;border:1px solid #cbd7de;border-radius:8px;font-size:13px;color:#284658}
+.week-confirm-bar button{min-height:36px;padding:6px 12px;border:1px solid #8ea5b2;border-radius:7px;background:#fff;color:#284658;cursor:pointer}
+#week-confirm-status.week-confirm-modified{color:#775900;font-weight:700}
+#schedule .post-confirm-change{background:#fff0b7!important}
+#schedule .post-confirm-change button{background:transparent}
+.week-confirm-history-list{display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow:auto}
+.week-confirm-history-entry{border:1px solid #d8dfe5;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere;line-height:1.5}
+.week-confirm-history-entry strong,.week-confirm-history-entry small{display:block}
+.week-confirm-history-entry small{color:#667987;margin:2px 0 6px}
+.week-confirm-bar [hidden]{display:none!important}
+@media print{#schedule .post-confirm-change{background:transparent!important}}

@@ -7,6 +7,7 @@ import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
 import {createStateManager} from './state-manager.js';
 import {createPrintPdf} from './print-pdf.js';
 import {createCloudSync} from './cloud-sync.js';
+import {confirmationDate,localToday,hasDueUnconfirmedWeeks,prepareWeekFinalizations,changedSinceConfirmation} from './week-finalization.js';
 const $=s=>document.querySelector(s);
 const CLOUD_CONFLICT_MESSAGE='別の端末でシフトが更新されています。\n\nこの端末からの保存・削除は停止しました。\n設定 → 複数端末共有 →「クラウドから最新を読み込む」を実行してください。';
 let preview=false,activeCell=null,backupAt='';
@@ -36,6 +37,7 @@ const stateManager=createStateManager({
  onRollback:()=>render(),
  onSaveFailure:()=>alert('変更を端末に保存できなかったため、今回の変更は反映していません。空き容量を確認してください。'),
  onSaved:(root,{sync})=>{if(sync)cloudSync?.queueSave(root);},
+ onBeforeSave:(candidate,previous)=>prepareWeekFinalizations(candidate,previous),
  onCloudConflictBlocked:()=>alert(CLOUD_CONFLICT_MESSAGE)
 });
 
@@ -182,7 +184,62 @@ function drawRules(){
   host.append(svg);
 }
 
-function render(){const root=stateManager.getRoot(),state=stateManager.getState(),storageError=stateManager.getStorageError();renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date,b);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else if(extra?.type==='task'){const start=Number.isInteger(extra.start)?extra.start:band.start,end=Number.isInteger(extra.end)?extra.end:band.end;label=timedTextLabel(extra.text,start,end,b);}}else label=shiftLabel(day.shifts[row-1][b],b);const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(row>=1&&row<=3&&label){const shift=day.shifts[row-1][b];const caption=el('span',{class:'employee-caption'});caption.append(el('span',{class:'employee-name'},shift.name));const suffix=label.slice(shift.name.length);if(suffix)caption.append(el('span',{class:'employee-time'},suffix));btn.replaceChildren(caption);}else if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:'notes-cell'}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?`この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：${holidayYears.join("・")}年）。`:'');requestAnimationFrame(fitText);}
+function render(){const root=stateManager.getRoot(),state=stateManager.getState(),storageError=stateManager.getStorageError();renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');const marked=new Set(changedSinceConfirmation(week()).map(item=>`${item.day}-${item.kind}-${item.row??''}-${item.band??''}`));week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date,b);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else if(extra?.type==='task'){const start=Number.isInteger(extra.start)?extra.start:band.start,end=Number.isInteger(extra.end)?extra.end:band.end;label=timedTextLabel(extra.text,start,end,b);}}else label=shiftLabel(day.shifts[row-1][b],b);const changedKey=row===4?`${d}-extra--${b}`:row>0?`${d}-shift-${row-1}-${b}`:'';const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''} ${marked.has(changedKey)?'post-confirm-change':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(row>=1&&row<=3&&label){const shift=day.shifts[row-1][b];const caption=el('span',{class:'employee-caption'});caption.append(el('span',{class:'employee-name'},shift.name));const suffix=label.slice(shift.name.length);if(suffix)caption.append(el('span',{class:'employee-time'},suffix));btn.replaceChildren(caption);}else if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:`notes-cell ${marked.has(`${d}-notes--`)?'post-confirm-change':''}`}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?`この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：${holidayYears.join("・")}年）。`:'');renderWeekConfirmation();requestAnimationFrame(fitText);}
+function renderWeekConfirmation(){
+ const current=week(),confirmed=current.confirmation,changes=changedSinceConfirmation(current);
+ const status=$('#week-confirm-status'),history=$('#week-confirm-history');
+ if(confirmed){
+  const count=changes.length;
+  status.textContent=`確定済み（${new Date(confirmed.confirmedAt).toLocaleString('ja-JP')}）${count?` ／ 確定後の変更：${count}か所`:''}`;
+  status.classList.toggle('week-confirm-modified',count>0);
+  history.hidden=false;
+  history.textContent=`変更履歴（${confirmed.changes.length}件）`;
+ }else{
+  status.textContent=`未確定（${confirmationDate(current.start).replaceAll('-','/')}から自動確定）`;
+  status.classList.remove('week-confirm-modified');
+  history.hidden=true;
+ }
+}
+function historyValue(item,value){
+ if(item.kind==='notes')return value||'（空欄）';
+ if(!value)return '（空欄）';
+ if(item.kind==='shift')return shiftLabel(value,item.band);
+ if(value.type==='training'){
+  const band=bands[item.band];
+  return `トレーニング：${shiftLabel({...value,start:value.start??band.start,end:value.end??band.end},item.band)}`;
+ }
+ const band=bands[item.band];
+ return timedTextLabel(value.text,value.start??band.start,value.end??band.end,item.band);
+}
+function openWeekHistory(){
+ const confirmed=week().confirmation;
+ if(!confirmed)return;
+ const body=openDialog('確定後の変更履歴');
+ hint(body,`確定日時：${new Date(confirmed.confirmedAt).toLocaleString('ja-JP')} ／ 確定時点のシフト内容は保持されています。`);
+ const list=el('div',{class:'week-confirm-history-list'});
+ if(!confirmed.changes.length)list.append(el('p',{class:'hint'},'確定後の変更はありません。'));
+ for(const item of [...confirmed.changes].reverse()){
+  const day=addDays(week().start,item.day);
+  const location=item.kind==='notes'?'備考':item.kind==='extra'
+   ?`不定期作業／トレーニング ${timeLabel(bands[item.band].start)}〜`
+   :`${['従業員①','従業員②','予備従業員'][item.row]} ${timeLabel(bands[item.band].start)}〜`;
+  const record=el('div',{class:'week-confirm-history-entry'});
+  record.append(
+   el('strong',{},`${day.replaceAll('-','/')}　${location}`),
+   el('small',{},new Date(item.at).toLocaleString('ja-JP')),
+   el('div',{},`変更前：${historyValue(item,item.before)}`),
+   el('div',{},`変更後：${historyValue(item,item.after)}`)
+  );
+  list.append(record);
+ }
+ body.append(list);
+}
+function autoConfirmOverdue(){
+ if(!hasDueUnconfirmedWeeks(stateManager.getRoot(),localToday()))return false;
+ if(!stateManager.persistChange(()=>{},false,false))return false;
+ render();
+ return true;
+}
 function openDialog(title){$('#dialog-title').textContent=title;$('#dialog-body').replaceChildren();if(!$('#editor').open)$('#editor').showModal();return $('#dialog-body');}
 function close(){ $('#editor').close();activeCell=null;}
 $('#close').onclick=close;
@@ -364,6 +421,7 @@ $('#settings-back').onclick=()=>{location.hash='';};
 $('#birthday-list').onclick=()=>{location.hash='birthdays';};
 $('#birthday-back').onclick=()=>{location.hash='settings';};
 window.addEventListener('hashchange',showSettings);
+$('#week-confirm-history').onclick=openWeekHistory;
 $('#employees').onclick=openEmployees;$('#fixed').onclick=openFixed;$('#copy-week').onclick=copyPreviousWeek;$('#prev').onclick=()=>navigate(-7);$('#next').onclick=()=>navigate(7);
 $('#today').onclick=()=>{const d=new Date();const key=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;navigate(0,monday(key));};
 document.querySelectorAll('[data-undo]').forEach(b=>b.onclick=undo);
@@ -543,18 +601,20 @@ cloudSync=createCloudSync({
  },
  onStatus:updateCloudSyncStatus,
  onConflict:()=>{stateManager.setCloudConflict();alert(CLOUD_CONFLICT_MESSAGE);},
- onRemoteLoaded:()=>render(),
+ onRemoteLoaded:()=>{render();autoConfirmOverdue();},
  canAutoApply:()=>!$('#editor')?.open&&!preview&&!printLayoutActive
 });
-render();stateManager.save(false);showSettings();
-cloudSync.initialize();
+render();stateManager.save(false,false,false);showSettings();
+cloudSync.initialize().then(()=>autoConfirmOverdue());
 const checkCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate();};
 const retryCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate({force:true});};
 window.addEventListener('online',retryCloudUpdate);
 window.addEventListener('focus',checkCloudUpdate);
 window.addEventListener('pageshow',checkCloudUpdate);
 document.addEventListener('visibilitychange',()=>{if(!document.hidden)checkCloudUpdate();});
-setInterval(checkCloudUpdate,60000);
+setInterval(()=>{autoConfirmOverdue();checkCloudUpdate();},60000);
+window.addEventListener('focus',autoConfirmOverdue);
+document.addEventListener('visibilitychange',()=>{if(!document.hidden)autoConfirmOverdue();});
 function showOfflineStatus(message){
  const status=$('#offline-status');
  status.textContent=message;

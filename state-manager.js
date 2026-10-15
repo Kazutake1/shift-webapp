@@ -13,6 +13,7 @@ export function createStateManager({
  onRollback=()=>{},
  onSaveFailure=()=>{},
  onSaved=()=>{},
+ onBeforeSave=()=>({sync:false}),
  onCloudConflictBlocked=()=>{}
 }={}){
  let root;
@@ -50,7 +51,7 @@ export function createStateManager({
   onRollback();
  };
 
- function writeRoot(candidate,{edit=true,sync=edit,allowStorageError=false,allowCloudConflict=false,notifySaved=true,success=''}={}){
+ function writeRoot(candidate,{edit=true,sync=edit,allowStorageError=false,allowCloudConflict=false,notifySaved=true,trackConfirmation=false,success=''}={}){
   if(storageError&&!allowStorageError){
    onStatus(storageError);
    return false;
@@ -67,6 +68,7 @@ export function createStateManager({
   }
 
   try{
+   const confirmation=trackConfirmation?onBeforeSave(candidate,JSON.parse(baseline)):null;
    const next=JSON.stringify(candidate);
    storage.setItem(storageKey,next);
    if(edit&&next!==baseline)undoData=baseline;
@@ -75,7 +77,7 @@ export function createStateManager({
    notifyUndo();
    const capacityWarning=utf8Bytes(next)>=STORAGE_WARNING_BYTES?STORAGE_CAPACITY_WARNING:'';
    onStatus([success,capacityWarning].filter(Boolean).join(' '));
-   if(notifySaved)onSaved(candidate,{edit,sync});
+   if(notifySaved)onSaved(candidate,{edit,sync:sync||Boolean(confirmation?.sync)});
    return true;
   }catch{
    onStatus(SAVE_ERROR);
@@ -91,8 +93,8 @@ export function createStateManager({
   return true;
  }
 
- function save(edit=true,sync=edit){
-  return writeRoot(root,{edit,sync});
+ function save(edit=true,sync=edit,trackConfirmation=true){
+  return writeRoot(root,{edit,sync,trackConfirmation});
  }
 
  function persistChange(change,edit=true,sync=edit){
@@ -118,7 +120,7 @@ export function createStateManager({
 
   try{
    const candidate=JSON.parse(undoData);
-   if(!replaceRoot(candidate,{edit:false,sync:true,success:'直前の操作を取り消しました'})){
+   if(!replaceRoot(candidate,{edit:false,sync:true,trackConfirmation:true,success:'直前の操作を取り消しました'})){
     return {
      ok:false,
      reason:externalChangeDetected?'external':storageError?'storage':'save',

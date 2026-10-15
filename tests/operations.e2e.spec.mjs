@@ -41,7 +41,8 @@ test('自動確定後の編集セルと変更履歴がリロード後も残る',
  page.once('dialog',dialog=>dialog.accept());
  await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
  await expect(cell).toHaveClass(/post-confirm-change/);
- await expect(page.locator('#week-confirm-status')).toContainText('変更：1か所');
+ await expect(page.locator('#week-confirm-status')).toHaveText('確定済み');
+ await expect(page.locator('#week-confirm-history')).toContainText('1件');
  await page.locator('#week-confirm-history').click();
  await expect(page.locator('#editor')).toContainText('変更前：従業員A');
  await expect(page.locator('#editor')).toContainText('変更後：従業員A');
@@ -49,6 +50,36 @@ test('自動確定後の編集セルと変更履歴がリロード後も残る',
  await page.reload();
  await expect(page.locator('#schedule td.employee-slot').first()).toHaveClass(/post-confirm-change/);
  await expect(page.locator('#week-confirm-history')).toContainText('1件');
+});
+
+test('確定済みは編集画面の店名の右側にだけ表示し、印刷プレビューには表示しない',async({page})=>{
+ await openApp(page);
+ const status=page.locator('#week-confirm-status');
+ await expect(status).toBeVisible();
+ await expect(status).toHaveText('確定済み');
+ const position=await page.evaluate(()=>{
+  const name=document.querySelector('#store-name').getBoundingClientRect();
+  const confirmed=document.querySelector('#week-confirm-status').getBoundingClientRect();
+  return {nameRight:name.right,labelLeft:confirmed.left,nameTop:name.top,labelTop:confirmed.top};
+ });
+ expect(position.labelLeft).toBeGreaterThanOrEqual(position.nameRight);
+ expect(Math.abs(position.labelTop-position.nameTop)).toBeLessThan(25);
+ await expect(page.locator('#week-confirm-bar')).toBeVisible();
+ await expect(page.locator('#week-confirm-bar')).not.toContainText('確定済み');
+ await page.locator('#preview').click();
+ const preview=page.frameLocator('.preview-sheet');
+ await expect(preview.locator('#store-name')).toBeVisible();
+ await expect(preview.locator('#week-confirm-status')).toHaveCount(0);
+ await expect(preview.locator('#week-confirm-history')).toHaveCount(0);
+});
+
+test('確定済みは印刷/PDF生成用のレイアウトで非表示',async({page})=>{
+ await openApp(page);
+ await expect(page.locator('#week-confirm-status')).toHaveText('確定済み');
+ await page.evaluate(()=>document.body.classList.add('print-layout'));
+ await expect(page.locator('#week-confirm-status')).toBeHidden();
+ await page.evaluate(()=>document.body.classList.remove('print-layout'));
+ await expect(page.locator('#week-confirm-status')).toBeVisible();
 });
 
 const STORAGE_KEY='shift-ipad-stores-v2';

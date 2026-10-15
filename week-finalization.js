@@ -14,14 +14,12 @@ export function diffWeekDays(before,after){
  for(let day=0;day<7;day++){
   for(let row=0;row<3;row++)for(let band=0;band<5;band++){
    const old=before.days[day].shifts[row][band],next=after.days[day].shifts[row][band];
-   if(!same(old,next))changes.push({day,kind:'shift',row,band,before:copy(old),after:copy(next)});
+   if(!same(old,next))changes.push({day,kind:'shift',row,band});
   }
   for(let band=0;band<5;band++){
    const old=before.days[day].extras[band],next=after.days[day].extras[band];
-   if(!same(old,next))changes.push({day,kind:'extra',band,before:copy(old),after:copy(next)});
+   if(!same(old,next))changes.push({day,kind:'extra',band});
   }
-  const old=before.days[day].notes,next=after.days[day].notes;
-  if(old!==next)changes.push({day,kind:'notes',before:old,after:next});
  }
  return changes;
 }
@@ -39,17 +37,13 @@ export function prepareWeekFinalizations(root,previous,{today=localToday(),at=ne
    const oldWeek=oldStore?.weeks[key];
    const oldConfirmation=oldWeek?.confirmation;
    if(oldConfirmation){
-    // Undo may restore an older week object. Never roll back its audit trail.
+    // Undo cannot overwrite the saved confirmation baseline.
     week.confirmation=copy(oldConfirmation);
    }else if(!week.confirmation&&today>=confirmationDate(key)){
     // When the deadline passed while offline, preserve what was saved before this edit.
-    week.confirmation={confirmedAt:at,snapshot:snapshot(oldWeek||week),changes:[]};
+    week.confirmation={confirmedAt:at,snapshot:snapshot(oldWeek||week)};
    }
    if(!week.confirmation)continue;
-   if(oldWeek){
-    const changes=diffWeekDays(oldWeek,week);
-    for(const change of changes)week.confirmation.changes.push({at,...change});
-   }
    if(!same(week.confirmation,oldConfirmation))confirmationUpdated=true;
   }
  }

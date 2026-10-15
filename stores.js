@@ -17,8 +17,9 @@ function validateWeekConfirmation(confirmation){
   for(const row of day.shifts)check(Array.isArray(row)&&row.length===5&&row.every(validShift));
   check(day.extras.every(validExtra));
  }
- check(Array.isArray(confirmation.changes));
- for(const item of confirmation.changes){
+ // Legacy backups may contain an audit trail; accept it without generating new entries.
+ check(confirmation.changes===undefined||Array.isArray(confirmation.changes));
+ for(const item of confirmation.changes||[]){
   check(item&&str(item.at,40)&&!Number.isNaN(Date.parse(item.at))&&Number.isInteger(item.day)&&item.day>=0&&item.day<7);
   if(item.kind==='shift')check(Number.isInteger(item.row)&&item.row>=0&&item.row<3&&Number.isInteger(item.band)&&item.band>=0&&item.band<5&&validShift(item.before)&&validShift(item.after));
   else if(item.kind==='extra')check(Number.isInteger(item.band)&&item.band>=0&&item.band<5&&validExtra(item.before)&&validExtra(item.after));

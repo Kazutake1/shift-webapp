@@ -615,10 +615,7 @@ td.employee-slot button{display:flex;align-items:center;justify-content:center}
 /* Auto-finalized weekly shifts: screen-only controls and changed cells. */
 #schedule .post-confirm-change{background:#fff0b7!important}
 #schedule .post-confirm-change button{background:transparent}
-.week-confirm-history-list{display:flex;flex-direction:column;gap:10px;max-height:55vh;overflow:auto}
-.week-confirm-history-entry{border:1px solid #d8dfe5;border-radius:8px;padding:10px 12px;overflow-wrap:anywhere;line-height:1.5}
-.week-confirm-history-entry strong,.week-confirm-history-entry small{display:block}
-.week-confirm-history-entry small{color:#667987;margin:2px 0 6px}
+body.print-layout #schedule .post-confirm-change{background:transparent!important}
 @media print{#schedule .post-confirm-change{background:transparent!important}}
 
 /* v173: confirmed label beside the store name on the editing screen only. */
@@ -629,11 +626,3 @@ body.print-layout .paper-store-heading{display:contents}
 body.print-layout #week-confirm-status{display:none!important}
 @media print{#week-confirm-status{display:none!important}.paper-store-heading{display:contents}}
 
-/* v174: compact day history action inside the existing notes cell. */
-#schedule td.notes-cell{position:relative}
-#schedule td.notes-cell:has(>.day-change-button)>button:first-child{padding-bottom:31px}
-#schedule td.notes-cell .day-change-button{position:absolute;left:50%;transform:translateX(-50%);bottom:4px;z-index:1;display:block;width:auto;min-height:24px;height:24px;padding:0 6px;border:1px solid #b9a56b;border-radius:5px;background:#fff6d5;color:#5b4a21;font-size:11px;font-weight:600;line-height:1.3;white-space:nowrap;text-align:center;box-shadow:none}
-#schedule td.notes-cell .day-change-button:hover{background:#f6e6b2}
-body.print-layout #schedule td.notes-cell .day-change-button{display:none!important}
-body.print-layout #schedule td.notes-cell:has(>.day-change-button)>button:first-child{padding:1mm}
-@media print{#schedule td.notes-cell .day-change-button{display:none!important}}

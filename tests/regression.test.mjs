@@ -1337,79 +1337,82 @@ test('GitHub Pages ActionsはNode24対応版の公式コミットSHAへ固定す
  }
 });
 
-test('シフト確定は開始週の7日前の月曜日から行い、その前には確定しない',()=>{
- const root=migrate(),state=root.stores[0];
- const future='2026-10-26';
- state.weeks={[future]:{start:future,days:structuredClone(state.weeks[state.current].days).map((day,i)=>({...day,date:addDays(future,i)}))}};
- state.current=future;
- assert.equal(confirmationDate(future),'2026-10-19');
- assert.equal(localToday(new Date('2026-10-19T09:00:00+09:00')),'2026-10-19');
+
+test('自動確定は7日前の月曜日に動き、履歴配列を作らない',()=>{
+ const root=migrate(),store=root.stores[0],start='2026-10-26';
+ store.weeks={[start]:{start,days:structuredClone(store.weeks[store.current].days).map((day,i)=>({...day,date:addDays(start,i)}))}};store.current=start;
+ assert.equal(confirmationDate(start),'2026-10-19');
  assert.equal(hasDueUnconfirmedWeeks(root,'2026-10-18'),false);
  const before=structuredClone(root);
- assert.equal(prepareWeekFinalizations(root,before,{today:'2026-10-18',at:'2026-10-18T00:00:00Z'}).sync,false);
- assert.equal(state.weeks[future].confirmation,undefined);
+ assert.equal(prepareWeekFinalizations(root,before,{today:'2026-10-18'}).sync,false);
+ assert.equal(store.weeks[start].confirmation,undefined);
  assert.equal(prepareWeekFinalizations(root,before,{today:'2026-10-19',at:'2026-10-19T00:00:00Z'}).sync,true);
- assert.equal(state.weeks[future].confirmation.confirmedAt,'2026-10-19T00:00:00Z');
- assert.equal(state.weeks[future].confirmation.changes.length,0);
- assert.equal(hasDueUnconfirmedWeeks(root,'2026-10-19'),false);
+ assert.equal(store.weeks[start].confirmation.confirmedAt,'2026-10-19T00:00:00Z');
+ assert.equal(Object.hasOwn(store.weeks[start].confirmation,'changes'),false);
  assert.doesNotThrow(()=>validateRoot(root));
 });
 
-test('確定後は変更前後と時刻を記録し、元の値へ戻すと色は消えても履歴は残る',()=>{
- const root=migrate(),store=root.stores[0],start=store.current;
- const before=structuredClone(root),at='2026-10-15T00:00:00Z';
- prepareWeekFinalizations(root,before,{today:'2026-10-15',at});
- const original=structuredClone(store.weeks[start].days[0].shifts[0][0]);
+test('変更されたシフトだけ比較し、元に戻したら強調対象から除く',()=>{
+ const root=migrate(),store=root.stores[0],start=store.current,old=structuredClone(root);
+ prepareWeekFinalizations(root,old,{today:'2026-10-15',at:'2026-10-15T00:00:00Z'});
+ const week=store.weeks[start],original=structuredClone(week.days[0].shifts[0][0]);
  const first=structuredClone(root);
- store.weeks[start].days[0].shifts[0][0].end=480;
- assert.equal(prepareWeekFinalizations(root,first,{today:'2026-10-15',at:'2026-10-15T01:00:00Z'}).sync,true);
- const confirmed=store.weeks[start].confirmation;
- assert.deepEqual(confirmed.snapshot.days[0].shifts[0][0],original);
- assert.equal(confirmed.changes.length,1);
- assert.equal(confirmed.changes[0].before.end,540);
- assert.equal(confirmed.changes[0].after.end,480);
- assert.equal(changedSinceConfirmation(store.weeks[start]).length,1);
- const second=structuredClone(root);
- store.weeks[start].days[0].shifts[0][0]=original;
- prepareWeekFinalizations(root,second,{today:'2026-10-15',at:'2026-10-15T02:00:00Z'});
- assert.equal(store.weeks[start].confirmation.changes.length,2);
- assert.equal(changedSinceConfirmation(store.weeks[start]).length,0);
+ week.days[0].shifts[0][0].end=480;
+ assert.equal(prepareWeekFinalizations(root,first,{today:'2026-10-15'}).sync,false);
+ assert.deepEqual(week.confirmation.snapshot.days[0].shifts[0][0],original);
+ assert.deepEqual(changedSinceConfirmation(week),[{day:0,kind:'shift',row:0,band:0}]);
+ assert.equal(Object.hasOwn(week.confirmation,'changes'),false);
+ week.days[0].notes='変更した備考';
+ assert.equal(changedSinceConfirmation(week).length,1);
+ week.days[0].shifts[0][0]=original;
+ assert.deepEqual(changedSinceConfirmation(week),[]);
  assert.doesNotThrow(()=>validateRoot(root));
  const backup=parseBackup(backupText(root));
  assert.equal(backup.version,2);
- assert.equal(backup.stores[0].weeks[start].confirmation.changes.length,2);
+ assert.equal(Object.hasOwn(backup.stores[0].weeks[start].confirmation,'changes'),false);
 });
 
-test('期限経過後に初めて編集しても編集前を確定し、取り消しで履歴を消さない',()=>{
- const storage=new Map();
- const manager=createStateManager({
-  storage:{getItem:k=>storage.get(k)??null,setItem:(k,v)=>storage.set(k,v),removeItem:k=>storage.delete(k)},
+test('Undoでも確定時点を維持し、操作履歴は生成しない',()=>{
+ const memory=new Map(),manager=createStateManager({
+  storage:{getItem:k=>memory.get(k)??null,setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)},
   onBeforeSave:(candidate,previous)=>prepareWeekFinalizations(candidate,previous,{today:'2026-10-15',at:'2026-10-15T00:00:00Z'})
  });
- const state=manager.getState(),start=state.current;
- const original=state.weeks[start].days[0].notes;
- assert.equal(manager.persistChange(()=>{state.weeks[start].days[0].notes='確定後に編集';}),true);
+ const state=manager.getState(),start=state.current,original=state.weeks[start].days[0].notes;
+ assert.equal(manager.persistChange(()=>{state.weeks[start].days[0].notes='新しい備考';}),true);
  assert.equal(state.weeks[start].confirmation.snapshot.days[0].notes,original);
- assert.equal(state.weeks[start].confirmation.changes.length,1);
  assert.equal(manager.undoLast().ok,true);
  assert.equal(manager.getState().weeks[start].days[0].notes,original);
- assert.equal(manager.getState().weeks[start].confirmation.changes.length,2);
- assert.equal(changedSinceConfirmation(manager.getState().weeks[start]).length,0);
+ assert.equal(Object.hasOwn(manager.getState().weeks[start].confirmation,'changes'),false);
  assert.doesNotThrow(()=>validateRoot(manager.getRoot()));
 });
 
-test('変更履歴は店舗・週ごとに分離し、確定後コピーの変更も検出する',()=>{
- const root=migrate(),first=root.stores[0],next=addDays(first.current,7);
- ensureWeek(first,next);
- const other=structuredClone(first);other.id='another-store';other.store='別店舗';
- root.stores.push(other);
- const old=structuredClone(root);
- prepareWeekFinalizations(root,old,{today:'2026-10-15',at:'2026-10-15T00:00:00Z'});
+test('店舗と週別の色分けを保ち、旧履歴は読み込めても追記しない',()=>{
+ const root=migrate(),first=root.stores[0],next=addDays(first.current,7);ensureWeek(first,next);
+ const second=structuredClone(first);second.id='other';second.store='別店舗';root.stores.push(second);
+ const before=structuredClone(root);
+ prepareWeekFinalizations(root,before,{today:'2026-10-15',at:'2026-10-15T00:00:00Z'});
+ const current=first.weeks[first.current];
+ current.confirmation.changes=[{at:'2026-10-15T00:00:00Z',day:0,kind:'notes',before:'',after:'以前'}];
  const saved=structuredClone(root);
- first.weeks[next].days[0].shifts[0][0].name='変更された氏名';
+ first.weeks[next].days[0].shifts[0][0].name='更新';
  prepareWeekFinalizations(root,saved,{today:'2026-10-15',at:'2026-10-15T01:00:00Z'});
- assert.equal(first.weeks[next].confirmation.changes.length,1);
- assert.equal(other.weeks[next].confirmation.changes.length,0);
- assert.equal(first.weeks[first.current].confirmation.changes.length,0);
+ assert.deepEqual(changedSinceConfirmation(first.weeks[next]),[{day:0,kind:'shift',row:0,band:0}]);
+ assert.deepEqual(changedSinceConfirmation(second.weeks[next]),[]);
+ assert.equal(current.confirmation.changes.length,1);
+ assert.equal(Object.hasOwn(first.weeks[next].confirmation,'changes'),false);
  assert.doesNotThrow(()=>validateRoot(root));
+ assert.equal(parseBackup(backupText(root)).stores[0].weeks[first.current].confirmation.changes.length,1);
+});
+
+test('履歴操作UIと追記処理がなく色分けは残っている',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8'),
+  styles=readFileSync(new URL('../style.css',import.meta.url),'utf8'),
+  model=readFileSync(new URL('../week-finalization.js',import.meta.url),'utf8');
+ assert.equal(app.includes('openDayHistory'),false);
+ assert.equal(app.includes('day-change-button'),false);
+ assert.equal(styles.includes('day-change-button'),false);
+ assert.equal(model.includes('.changes.push('),false);
+ assert.match(app,/post-confirm-change/);
+ assert.match(app,/renderWeekConfirmation/);
+ assert.match(styles,/body\.print-layout #schedule \.post-confirm-change\{background:transparent!important\}/);
 });

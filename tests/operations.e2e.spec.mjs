@@ -94,13 +94,17 @@ test('変更した日だけ備考欄に変更ありを表示し、当日の履�
  const alignment=await notes.nth(2).evaluate(cell=>{
   const label=cell.querySelector('.day-change-button');
   const outer=cell.getBoundingClientRect(),inner=label.getBoundingClientRect();
+  const shiftButton=document.querySelector('#schedule td.employee-slot button');
   return {
    xOffset:inner.left+inner.width/2-(outer.left+outer.width/2),
-   bottomGap:outer.bottom-inner.bottom
+   bottomGap:outer.bottom-inner.bottom,
+   historyHeight:inner.height,
+   shiftButtonHeight:shiftButton.getBoundingClientRect().height
   };
  });
  expect(Math.abs(alignment.xOffset)).toBeLessThan(2);
  expect(Math.abs(alignment.bottomGap-4)).toBeLessThan(2);
+ expect(Math.abs(alignment.historyHeight-alignment.shiftButtonHeight)).toBeLessThan(.5);
  await expect(notes.first().locator('.day-change-button')).toHaveCount(0);
  await notes.nth(2).locator('.day-change-button').click();
  await expect(page.locator('#dialog-title')).toContainText('変更履歴');

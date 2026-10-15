@@ -42,14 +42,14 @@ test('自動確定後の編集セルと変更履歴がリロード後も残る',
  await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
  await expect(cell).toHaveClass(/post-confirm-change/);
  await expect(page.locator('#week-confirm-status')).toHaveText('確定済み');
- await expect(page.locator('#week-confirm-history')).toContainText('1件');
- await page.locator('#week-confirm-history').click();
+ await expect(page.locator('#schedule td.notes-cell').first().locator('.day-change-button')).toHaveText('変更あり');
+ await page.locator('#schedule td.notes-cell').first().locator('.day-change-button').click();
  await expect(page.locator('#editor')).toContainText('変更前：従業員A');
  await expect(page.locator('#editor')).toContainText('変更後：従業員A');
  await page.locator('#close').click();
  await page.reload();
  await expect(page.locator('#schedule td.employee-slot').first()).toHaveClass(/post-confirm-change/);
- await expect(page.locator('#week-confirm-history')).toContainText('1件');
+ await expect(page.locator('#schedule td.notes-cell').first().locator('.day-change-button')).toHaveText('変更あり');
 });
 
 test('確定済みは編集画面の店名の右側にだけ表示し、印刷プレビューには表示しない',async({page})=>{
@@ -64,13 +64,12 @@ test('確定済みは編集画面の店名の右側にだけ表示し、印刷�
  });
  expect(position.labelLeft).toBeGreaterThanOrEqual(position.nameRight);
  expect(Math.abs(position.labelTop-position.nameTop)).toBeLessThan(25);
- await expect(page.locator('#week-confirm-bar')).toBeVisible();
- await expect(page.locator('#week-confirm-bar')).not.toContainText('確定済み');
+ await expect(page.locator('#week-confirm-bar')).toHaveCount(0);
  await page.locator('#preview').click();
  const preview=page.frameLocator('.preview-sheet');
  await expect(preview.locator('#store-name')).toBeVisible();
  await expect(preview.locator('#week-confirm-status')).toHaveCount(0);
- await expect(preview.locator('#week-confirm-history')).toHaveCount(0);
+ await expect(preview.locator('.day-change-button')).toHaveCount(0);
 });
 
 test('確定済みは印刷/PDF生成用のレイアウトで非表示',async({page})=>{
@@ -80,6 +79,67 @@ test('確定済みは印刷/PDF生成用のレイアウトで非表示',async({p
  await expect(page.locator('#week-confirm-status')).toBeHidden();
  await page.evaluate(()=>document.body.classList.remove('print-layout'));
  await expect(page.locator('#week-confirm-status')).toBeVisible();
+});
+
+test('変更した日だけ備考欄に変更ありを表示し、当日の履歴を開ける',async({page})=>{
+ await openApp(page);
+ const notes=page.locator('#schedule td.notes-cell');
+ await expect(notes.first().locator('.day-change-button')).toHaveCount(0);
+ await notes.nth(2).locator('button:not(.day-change-button)').click();
+ await page.locator('#editor textarea').fill('検品予定');
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ await expect(notes.nth(2).locator('button:not(.day-change-button)')).toHaveText('検品予定');
+ await expect(notes.nth(2).locator('.day-change-button')).toHaveText('変更あり');
+ await expect(notes.first().locator('.day-change-button')).toHaveCount(0);
+ await notes.nth(2).locator('.day-change-button').click();
+ await expect(page.locator('#dialog-title')).toContainText('変更履歴');
+ await expect(page.locator('#editor')).toContainText('変更日時：');
+ await expect(page.locator('#editor')).toContainText('変更前：（空欄）');
+ await expect(page.locator('#editor')).toContainText('変更後：検品予定');
+ await expect(page.locator('#editor')).not.toContainText('従業員①');
+ await page.locator('#close').click();
+ await page.locator('#preview').click();
+ const preview=page.frameLocator('.preview-sheet');
+ await expect(preview.locator('.day-change-button')).toHaveCount(0);
+ await expect(preview.locator('td.notes-cell').nth(2).locator('button')).toHaveText('検品予定');
+});
+
+test('確定時の内容へ戻すと変更履歴に切り替わり記録は残る',async({page})=>{
+ await openApp(page);
+ const notes=page.locator('#schedule td.notes-cell').first();
+ const shift=page.locator('#schedule td.employee-slot').first();
+ await shift.locator('button').click();
+ await page.locator('#editor input[type=time]').last().fill('08:00');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ await expect(notes.locator('.day-change-button')).toHaveText('変更あり');
+ await shift.locator('button').click();
+ await page.locator('#editor input[type=time]').last().fill('09:00');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ await expect(notes.locator('.day-change-button')).toHaveText('変更履歴');
+ await expect(shift).not.toHaveClass(/post-confirm-change/);
+ await notes.locator('.day-change-button').click();
+ await expect(page.locator('.week-confirm-history-entry')).toHaveCount(2);
+ await expect(page.locator('#editor')).toContainText('変更前：従業員A');
+ await page.locator('#close').click();
+ await page.reload();
+ await expect(page.locator('#schedule td.notes-cell').first().locator('.day-change-button')).toHaveText('変更履歴');
+});
+
+test('印刷時は履歴ボタンを隠し備考入力は保つ',async({page})=>{
+ await openApp(page);
+ const notes=page.locator('#schedule td.notes-cell').first();
+ await notes.locator('button:not(.day-change-button)').click();
+ await page.locator('#editor textarea').fill('印刷に残す備考');
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ await expect(notes.locator('.day-change-button')).toBeVisible();
+ await page.evaluate(()=>document.body.classList.add('print-layout'));
+ await expect(notes.locator('.day-change-button')).toBeHidden();
+ await expect(notes.locator('button:not(.day-change-button)')).toHaveText('印刷に残す備考');
+ await page.evaluate(()=>document.body.classList.remove('print-layout'));
+ await notes.locator('button:not(.day-change-button)').click();
+ await expect(page.locator('#editor textarea')).toHaveValue('印刷に残す備考');
 });
 
 const STORAGE_KEY='shift-ipad-stores-v2';
@@ -272,7 +332,7 @@ test('スマホを横向きにしても上部操作と印刷プレビューの�
 });
 
 async function editFirstNote(page,text){
- await page.locator('td.notes-cell button').first().click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').first().click();
  await page.locator('#editor textarea').fill(text);
  await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
 }
@@ -319,7 +379,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
 
  // 古い画面側にも変更履歴を1件作る。
  await editFirstNote(stale,'古い画面の変更');
- await expect(stale.locator('td.notes-cell button').first()).toHaveText('古い画面の変更');
+ await expect(stale.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText('古い画面の変更');
  await expect(stale.locator('[data-undo]')).toHaveCount(0);
 
  // 最新画面は古い画面の保存後に開く。
@@ -335,7 +395,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
 
  // 最新画面でさらに変更し、古い画面を競合状態にする。
  await editFirstNote(latest,'最新画面の変更');
- await expect(latest.locator('td.notes-cell button').first()).toHaveText('最新画面の変更');
+ await expect(latest.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText('最新画面の変更');
  await expect.poll(()=>staleDialogs.some(message=>message.includes('別のタブまたはウインドウ'))).toBe(true);
  await expect(stale.locator('#saved')).toContainText('別の画面でデータが変更されました');
 
@@ -368,7 +428,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
 test('localStorage保存失敗時は画面と保存データを変更前へ戻す',async({page})=>{
  await openApp(page);
  const beforeRaw=await page.evaluate(key=>localStorage.getItem(key),STORAGE_KEY);
- const beforeNote=await page.locator('td.notes-cell button').first().textContent();
+ const beforeNote=await page.locator('td.notes-cell button:not(.day-change-button)').first().textContent();
 
  await page.evaluate(key=>{
   const original=Storage.prototype.setItem;
@@ -389,7 +449,7 @@ test('localStorage保存失敗時は画面と保存データを変更前へ戻�
  expect(afterRaw).toBe(beforeRaw);
 
  if(await page.locator('#editor').evaluate(el=>el.open))await page.locator('#close').click();
- await expect(page.locator('td.notes-cell button').first()).toHaveText(beforeNote||'');
+ await expect(page.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText(beforeNote||'');
 });
 
 test('バックアップ復元は実際の画面とlocalStorageを復元データへ置き換える',async({page})=>{
@@ -410,7 +470,7 @@ test('バックアップ復元は実際の画面とlocalStorageを復元デー�
  await page.locator('#settings-back').click();
 
  await expect(page.locator('#store-name')).toHaveText('復元確認店');
- await expect(page.locator('td.notes-cell button').first()).toHaveText('復元テスト成功');
+ await expect(page.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText('復元テスト成功');
  expect(await savedRoot(page)).toEqual(candidate);
 });
 
@@ -1087,7 +1147,7 @@ test('複数端末共有はログイン後に初期アップロードし編集�
  expect(posted?.payload?.version).toBe(2);
  expect(posted?.owner_id).toBe('11111111-1111-1111-1111-111111111111');
  await page.locator('#settings-back').click();
- await page.locator('td.notes-cell button').first().click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').first().click();
  await page.locator('#dialog-body textarea').fill('複数端末同期テスト');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  await expect.poll(()=>revision).toBe(2);
@@ -1132,7 +1192,7 @@ test('クラウド競合時は検知時と保存拒否時に警告を表示す�
   await dialog.accept();
   resolve(message);
  }));
- await page.locator('td.notes-cell button').first().click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').first().click();
  await page.locator('#dialog-body textarea').fill('競合を発生させる');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  const firstMessage=await firstWarning;
@@ -1145,7 +1205,7 @@ test('クラウド競合時は検知時と保存拒否時に警告を表示す�
   await dialog.accept();
   resolve(message);
  }));
- await page.locator('td.notes-cell button').nth(1).click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').nth(1).click();
  await page.locator('#dialog-body textarea').fill('拒否される変更');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  const secondMessage=await secondWarning;
@@ -1192,7 +1252,7 @@ test('別端末の更新は画面復帰時に安全なら自動反映する',asy
  remoteRevision=2;
  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
 
- await expect(page.locator('td.notes-cell button').first()).toHaveText('別端末から更新');
+ await expect(page.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText('別端末から更新');
  const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
  expect(stored.stores.find(item=>item.id===stored.activeStoreId).weeks[store.current].days[0].notes).toBe('別端末から更新');
 });
@@ -1229,7 +1289,7 @@ test('編集中に別端末更新を検知した場合は自動反映せず競�
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
  await page.locator('#settings-back').click();
 
- await page.locator('td.notes-cell button').first().click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').first().click();
  await page.locator('#dialog-body textarea').fill('入力途中');
  const store=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
  store.weeks[store.current].days[0].notes='別端末から更新';
@@ -1242,7 +1302,7 @@ test('編集中に別端末更新を検知した場合は自動反映せず競�
  const message=await warning;
  expect(message).toContain('別の端末でシフトが更新されています');
  await expect(page.locator('#dialog-body textarea')).toHaveValue('入力途中');
- await expect(page.locator('td.notes-cell button').first()).not.toHaveText('別端末から更新');
+ await expect(page.locator('td.notes-cell button:not(.day-change-button)').first()).not.toHaveText('別端末から更新');
 });
 
 
@@ -1286,7 +1346,7 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
  await page.locator('#settings-back').click();
 
  networkDown=true;
- await page.locator('td.notes-cell button').first().click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').first().click();
  await page.locator('#dialog-body textarea').fill('オフライン編集を保持');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
@@ -1295,7 +1355,7 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
  expect(localStore.weeks[localStore.current].days[0].notes).toBe('オフライン編集を保持');
 
  await page.reload();
- await expect(page.locator('td.notes-cell button').first()).toHaveText('オフライン編集を保持');
+ await expect(page.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText('オフライン編集を保持');
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
 
  networkDown=false;
@@ -1345,7 +1405,7 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await page.locator('#settings-back').click();
 
  networkDown=true;
- await page.locator('td.notes-cell button').first().click();
+ await page.locator('td.notes-cell button:not(.day-change-button)').first().click();
  await page.locator('#dialog-body textarea').fill('この端末の未同期変更');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
@@ -1362,7 +1422,7 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  const message=await warning;
  expect(message).toContain('別の端末でシフトが更新されています');
- await expect(page.locator('td.notes-cell button').first()).toHaveText('この端末の未同期変更');
+ await expect(page.locator('td.notes-cell button:not(.day-change-button)').first()).toHaveText('この端末の未同期変更');
  await expect(page.locator('#cloud-sync-alert')).toContainText('別の端末で更新されています');
 });
 

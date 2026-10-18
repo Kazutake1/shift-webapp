@@ -1,5 +1,75 @@
 import {test,expect} from '@playwright/test';
 
+test('従業員管理で退職日が過ぎた人だけ退職者ページへ自動で表示',async({page})=>{
+ await openApp(page);
+ const info=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(s=>s.id===root.activeStoreId);
+  const now=new Date();
+  const iso=offset=>{const d=new Date(now.getFullYear(),now.getMonth(),now.getDate()+offset);return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;};
+  const [old,today,future,hidden]=store.employees;
+  old.retirementDate=iso(-1);
+  today.retirementDate=iso(0);
+  future.retirementDate=iso(1);
+  hidden.retirementDate=iso(-5);hidden.hidden=true;
+  localStorage.setItem(key,JSON.stringify(root));
+  return {oldId:old.id,todayId:today.id,futureId:future.id,hiddenId:hidden.id};
+ },STORAGE_KEY);
+ await page.reload();
+ await page.locator('#settings').click();
+ await page.locator('#employees').click();
+ await expect(page.locator('#dialog-title')).toHaveText('従業員管理');
+ const active=page.locator('#editor [data-employee]');
+ await expect(active).toHaveCount(8);
+ await expect(page.locator(`#editor [data-employee="${info.oldId}"]`)).toHaveCount(0);
+ await expect(page.locator(`#editor [data-employee="${info.todayId}"]`)).toHaveCount(1);
+ await expect(page.locator(`#editor [data-employee="${info.futureId}"]`)).toHaveCount(1);
+ await expect(page.getByRole('button',{name:'退職者ページを開く'})).toContainText('2名');
+ await page.getByRole('button',{name:'退職者ページを開く'}).click();
+ await expect(page.locator('#dialog-title')).toHaveText('退職者');
+ const retired=page.locator('#editor [data-retired-employee]');
+ await expect(retired).toHaveCount(2);
+ await expect(page.locator(`#editor [data-retired-employee="${info.oldId}"]`)).toBeVisible();
+ await expect(page.locator(`#editor [data-retired-employee="${info.hiddenId}"]`)).toBeVisible();
+ await expect(page.locator('#editor .employee-retirement-date')).toHaveCount(2);
+ await page.reload();
+ const saved=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(s=>s.id===root.activeStoreId);
+  return {employeeCount:store.employees.length,shiftName:store.weeks[store.current].days[0].shifts[0][0].name,retirementDate:store.employees[0].retirementDate};
+ },STORAGE_KEY);
+ expect(saved.employeeCount).toBe(10);
+ expect(saved.shiftName).toBe('従業員A');
+ expect(saved.retirementDate).toBeTruthy();
+});
+
+test('退職者ページで退職日を解除すると在籍者側へ戻りデータを維持',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(s=>s.id===root.activeStoreId);
+  const d=new Date(),yesterday=new Date(d.getFullYear(),d.getMonth(),d.getDate()-1);
+  store.employees[0].retirementDate=`${yesterday.getFullYear()}-${String(yesterday.getMonth()+1).padStart(2,'0')}-${String(yesterday.getDate()).padStart(2,'0')}`;
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+ await page.locator('#settings').click();
+ await page.locator('#employees').click();
+ await page.getByRole('button',{name:'退職者ページを開く'}).click();
+ const retired=page.locator('#editor [data-retired-employee]').first();
+ await expect(retired).toContainText('従業員A');
+ await retired.getByRole('button',{name:'編集'}).click();
+ await expect(page.locator('#dialog-title')).toHaveText('従業員を編集');
+ await page.locator('#editor input[type=date]').last().fill('');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ await expect(page.locator('#dialog-title')).toHaveText('従業員管理');
+ await expect(page.locator('#editor [data-employee="sample-0"]')).toHaveCount(1);
+ await expect(page.getByRole('button',{name:'退職者ページを開く'})).toContainText('0名');
+ const stored=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(s=>s.id===root.activeStoreId);
+  return {date:store.employees[0].retirementDate,shiftName:store.weeks[store.current].days[0].shifts[0][0].name};
+ },STORAGE_KEY);
+ expect(stored).toEqual({date:'',shiftName:'従業員A'});
+});
+
 test('連携従業員は一店舗の勤続年数で対象となり渡し済みが両店舗に反映される',async({page})=>{
  await openApp(page);
  const year=Number(new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric'}).format(new Date()));

@@ -626,3 +626,6 @@ body.print-layout .paper-store-heading{display:contents}
 body.print-layout #week-confirm-status{display:none!important}
 @media print{#week-confirm-status{display:none!important}.paper-store-heading{display:contents}}
 
+
+/* Employee management: separate retired staff view (screen/dialog only). */
+@media screen{dialog .employee-retired-nav{display:block;min-height:40px;margin:0 0 12px auto}dialog .employee-retired-back{margin-bottom:12px}dialog .employee-retirement-date{display:block;font-size:12px;margin-top:5px}}

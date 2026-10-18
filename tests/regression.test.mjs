@@ -17,6 +17,7 @@ import {createStateManager} from '../state-manager.js';
 import {birthdayNotices,japanToday} from '../birthdays.js';
 import {birthdayGiftChecklist} from '../birthdays.js';
 import {linkEmployees,unlinkEmployee,syncEmployeeProfile,updateBirthdayKeys} from '../employee-identity.js';
+import {employeesByRetirement} from '../employee-dialog.js';
 import {
   encryptBackupText,decryptBackupText,encryptedBackupInfo,isEncryptedBackupText,MAX_ENCRYPTED_BACKUP_BYTES
 } from '../crypto-backup.js';
@@ -1415,4 +1416,39 @@ test('履歴操作UIと追記処理がなく色分けは残っている',()=>{
  assert.match(app,/post-confirm-change/);
  assert.match(app,/renderWeekConfirmation/);
  assert.match(styles,/body\.print-layout #schedule \.post-confirm-change\{background:transparent!important\}/);
+});
+
+test('従業員管理で退職日の翌日から退職者に分類し、退職日当日は在籍者とする',()=>{
+ const employees=[
+  {id:'old',name:'前日退職',retirementDate:'2026-10-17',hidden:false},
+  {id:'today',name:'当日退職',retirementDate:'2026-10-18',hidden:false},
+  {id:'future',name:'後日退職',retirementDate:'2026-10-19',hidden:false},
+  {id:'empty',name:'在籍中',retirementDate:'',hidden:false},
+  {id:'hidden',name:'非表示の退職者',retirementDate:'2026-09-01',hidden:true}
+ ];
+ const first=employeesByRetirement(employees,'2026-10-18');
+ assert.deepEqual(first.active.map(e=>e.id),['today','future','empty']);
+ assert.deepEqual(first.retired.map(e=>e.id),['old','hidden']);
+ const next=employeesByRetirement(employees,'2026-10-19');
+ assert.deepEqual(next.retired.map(e=>e.id),['old','today','hidden']);
+ assert.equal(employees.length,5);
+ assert.equal(employeeAvailableOn(employees[1],'2026-10-18'),true);
+ assert.equal(employeeAvailableOn(employees[1],'2026-10-19'),false);
+ const otherStore=[{id:'different',name:'別店舗の在籍者',retirementDate:''}];
+ assert.deepEqual(employeesByRetirement(otherStore,'2026-10-19').retired,[]);
+});
+
+test('退職者管理の追加は既存従業員ID・保存形式や過去シフトを変更しない',()=>{
+ const root=migrate(),store=root.stores[0];
+ const employee=store.employees[0],id=employee.id,shift=structuredClone(store.weeks[store.current].days[0].shifts[0][0]);
+ employee.retirementDate='2026-10-01';
+ const grouped=employeesByRetirement(store.employees,'2026-10-18');
+ assert.equal(grouped.retired.some(e=>e.id===id),true);
+ assert.equal(store.employees[0].id,id);
+ assert.deepEqual(store.weeks[store.current].days[0].shifts[0][0],shift);
+ assert.doesNotThrow(()=>validateRoot(root));
+ const backup=parseBackup(backupText(root));
+ assert.equal(backup.version,2);
+ assert.equal(backup.stores[0].employees[0].id,id);
+ assert.deepEqual(backup.stores[0].weeks[store.current].days[0].shifts[0][0],shift);
 });

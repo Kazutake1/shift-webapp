@@ -1,4 +1,4 @@
-import {employeeShiftName} from './model.js';
+import {employeeShiftName,employeeRetiredBy} from './model.js';
 import {linkEmployees,unlinkEmployee,syncEmployeeProfile,updateBirthdayKeys} from './employee-identity.js';
 
 function normalizeEmployeeSearch(value){
@@ -39,6 +39,18 @@ export function withinFirstMonth(employee,date){
  const last=new Date(Date.UTC(year,month+1,0,12)).getUTCDate();
  const limit=new Date(Date.UTC(year,month,Math.min(day,last),12));
  return target<=limit;
+}
+
+// 退職日は最終在籍日。翌日から退職者一覧に表示する。
+export function employeesByRetirement(employees,date){
+ return {
+  active:employees.filter(employee=>!employeeRetiredBy(employee,date)),
+  retired:employees.filter(employee=>employeeRetiredBy(employee,date))
+ };
+}
+function employeeManagementToday(){
+ const today=new Date();
+ return `${today.getFullYear()}-${String(today.getMonth()+1).padStart(2,'0')}-${String(today.getDate()).padStart(2,'0')}`;
 }
 
 export function createEmployeeUi({
@@ -229,13 +241,20 @@ export function createEmployeeUi({
  }
 
  function openEmployees(){
-  const state=getState();
+  const state=getState(),today=employeeManagementToday();
+  const {active,retired}=employeesByRetirement(state.employees,today);
   const body=openDialog('従業員管理');
-  hint(body,'≡をドラッグして並べ替え。非表示の従業員は選択一覧から除外され、登録済みの名前は残ります。');
+  hint(body,'≡をドラッグして並べ替え。非表示の従業員は選択一覧から除外され、登録済みの名前は残ります。退職日を過ぎた従業員は「退職者」に表示されます。');
+  const retiredButton=button(`退職者（${retired.length}名）`,openRetiredEmployees,'employee-retired-nav');
+  retiredButton.setAttribute('aria-label','退職者ページを開く');
+  body.append(retiredButton);
   const list=el('div');
   body.append(list);
+  if(!active.length)hint(body,'在籍中の従業員はいません。');
 
+  // ドラッグで使うindexは、退職者も含めた既存配列上の位置を維持する。
   state.employees.forEach((employee,index)=>{
+   if(employeeRetiredBy(employee,today))return;
    const row=el('div',{class:'employee-row','data-employee':employee.id});
    const handle=button('≡',()=>{},'handle');
    handle.setAttribute('aria-label',`${employee.name}をドラッグして並べ替え`);
@@ -301,6 +320,28 @@ export function createEmployeeUi({
   body.append(button('＋ 従業員を追加',()=>employeeForm(null),'primary'));
  }
 
+ function openRetiredEmployees(){
+  const {retired}=employeesByRetirement(getState().employees,employeeManagementToday());
+  const body=openDialog('退職者');
+  hint(body,'退職日の翌日から自動でこちらに表示されます。既存のシフトと従業員情報は保持されます。退職日を修正・解除すると在籍者一覧へ戻ります。');
+  body.append(button('従業員管理へ戻る',openEmployees,'employee-retired-back'));
+  if(!retired.length){
+   hint(body,'退職者はいません。');
+   return;
+  }
+  const list=el('div');
+  for(const employee of retired){
+   const row=el('div',{class:'employee-row','data-retired-employee':employee.id});
+   const name=el('span',{class:'name'},employee.name);
+   const shiftName=employeeShiftName(employee);
+   if(shiftName!==employee.name)name.append(el('span',{class:'muted'},`　シフト：${shiftName}`));
+   name.append(el('span',{class:'muted employee-retirement-date'},`　退職日：${displayDate(employee.retirementDate)}`));
+   row.append(name,button('編集',()=>employeeForm(employee,'retired')));
+   list.append(row);
+  }
+  body.append(list);
+ }
+
  function moveEmployee(from,to){
   persistChange(()=>{
    const state=getState();
@@ -311,7 +352,7 @@ export function createEmployeeUi({
   openEmployees();
  }
 
- function employeeForm(employee){
+ function employeeForm(employee,returnPage='active'){
   const body=openDialog(employee?'従業員を編集':'従業員を追加');
   const fullName=el('input',{
    maxlength:20,
@@ -365,13 +406,13 @@ export function createEmployeeUi({
      if(!confirm(`「${employee.name}」と「${other.name}」を同じ従業員として連携しますか？氏名と生年月日は現在編集中の従業員の情報に揃います。従業員番号・入社年月日・退職日は各店舗の情報を保持します。`))return;
      try{
       const ok=persistChange(()=>linkEmployees(getRoot(),getState().id,employee.id,storeId,id));
-      if(ok){renderBirthdays();employeeForm(employee);}
+      if(ok){renderBirthdays();employeeForm(employee,returnPage);}
      }catch(err){alert(err.message);}
     }));
    }
    if(linked.length)body.append(button('この店舗の連携を解除',()=>{
     if(!confirm(`${employee.name}の他店舗との連携を解除しますか？`))return;
-    if(persistChange(()=>unlinkEmployee(getRoot(),getState().id,employee.id))){renderBirthdays();employeeForm(employee);}
+    if(persistChange(()=>unlinkEmployee(getRoot(),getState().id,employee.id))){renderBirthdays();employeeForm(employee,returnPage);}
    }));
   }
 
@@ -451,13 +492,16 @@ export function createEmployeeUi({
      }
     })){
      renderBirthdays();
-     openEmployees();
+     const updated=employeeId?getState().employees.find(item=>item.id===employeeId):null;
+     if(updated&&employeeRetiredBy(updated,employeeManagementToday()))openRetiredEmployees();
+     else if(returnPage==='retired'&&updated&&!employeeRetiredBy(updated,employeeManagementToday()))openEmployees();
+     else openEmployees();
     }else if(employeeId){
      const current=getState();
-     employeeForm(current.employees.find(item=>item.id===employeeId));
+     employeeForm(current.employees.find(item=>item.id===employeeId),returnPage);
     }
    },'primary'),
-   button('戻る',openEmployees)
+   button('戻る',returnPage==='retired'?openRetiredEmployees:openEmployees)
   );
  }
 

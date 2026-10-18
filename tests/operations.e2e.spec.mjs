@@ -1115,7 +1115,12 @@ test('退職日を登録した従業員は翌日以降に退職者リストへ�
 
  await page.locator('#birthday-back').click();
  await page.locator('#employees').click();
- await page.locator('.employee-row',{hasText:'退職確認従業員'}).getByRole('button',{name:'編集'}).click();
+ await expect(page.locator('#editor [data-employee]').filter({hasText:'退職確認従業員'})).toHaveCount(0);
+ await page.getByRole('button',{name:'退職者ページを開く'}).click();
+ await expect(page.locator('#dialog-title')).toHaveText('退職者');
+ const record=page.locator('#editor [data-retired-employee]').filter({hasText:'退職確認従業員'});
+ await expect(record).toContainText('退職日：2000/01/01');
+ await record.getByRole('button',{name:'編集'}).click();
  const retirement=page.locator('#dialog-body input[type="date"]').nth(2);
  await expect(retirement).toHaveValue('2000-01-01');
 });

@@ -2259,3 +2259,193 @@ test('STEP8: 保存確定応答が不明なら再保存せず照合待ち',async
  expect(actual.disk.data.stores[0].store).toBe('保存結果が不明な架空店');
  expect(actual.events).toEqual([]);
 });
+
+
+// STEP9: all data is fictional; these fixtures are excluded from public builds.
+const step9VaultBootstrap=readFileSync(new URL('./fixtures/shift-step9-durable-outbox-fixture.js',import.meta.url),'utf8');
+async function openStep9(page){
+ await page.addInitScript({content:step8ManagerBootstrap});
+ await page.addInitScript({content:step9VaultBootstrap});
+ await page.goto('/');
+ await page.waitForFunction(()=>!!window.__shiftStep9&&!!window.__shiftStep8AsyncManager);
+}
+
+test('STEP9: 暗号化本体と未同期記録は同じトランザクションで確定し中断時に両方を維持',async({page})=>{
+ await openStep9(page);
+ const output=await page.evaluate(async({initial,password})=>{
+  const vault=window.__shiftStep9.createVault();await vault.reset();
+  await vault.write(initial,password,0,false,{sync:false});
+  const notices=[];
+  const manager=window.__shiftStep8AsyncManager({vault,onSaved:(_data,meta)=>notices.push(meta)});
+  await manager.unlock(password);
+  const localOnly=await manager.persistChange(root=>{root.birthdayGiftDelivered.push('FAKE-LOCAL-ONLY');},{sync:false});
+  const before=await vault.outbox();
+  const failed=await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts.push('FAKE-ABORT');},{abort:true});
+  const afterFailure={journal:await vault.outbox(),stored:await vault.read(password),notices:[...notices]};
+  const succeeded=await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts.push('FAKE-CONFIRMED');});
+  const row=await vault.row();
+  return {localOnly,before,failed,afterFailure,succeeded,journal:await vault.outbox(),row,notices};
+ },{initial:step6VaultRecord,password:step6VaultPassphrase});
+ expect(output.localOnly.ok).toBe(true);
+ expect(output.before.pendingRevision).toBeNull();
+ expect(output.failed).toMatchObject({ok:false,reason:'TRANSACTION_ABORTED',revision:2});
+ expect(output.afterFailure.journal.pendingRevision).toBeNull();
+ expect(output.afterFailure.stored.revision).toBe(2);
+ expect(output.afterFailure.notices).toEqual([]);
+ expect(output.succeeded).toMatchObject({ok:true,revision:3});
+ expect(output.journal).toEqual({ownerId:'FAKE-OWNER-A',pendingRevision:3,cloudBaseRevision:0});
+ expect(output.notices).toEqual([{sync:true,revision:3}]);
+ const disk=JSON.stringify({row:output.row,journal:output.journal});
+ for(const prohibited of ['架空従業員カナリア','FAKE-NUM-0001','1991-02-03','FAKE-QUO-ONLY','FAKE-LOCAL-ONLY','架空備考カナリア'])expect(disk).not.toContain(prohibited);
+});
+
+test('STEP9: 同期通知失敗とページ再読込の後も未同期記録を再送でき、個人情報を送らない',async({page})=>{
+ await openStep9(page);
+ const saved=await page.evaluate(async({initial,password})=>{
+  const vault=window.__shiftStep9.createVault();await vault.reset();await vault.write(initial,password,0,false,{sync:false});
+  const manager=window.__shiftStep8AsyncManager({vault,onSaved:()=>{throw Error('FAKE-CRASH-BEFORE-SYNC');}});
+  await manager.unlock(password);
+  const committed=await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-NEW-SHIFT';});
+  return {committed,journal:await vault.outbox()};
+ },{initial:step6VaultRecord,password:step6VaultPassphrase});
+ expect(saved.committed).toMatchObject({ok:true,warning:'POST_COMMIT_NOTIFICATION_FAILED',revision:2});
+ expect(saved.journal.pendingRevision).toBe(2);
+ await page.reload();
+ const replay=await page.evaluate(async password=>{
+  const step9=window.__shiftStep9,vault=step9.createVault(),cloud=step9.cloudFake();
+  const reopened=window.__shiftStep8AsyncManager({vault});
+  const unlocked=await reopened.unlock(password);
+  const journalBefore=await vault.outbox();
+  const result=await step9.syncOnce(vault,password,cloud);
+  return {unlocked,journalBefore,result,after:await vault.outbox(),cloud:cloud.get(),root:reopened.getRoot()};
+ },step6VaultPassphrase);
+ expect(replay.unlocked).toEqual({ok:true,reason:'',revision:2});
+ expect(replay.journalBefore.pendingRevision).toBe(2);
+ expect(replay.result).toMatchObject({status:'synced',acknowledged:true,pendingRevision:null,cloudBaseRevision:1});
+ expect(replay.after).toEqual({ownerId:'FAKE-OWNER-A',pendingRevision:null,cloudBaseRevision:1});
+ expect(replay.cloud.revision).toBe(1);
+ expect(replay.cloud.patches).toBe(1);
+ expect(replay.cloud.payload.stores[0].weeks['2026-10-19'].shifts).toEqual(['FAKE-NEW-SHIFT']);
+ const outgoing=JSON.stringify(replay.cloud.payload);
+ for(const prohibited of ['架空従業員カナリア','架空店舗テストA','FAKE-NUM-0001','1991-02-03','FAKE-QUO-ONLY','架空備考カナリア'])expect(outgoing).not.toContain(prohibited);
+ expect(replay.root.stores[0].employees[0].employeeNumber).toBe('FAKE-NUM-0001');
+});
+
+test('STEP9: 通信断と他端末の競合は未同期記録を保持し上書き送信しない',async({page})=>{
+ await openStep9(page);
+ const output=await page.evaluate(async({initial,password})=>{
+  const vault=window.__shiftStep9.createVault();await vault.reset();await vault.write(initial,password,0,false,{sync:false});
+  const manager=window.__shiftStep8AsyncManager({vault});await manager.unlock(password);
+  await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-PENDING';});
+  const cloud=window.__shiftStep9.cloudFake();
+  cloud.configure({read:true});
+  const offline=await window.__shiftStep9.syncOnce(vault,password,cloud);
+  cloud.configure({before:true});
+  const noSend=await window.__shiftStep9.syncOnce(vault,password,cloud);
+  cloud.configure({});
+  cloud.externalChange();
+  const collision=await window.__shiftStep9.syncOnce(vault,password,cloud);
+  return {offline,noSend,collision,meta:await vault.outbox(),cloud:cloud.get(),root:await vault.read(password)};
+ },{initial:step6VaultRecord,password:step6VaultPassphrase});
+ expect(output.offline.status).toBe('offline');
+ expect(output.noSend.status).toBe('send_unconfirmed');
+ expect(output.collision.status).toBe('remote_conflict_or_unconfirmed');
+ expect(output.meta).toEqual({ownerId:'FAKE-OWNER-A',pendingRevision:2,cloudBaseRevision:0});
+ expect(output.cloud).toEqual({revision:1,payload:{type:'OTHER_DEVICE_CHANGE'},patches:0});
+ expect(output.root.data.stores[0].weeks['2026-10-19'].shifts[0]).toBe('FAKE-PENDING');
+});
+
+test('STEP9: サーバー側のみ更新済みでも無条件再送せず、端末承認失敗は未同期を残す',async({page})=>{
+ await openStep9(page);
+ const output=await page.evaluate(async({initial,password})=>{
+  const result={};
+  for(const mode of ['lostResponse','failedAck']){
+   const vault=window.__shiftStep9.createVault();await vault.reset();await vault.write(initial,password,0,false,{sync:false});
+   const manager=window.__shiftStep8AsyncManager({vault});await manager.unlock(password);
+   await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-'+mode;});
+   const cloud=window.__shiftStep9.cloudFake();
+   if(mode==='lostResponse')cloud.configure({after:true});
+   const once=await window.__shiftStep9.syncOnce(vault,password,cloud,{abortAcknowledge:mode==='failedAck'});
+   cloud.configure({});
+   const twice=await window.__shiftStep9.syncOnce(vault,password,cloud);
+   result[mode]={once,twice,meta:await vault.outbox(),cloud:cloud.get()};
+  }
+  return result;
+ },{initial:step6VaultRecord,password:step6VaultPassphrase});
+ expect(output.lostResponse.once.status).toBe('send_unconfirmed');
+ expect(output.failedAck.once.status).toBe('ack_failed');
+ for(const mode of ['lostResponse','failedAck']){
+  expect(output[mode].twice.status).toBe('remote_conflict_or_unconfirmed');
+  expect(output[mode].meta).toEqual({ownerId:'FAKE-OWNER-A',pendingRevision:2,cloudBaseRevision:0});
+  expect(output[mode].cloud.revision).toBe(1);
+  expect(output[mode].cloud.patches).toBe(1);
+ }
+});
+
+test('STEP9: Undoとバックアップ復元が失敗した場合に既存台帳・シフト・未同期情報を保持',async({page})=>{
+ await openStep9(page);
+ const output=await page.evaluate(async({initial,password})=>{
+  const vault=window.__shiftStep9.createVault();await vault.reset();await vault.write(initial,password,0,false,{sync:false});
+  const manager=window.__shiftStep8AsyncManager({vault});await manager.unlock(password);
+  const changed=await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-EDIT';});
+  const undo=await manager.undoLast();
+  const afterUndo={root:manager.getRoot(),journal:await vault.outbox()};
+  const backup=structuredClone(initial);
+  backup.stores[0].employees[0].name='架空バックアップ従業員';
+  backup.stores[0].weeks['2026-10-19'].shifts=['FAKE-RESTORED-SHIFT'];
+  const rejected=await manager.replaceRoot(backup,{sync:true,abort:true});
+  const afterRejected={root:manager.getRoot(),journal:await vault.outbox(),disk:await vault.read(password)};
+  const restored=await manager.replaceRoot(backup,{sync:true});
+  return {changed,undo,afterUndo,rejected,afterRejected,restored,final:await vault.read(password),journal:await vault.outbox(),canUndo:manager.getStatus().canUndo};
+ },{initial:step6VaultRecord,password:step6VaultPassphrase});
+ expect(output.changed.ok).toBe(true);
+ expect(output.undo.ok).toBe(true);
+ expect(output.afterUndo.root).toEqual(step6VaultRecord);
+ expect(output.afterUndo.journal.pendingRevision).toBe(3);
+ expect(output.rejected).toMatchObject({ok:false,reason:'TRANSACTION_ABORTED',revision:3});
+ expect(output.afterRejected.root).toEqual(step6VaultRecord);
+ expect(output.afterRejected.disk).toEqual({revision:3,data:step6VaultRecord});
+ expect(output.afterRejected.journal).toEqual(output.afterUndo.journal);
+ expect(output.restored).toMatchObject({ok:true,revision:4});
+ expect(output.final.data.stores[0].employees[0].name).toBe('架空バックアップ従業員');
+ expect(output.final.data.stores[0].weeks['2026-10-19'].shifts).toEqual(['FAKE-RESTORED-SHIFT']);
+ expect(output.journal.pendingRevision).toBe(4);
+ expect(output.canUndo).toBe(false);
+});
+
+test('STEP9: 所有者不一致と2タブ競合は暗号化データ・未同期記録の更新を拒否',async({browser})=>{
+ const ctx=await browser.newContext({serviceWorkers:'block'});
+ try{
+  await ctx.addInitScript({content:step8ManagerBootstrap});
+  await ctx.addInitScript({content:step9VaultBootstrap});
+  const first=await ctx.newPage(),second=await ctx.newPage();
+  await first.goto('/');await second.goto('/');
+  await first.evaluate(async({initial,password})=>{
+   const vault=window.__shiftStep9.createVault();await vault.reset();await vault.write(initial,password,0,false,{sync:false});
+   window.__step9Manager=window.__shiftStep8AsyncManager({vault});
+   await window.__step9Manager.unlock(password);
+  },{initial:step6VaultRecord,password:step6VaultPassphrase});
+  const ownerResult=await second.evaluate(async({initial,password})=>{
+   const forbidden=window.__shiftStep9.createVault({ownerId:'FAKE-OWNER-B'});
+   let denied='ALLOWED';
+   try{await forbidden.write(initial,password,1,false,{sync:true});}catch(e){denied=e.message;}
+   const sync=await window.__shiftStep9.syncOnce(forbidden,password,window.__shiftStep9.cloudFake(),{ownerId:'FAKE-OWNER-B'});
+   const manager=window.__shiftStep8AsyncManager({vault:window.__shiftStep9.createVault()});
+   await manager.unlock(password);
+   window.__step9Manager=manager;
+   return {denied,sync};
+  },{initial:step6VaultRecord,password:step6VaultPassphrase});
+  expect(ownerResult.denied).toBe('OWNER_MISMATCH');
+  expect(ownerResult.sync.status).toBe('owner_mismatch');
+  const firstCommit=await first.evaluate(()=>window.__step9Manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-WINNER';}));
+  const rejected=await second.evaluate(()=>window.__step9Manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-LOSER';}));
+  const persisted=await first.evaluate(async p=>{
+   const vault=window.__shiftStep9.createVault();
+   return {state:await vault.read(p),journal:await vault.outbox()};
+  },step6VaultPassphrase);
+  expect(firstCommit).toMatchObject({ok:true,revision:2});
+  expect(rejected).toMatchObject({ok:false,reason:'REVISION_CONFLICT',revision:1});
+  expect(persisted.state.data.stores[0].weeks['2026-10-19'].shifts[0]).toBe('FAKE-WINNER');
+  expect(persisted.journal.pendingRevision).toBe(2);
+ }finally{await ctx.close();}
+});

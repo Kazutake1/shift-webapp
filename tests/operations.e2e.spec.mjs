@@ -2449,3 +2449,36 @@ test('STEP9: 所有者不一致と2タブ競合は暗号化データ・未同期
   expect(persisted.journal.pendingRevision).toBe(2);
  }finally{await ctx.close();}
 });
+
+
+test('STEP9: 送信中の追加編集は新しい未同期記録を維持して次の同期で反映',async({page})=>{
+ await openStep9(page);
+ const result=await page.evaluate(async({initial,password})=>{
+  const step9=window.__shiftStep9,vault=step9.createVault();await vault.reset();
+  await vault.write(initial,password,0,false,{sync:false});
+  const manager=window.__shiftStep8AsyncManager({vault});await manager.unlock(password);
+  await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-FIRST';});
+  const cloud=step9.cloudFake();
+  const hook={
+   readRevision:()=>cloud.readRevision(),
+   patch:async(expected,payload)=>{
+    const ack=await cloud.patch(expected,payload);
+    const concurrentlySaved=await manager.persistChange(root=>{root.stores[0].weeks['2026-10-19'].shifts[0]='FAKE-SECOND';});
+    if(!concurrentlySaved.ok)throw Error('CONCURRENT_LOCAL_WRITE_FAILED');
+    return ack;
+   }
+  };
+  const first=await step9.syncOnce(vault,password,hook);
+  const pending=await vault.outbox(),afterFirst=cloud.get();
+  const second=await step9.syncOnce(vault,password,cloud);
+  return {first,pending,afterFirst,second,afterSecond:cloud.get(),meta:await vault.outbox(),disk:await vault.read(password)};
+ },{initial:step6VaultRecord,password:step6VaultPassphrase});
+ expect(result.first).toMatchObject({status:'synced',pendingRevision:3,cloudBaseRevision:1});
+ expect(result.pending).toEqual({ownerId:'FAKE-OWNER-A',pendingRevision:3,cloudBaseRevision:1});
+ expect(result.afterFirst.payload.stores[0].weeks['2026-10-19'].shifts[0]).toBe('FAKE-FIRST');
+ expect(result.second).toMatchObject({status:'synced',pendingRevision:null,cloudBaseRevision:2});
+ expect(result.afterSecond.payload.stores[0].weeks['2026-10-19'].shifts[0]).toBe('FAKE-SECOND');
+ expect(result.afterSecond.patches).toBe(2);
+ expect(result.meta).toEqual({ownerId:'FAKE-OWNER-A',pendingRevision:null,cloudBaseRevision:2});
+ expect(result.disk.revision).toBe(3);
+});

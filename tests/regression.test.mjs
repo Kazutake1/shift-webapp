@@ -1290,6 +1290,8 @@ test('クラウド同期payloadはシフト表だけに制限し従業員情報�
  const {migrate}=await import('../stores.js');
  const local=migrate(initialState()),store=local.stores[0],employee=store.employees[0];
  employee.name='個人情報フルネーム';employee.shiftName='表記A';employee.employeeNumber='社員番号-秘';
+ const privateDisplayEmployee=store.employees[1];
+ privateDisplayEmployee.name='個人情報フルネーム2';privateDisplayEmployee.shiftName=privateDisplayEmployee.name;
  employee.birthDate='1990-01-02';employee.hireDate='2020-03-04';employee.retirementDate='';
  const week=store.weeks[store.current];
  week.days[0].notes='個人情報を含む備考';
@@ -1302,14 +1304,17 @@ test('クラウド同期payloadはシフト表だけに制限し従業員情報�
  assert.equal(cloud.stores[0].employees.length,0);
  assert.equal(cloud.stores[0].weeks[store.current].days[0].notes,'');
  assert.equal(cloud.stores[0].weeks[store.current].days[0].shifts[0][0].name,'表記A');
+ assert.equal(cloud.stores[0].weeks[store.current].days[0].shifts[1][0].name,'従業員');
  assert.equal(Object.hasOwn(cloud,'birthdayAcknowledgements'),false);
  assert.equal(Object.hasOwn(cloud,'birthdayGiftDelivered'),false);
  assert.equal(Object.hasOwn(cloud,'birthdayGiftDeliveryStores'),false);
  assert.equal(Object.hasOwn(cloud.stores[0].weeks[store.current].confirmation,'changes'),false);
- for(const secret of ['個人情報フルネーム','社員番号-秘','1990-01-02','2020-03-04','個人情報を含む備考','個人誕生日','個人QUO','秘密2'])assert.equal(serialized.includes(secret),false,secret);
+ for(const secret of ['個人情報フルネーム','個人情報フルネーム2','社員番号-秘','1990-01-02','2020-03-04','個人情報を含む備考','個人誕生日','個人QUO','秘密2'])assert.equal(serialized.includes(secret),false,secret);
  const merged=mergeScheduleRoot(cloud,local);
  assert.equal(merged.stores[0].employees[0].name,'個人情報フルネーム');
  assert.equal(merged.stores[0].weeks[store.current].days[0].notes,'個人情報を含む備考');
+ assert.equal(merged.stores[0].weeks[store.current].days[0].shifts[1][0].name,'個人情報フルネーム2');
+ assert.equal(merged.stores[0].weeks[store.current].confirmation.snapshot.days[0].shifts[1][0].name,'個人情報フルネーム2');
 });
 
 test('同期済み端末はクラウド更新でも選択店舗と表示週を保持する',async()=>{

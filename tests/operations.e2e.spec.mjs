@@ -507,6 +507,9 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  // 最新画面は古い画面の保存後に開く。
  const latest=await context.newPage();
  await openApp(latest);
+ // 別ウィンドウでも起動時のお知らせが出るため、備考編集の前に閉じる。
+ await expect(latest.locator('#birthday-notices')).toBeVisible();
+ await latest.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
  latest.on('dialog',dialog=>dialog.accept());
 
  const staleDialogs=[];

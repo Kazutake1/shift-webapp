@@ -136,7 +136,9 @@ export function createStateManager({
  }
 
  function handleStorageEvent(event){
-  if(event.key!==storageKey)return false;
+  // Ignore sessionStorage and other storage areas; a null key signals clear().
+  if(event.storageArea!=null&&event.storageArea!==storage)return false;
+  if(event.key!==storageKey&&event.key!==null)return false;
   externalChangeDetected=true;
   onStatus(CONFLICT_STATUS);
   return true;

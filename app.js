@@ -203,7 +203,7 @@ $('#close').onclick=close;
 function field(label,input){const wrapper=el('label',{class:'field'},label);wrapper.append(input);return wrapper;}
 function hint(parent,text){parent.append(el('p',{class:'hint'},text));}
 function confirmChange(existing){return !existing||confirm('登録済みの内容を変更しますか？');}
-function commit(fn){if(!persistChange(fn))return false;render();close();return true;}
+function commit(fn,sync=true){if(!persistChange(fn,true,sync))return false;render();close();return true;}
 const {renderBirthdays,showStartupBirthdayPopup}=createBirthdayUi({
  getRoot:()=>stateManager.getRoot(),
  replaceRoot,
@@ -258,7 +258,7 @@ function chooseShiftDuration(d,row,b,employee){
  body.append(button('従業員を選び直す',()=>openCell(d,row,b)));
 }
 function editShift(d,row,b,draft){const body=openDialog('勤務を編集');const name=button(`${draft.name}　変更`,()=>{try{Object.assign(draft,workingTimes(start.value,end.value));}catch{}const picker=openDialog('従業員を変更');employeesList(picker,e=>editShift(d,row,b,{...draft,employeeId:e.id,name:employeeShiftName(e)}),draft.employeeId,e=>employeeAvailableOn(e,week().days[d].date));picker.append(button('戻る',()=>editShift(d,row,b,draft)));});body.append(name);const start=el('input',{type:'time',required:'',value:timeValue(draft.start)}),end=el('input',{type:'time',required:'',value:timeValue(draft.end)});const rowEl=el('div',{class:'row'});rowEl.append(field('開始時刻',start),field('終了時刻',end));body.append(rowEl);hint(body,'6:00から翌朝6:00までの勤務を入力。0:00〜5:59は翌日として扱います。');if(b===3){body.append(button('17:00〜20:00',()=>{start.value='17:00';end.value='20:00';}));}if(b===4){body.append(button('22:00〜翌1:00',()=>{start.value='22:00';end.value='01:00';}),button('22:00〜翌6:00',()=>{start.value='22:00';end.value='06:00';}));}const err=el('p',{class:'error',role:'alert'});body.append(err);const actions=el('div',{class:'actions'});actions.append(button('削除',()=>{if(confirm('この勤務を削除しますか？'))commit(()=>week().days[d].shifts[row-1][b]=null);},'danger'),button('保存',()=>{try{const times=workingTimes(start.value,end.value);const candidate={...draft,...times};const employee=stateManager.getState().employees.find(item=>item.id===candidate.employeeId);if(!employee||!employeeAvailableOn(employee,week().days[d].date)){err.textContent='この従業員はこの日には在籍していないため保存できません。';return;}if(confirmChange(true)&&confirmShiftOverlap(d,candidate,{row:row-1,band:b}))commit(()=>week().days[d].shifts[row-1][b]=candidate);}catch(e){err.textContent=e.message;}},'primary'));body.append(actions);}
-function openNotes(d){const body=openDialog('備考');const input=el('textarea',{rows:6,maxlength:180});input.value=week().days[d].notes;body.append(field('自由入力（180文字まで）',input),button('保存',()=>{if(confirmChange(week().days[d].notes&&week().days[d].notes!==input.value))commit(()=>week().days[d].notes=input.value);},'primary'));}
+function openNotes(d){const body=openDialog('備考');const input=el('textarea',{rows:6,maxlength:180});input.value=week().days[d].notes;body.append(field('自由入力（180文字まで）',input),button('保存',()=>{if(confirmChange(week().days[d].notes&&week().days[d].notes!==input.value))commit(()=>week().days[d].notes=input.value,false);},'primary'));}
 function openExtra(d,b){
  const existing=week().days[d].extras[b],band=bands[b],ipad=isIpad();
  const body=openDialog('不定期作業／トレーニング');

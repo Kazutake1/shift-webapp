@@ -1372,6 +1372,17 @@ test('複数端末共有はログイン後に初期アップロードし編集�
  await page.locator('td.notes-cell button').first().click();
  await page.locator('#dialog-body textarea').fill('複数端末同期テスト');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ await page.waitForTimeout(150);
+ expect(revision).toBe(1);
+ expect(patched).toBeNull();
+ const noteLocal=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
+ expect(noteLocal.stores.find(store=>store.id===noteLocal.activeStoreId).weeks[noteLocal.stores.find(store=>store.id===noteLocal.activeStoreId).current].days[0].notes).toBe('複数端末同期テスト');
+
+ const shiftButton=page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button');
+ await shiftButton.click();
+ await page.getByLabel('終了時刻').fill('09:30');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#dialog-body').getByRole('button',{name:'保存',exact:true}).click();
  await expect.poll(()=>revision).toBe(2);
  expect(patched?.payload?.stores?.some(store=>Object.values(store.weeks).some(week=>week.days.some(day=>day.notes==='')))).toBe(true);
  const local=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);

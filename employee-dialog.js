@@ -65,6 +65,7 @@ export function createEmployeeUi({
  persistChange,
  renderBirthdays
 }){
+ const persistEmployeeChange=change=>persistChange(change,true,false);
  function openIPadDatePicker(input,trigger,label){
   const editor=document.querySelector('#editor');
   if(!editor)return;
@@ -299,13 +300,13 @@ export function createEmployeeUi({
     name,
     button('編集',()=>employeeForm(employee)),
     button(employee.hidden?'表示':'非表示',()=>{
-     persistChange(()=>employee.hidden=!employee.hidden);
+     persistEmployeeChange(()=>employee.hidden=!employee.hidden);
      renderBirthdays();
      openEmployees();
     }),
     button('削除',()=>{
      if(confirm(`${employee.name}を削除しますか？既存シフト・トレーニングの名前は保持されます。`)){
-      persistChange(()=>{
+      persistEmployeeChange(()=>{
        const current=getState();
        current.employees=current.employees.filter(item=>item.id!==employee.id);
       });
@@ -343,7 +344,7 @@ export function createEmployeeUi({
  }
 
  function moveEmployee(from,to){
-  persistChange(()=>{
+  persistEmployeeChange(()=>{
    const state=getState();
    const [employee]=state.employees.splice(from,1);
    state.employees.splice(to,0,employee);
@@ -405,14 +406,14 @@ export function createEmployeeUi({
      if(!other)return;
      if(!confirm(`「${employee.name}」と「${other.name}」を同じ従業員として連携しますか？氏名と生年月日は現在編集中の従業員の情報に揃います。従業員番号・入社年月日・退職日は各店舗の情報を保持します。`))return;
      try{
-      const ok=persistChange(()=>linkEmployees(getRoot(),getState().id,employee.id,storeId,id));
+      const ok=persistEmployeeChange(()=>linkEmployees(getRoot(),getState().id,employee.id,storeId,id));
       if(ok){renderBirthdays();employeeForm(employee,returnPage);}
      }catch(err){alert(err.message);}
     }));
    }
    if(linked.length)body.append(button('この店舗の連携を解除',()=>{
     if(!confirm(`${employee.name}の他店舗との連携を解除しますか？`))return;
-    if(persistChange(()=>unlinkEmployee(getRoot(),getState().id,employee.id))){renderBirthdays();employeeForm(employee,returnPage);}
+    if(persistEmployeeChange(()=>unlinkEmployee(getRoot(),getState().id,employee.id))){renderBirthdays();employeeForm(employee,returnPage);}
    }));
   }
 
@@ -476,7 +477,7 @@ export function createEmployeeUi({
     }
 
     const employeeId=employee?.id||null;
-    if(persistChange(()=>{
+    if(persistEmployeeChange(()=>{
      const current=getState();
      if(employee){
       updateBirthdayKeys(getRoot(),employee,details.birthDate);

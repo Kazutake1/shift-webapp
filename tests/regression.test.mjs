@@ -300,7 +300,7 @@ test('シフトデータの書き込み経路をstate-managerへ共通化',()=>{
  assert.equal((manager.match(/storage\.setItem\(storageKey,/g)||[]).length,1);
  assert.match(manager,/function save\(edit=true,sync=edit,trackConfirmation=true\)/);
  assert.match(manager,/replaceRoot\(candidate,\{edit:false,sync:true,trackConfirmation:true,success:'直前の操作を取り消しました'\}\)/);
- assert.match(birthdayUi,/replaceRoot\(candidate,\{edit:false,sync:true,success:'誕生日の確認済みを保存しました'\}\)/);
+ assert.match(birthdayUi,/replaceRoot\(candidate,\{edit:false,sync:false,success:'誕生日の確認済みを保存しました'\}\)/);
  assert.match(backup,/replaceRoot\(candidate,\{edit:false,sync:true,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
 });
 
@@ -1067,7 +1067,7 @@ test('Undo対象外の共有データ変更と端末UI操作でクラウド同�
  assert.match(app,/persistChange\(\(\)=>\{copied=copyPreviousWeekEmployeeShifts\(state,state\.current\);\}\s*,false,true\)/);
  assert.match(app,/persistChange\(\(\)=>\{copied=ensureWeek\(state,next\);state\.current=next;\},false,!existed\)/);
  assert.match(backup,/edit:false,sync:true,allowStorageError:true/);
- assert.match(birthdays,/edit:false,sync:true,success:'誕生日の確認済みを保存しました'/);
+ assert.match(birthdays,/edit:false,sync:false,success:'誕生日の確認済みを保存しました'/);
  assert.match(stores,/persistChange\(\(\)=>\{[\s\S]*activeStoreId=id;[\s\S]*\},false\)/);
 });
 
@@ -1272,6 +1272,17 @@ test('保存中に延期したクラウド更新確認は保存終了後に再�
  assert.match(cloud,/if\(pendingSaves===0&&deferredRemoteCheck&&!conflicted\)\{[\s\S]*queueMicrotask\(\(\)=>checkForRemoteUpdate\(\{force:true\}\)\)/);
 });
 
+
+test('従業員情報・誕生日管理・備考のローカル変更はクラウド同期を起動しない',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const employee=readFileSync(new URL('../employee-dialog.js',import.meta.url),'utf8');
+ const birthday=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ assert.match(app,/function commit\(fn,sync=true\)\{if\(!persistChange\(fn,true,sync\)\)/);
+ assert.match(app,/commit\(\(\)=>week\(\)\.days\[d\]\.notes=input\.value,false\)/);
+ assert.match(employee,/const persistEmployeeChange=change=>persistChange\(change,true,false\)/);
+ assert.match(employee,/persistEmployeeChange\(\(\)=>/);
+ assert.match(birthday,/current\.birthdayGiftDelivered=\[\.\.\.set\];[\s\S]*?\},true,false\)/);
+});
 
 test('クラウド同期payloadはシフト表だけに制限し従業員情報と備考を含めない',async()=>{
  const {projectScheduleRoot,mergeScheduleRoot}=await import('../schedule-sync.js');
@@ -1490,7 +1501,7 @@ test('誕生日通知は起動ポップアップへ移り既存の確認済み�
  assert.match(app,/showStartupBirthdayPopup\(\)/);
  assert.match(birth,/popupShownThisOpening/);
  assert.match(birth,/birthdayAcknowledgements/);
- assert.match(birth,/replaceRoot\(candidate,\{edit:false,sync:true,success:'誕生日の確認済みを保存しました'\}\)/);
+ assert.match(birth,/replaceRoot\(candidate,\{edit:false,sync:false,success:'誕生日の確認済みを保存しました'\}\)/);
  assert.match(app,/renderBirthdays/);
 });
 

@@ -233,6 +233,40 @@ test('誕生日のお知らせはアプリ起動時だけ中央ポップアッ�
  expect(entries).toHaveLength(1);
 });
 
+test('空欄の夕方・深夜枠は従業員登録時に勤務終了時刻を選べる',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(item=>item.id===root.activeStoreId);
+  store.weeks[store.current].days[0].shifts[0][3]=null;
+  store.weeks[store.current].days[0].shifts[0][4]=null;
+  store.employees.push({id:'duration-choice',name:'時間選択テスト',hidden:false});
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+
+ const evening=page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').nth(3);
+ await evening.locator('button').click();
+ await page.getByRole('button',{name:'時間選択テスト',exact:true}).click();
+ await expect(page.locator('#dialog-title')).toHaveText('勤務時間を選択');
+ await expect(page.locator('#editor').getByRole('button',{name:'17:00〜20:00'})).toBeVisible();
+ await expect(page.locator('#editor').getByRole('button',{name:'17:00〜22:00'})).toBeVisible();
+ await page.locator('#editor').getByRole('button',{name:'17:00〜22:00'}).click();
+
+ const night=page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').nth(4);
+ await night.locator('button').click();
+ await page.getByRole('button',{name:'時間選択テスト',exact:true}).click();
+ await expect(page.locator('#dialog-title')).toHaveText('勤務時間を選択');
+ await expect(page.locator('#editor').getByRole('button',{name:'22:00〜翌1:00'})).toBeVisible();
+ await expect(page.locator('#editor').getByRole('button',{name:'22:00〜翌6:00'})).toBeVisible();
+ await page.locator('#editor').getByRole('button',{name:'22:00〜翌1:00'}).click();
+
+ const saved=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(item=>item.id===root.activeStoreId);
+  return store.weeks[store.current].days[0].shifts[0].slice(3,5).map(shift=>({start:shift.start,end:shift.end}));
+ },STORAGE_KEY);
+ expect(saved).toEqual([{start:1020,end:1320},{start:1320,end:1500}]);
+});
+
 test('誕生日通知対象がいなければ起動時ポップアップは表示されない',async({page})=>{
  await openApp(page);
  await expect(page.locator('#birthday-notices')).not.toBeVisible();

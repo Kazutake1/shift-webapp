@@ -70,7 +70,8 @@ function mapWeekNamesToLocal(week,employees){
    const matches=employees.filter(item=>employeeShiftName(item)===shift.name);
    if(matches.length===1)employee=matches[0];
   }
-  return employee?{...shift,employeeId:employee.id}:shift;
+  // Restore this device's private display name when a cloud placeholder matches locally.
+  return employee?{...shift,employeeId:employee.id,name:shift.name==='従業員'?employeeShiftName(employee):shift.name}:shift;
  };
  for(const day of week.days){
   day.shifts=day.shifts.map(row=>row.map(setName));

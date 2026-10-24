@@ -1934,3 +1934,68 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  await expect(page.locator('#cloud-sync-status')).toContainText('rev.2');
  await expect(page.locator('#week-label')).toHaveText(localLabel);
 });
+
+test('別タブで保存領域が全消去されたら古い画面は再書き込みしない',async({browser})=>{
+ const context=await browser.newContext({serviceWorkers:'block',viewport:{width:1180,height:820}});
+ try{
+  const stale=await context.newPage();
+  await openApp(stale);
+  if(await stale.locator('#birthday-notices').isVisible()){
+   await stale.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+  }
+  const other=await context.newPage();
+  await openApp(other);
+  const dialogs=[];
+  stale.on('dialog',dialog=>{dialogs.push(dialog.message());return dialog.accept();});
+  await other.evaluate(()=>localStorage.clear());
+  await expect.poll(()=>dialogs.some(message=>message.includes('別のタブまたはウインドウ'))).toBe(true);
+  await stale.locator('td.notes-cell button').first().click();
+  await stale.locator('#editor textarea').fill('全消去後の再保存は拒否');
+  await stale.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+  await expect(stale.locator('#saved')).toContainText('別の画面でデータが変更されました');
+  expect(await stale.evaluate(key=>localStorage.getItem(key),STORAGE_KEY)).toBeNull();
+ }finally{
+  await context.close();
+ }
+});
+
+test('ログアウトの端末セッション削除失敗時は画面を閉じず警告を表示する',async({page})=>{
+ await page.addInitScript(()=>{
+  const original=Storage.prototype.removeItem;
+  Storage.prototype.removeItem=function(key){
+   if(key==='shift-supabase-session-v1')throw Error('simulated storage failure');
+   return original.call(this,key);
+  };
+ });
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'fake-access-token',refresh_token:'fake-refresh-token',
+    expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'77777777-7777-7777-7777-777777777777',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_admins'){
+   return route.fulfill({status:200,contentType:'application/json',body:'[{"user_id":"77777777-7777-7777-7777-777777777777"}]'});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'){
+   if(request.method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:'[]'});
+   if(request.method()==='POST')return route.fulfill({status:201,contentType:'application/json',body:'[{"revision":1}]'});
+  }
+  if(url.pathname==='/auth/v1/logout')return route.fulfill({status:204,body:''});
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await openApp(page);
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ await expect(page.locator('#cloud-sync-status')).toContainText('rev.1');
+ await page.locator('#cloud-sync').click();
+ await page.getByRole('button',{name:'クラウド同期からログアウト'}).click();
+ await expect(page.locator('#editor')).toBeVisible();
+ await expect(page.locator('#dialog-body .error')).toContainText('ログイン情報を端末から削除できません');
+ expect(await page.evaluate(()=>localStorage.getItem('shift-supabase-session-v1')!==null)).toBe(true);
+});

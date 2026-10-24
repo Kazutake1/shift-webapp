@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {readFileSync} from 'node:fs';
 
 test('従業員管理で退職日が過ぎた人だけ退職者ページへ自動で表示',async({page})=>{
  await openApp(page);
@@ -1003,6 +1004,10 @@ test('従業員リストは選択中の店舗ごとに切り替わる',async({pa
   localStorage.setItem(key,JSON.stringify(root));
  },STORAGE_KEY);
  await page.reload();
+ // Birthday notices may overlap navigation when the calendar date changes.
+ if(await page.locator('#birthday-notices').isVisible()){
+  await page.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+ }
  await page.locator('#settings').click();
  await page.locator('#birthday-list').click();
  await expect(page.locator('#birthday-gift-list')).toContainText('現在店舗従業員');
@@ -1933,4 +1938,121 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await expect(page.locator('#cloud-sync-status')).toContainText('rev.2');
  await expect(page.locator('#week-label')).toHaveText(localLabel);
+});
+
+// Isolated browser crypto/storage tests. This fixture never ships in dist.
+const step6VaultBootstrap=readFileSync(new URL('./fixtures/shift-step6-vault-fixture.js',import.meta.url),'utf8');
+const step6VaultPassphrase='SYNTHETIC-ONLY-STEP6-PASSPHRASE';
+const step6VaultRecord={
+ version:2,activeStoreId:'TEST-ONLY-STORE',
+ stores:[{id:'TEST-ONLY-STORE',store:'架空店舗テストA',
+  employees:[{id:'TEST-ONLY-WORKER',name:'架空従業員カナリア',employeeNumber:'FAKE-NUM-0001',birthDate:'1991-02-03'}],
+  weeks:{'2026-10-19':{notes:'架空備考カナリア',shifts:['FAKE-SHIFT']}}}],
+ birthdayGiftDelivered:['FAKE-QUO-ONLY'],birthdayAcknowledgements:['FAKE-BIRTHDAY-ONLY']
+};
+async function openStep6Vault(page){
+ await page.addInitScript({content:step6VaultBootstrap});
+ await page.goto('/');
+ await page.waitForFunction(()=>Boolean(window.__shiftStep6Vault));
+}
+
+test('STEP6: 実IndexedDBで暗号化・完全復号・誤パスワード拒否・平文非保存',async({page})=>{
+ await openStep6Vault(page);
+ const actual=await page.evaluate(async({record,password})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();
+  const revision=await vault.write(record,password,0);
+  const disk=JSON.stringify(await vault.row());
+  const decoded=await vault.read(password);
+  let wrongPasswordRejected=false;
+  try{await vault.read('INCORRECT-SYNTHETIC-PASSPHRASE');}catch{wrongPasswordRejected=true;}
+  return {revision,disk,decoded,wrongPasswordRejected};
+ },{record:step6VaultRecord,password:step6VaultPassphrase});
+ expect(actual.revision).toBe(1);
+ expect(actual.decoded.data).toEqual(step6VaultRecord);
+ expect(actual.wrongPasswordRejected).toBe(true);
+ for(const word of ['架空従業員カナリア','FAKE-NUM-0001','1991-02-03','FAKE-QUO-ONLY','架空備考カナリア']){
+  expect(actual.disk).not.toContain(word);
+ }
+});
+
+test('STEP6: IndexedDB保存の中断で旧版が残り、再読込後も維持',async({page})=>{
+ await openStep6Vault(page);
+ const result=await page.evaluate(async({record,password})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();
+  await vault.write(record,password,0);
+  const changed=structuredClone(record);changed.stores[0].store='未確定の架空店名';
+  let rejected=false;
+  try{await vault.write(changed,password,1,true);}catch(e){if(e.message!=='TRANSACTION_ABORTED')throw e;rejected=true;}
+  return {rejected,active:await vault.read(password),previous:await vault.row('previous')};
+ },{record:step6VaultRecord,password:step6VaultPassphrase});
+ expect(result.rejected).toBe(true);
+ expect(result.previous).toBeNull();
+ expect(result.active).toEqual({revision:1,data:step6VaultRecord});
+ await page.reload();
+ const resumed=await page.evaluate(p=>window.__shiftStep6Vault.read(p),step6VaultPassphrase);
+ expect(resumed).toEqual({revision:1,data:step6VaultRecord});
+});
+
+test('STEP6: 実2タブのrevision衝突を拒否し、改ざん時も直前版を読める',async({browser})=>{
+ const context=await browser.newContext({serviceWorkers:'block'});
+ try{
+  await context.addInitScript({content:step6VaultBootstrap});
+  const first=await context.newPage(),second=await context.newPage();
+  await first.goto('/');await second.goto('/');
+  await first.evaluate(async({data,p})=>{await window.__shiftStep6Vault.reset();await window.__shiftStep6Vault.write(data,p,0);},{data:step6VaultRecord,p:step6VaultPassphrase});
+  const updated=structuredClone(step6VaultRecord);updated.stores[0].store='別タブが確定した架空店舗';
+  expect(await second.evaluate(({data,p})=>window.__shiftStep6Vault.write(data,p,1),{data:updated,p:step6VaultPassphrase})).toBe(2);
+  const stale=await first.evaluate(async({data,p})=>{
+   try{await window.__shiftStep6Vault.write(data,p,1);return 'ALLOWED';}catch(e){return e.message;}
+  },{data:step6VaultRecord,p:step6VaultPassphrase});
+  expect(stale).toBe('REVISION_CONFLICT');
+  await second.evaluate(()=>window.__shiftStep6Vault.tamper());
+  const data=await first.evaluate(async p=>{
+   let tamperRejected=false;
+   try{await window.__shiftStep6Vault.read(p);}catch{tamperRejected=true;}
+   return {tamperRejected,previous:await window.__shiftStep6Vault.read(p,'previous')};
+  },step6VaultPassphrase);
+  expect(data).toEqual({tamperRejected:true,previous:{revision:1,data:step6VaultRecord}});
+ }finally{await context.close();}
+});
+
+test('STEP6: 通信遮断中にIndexedDBを読み書きしChromiumではオフライン再読込',async({browser,browserName})=>{
+ test.setTimeout(40000);
+ const context=await browser.newContext({serviceWorkers:'allow'});
+ try{
+  await context.addInitScript({content:step6VaultBootstrap});
+  const page=await context.newPage();await page.goto('/');
+  await page.waitForFunction(()=>navigator.serviceWorker?.controller!==null,null,{timeout:16000});
+  await page.evaluate(async({data,p})=>{await window.__shiftStep6Vault.reset();await window.__shiftStep6Vault.write(data,p,0);},{data:step6VaultRecord,p:step6VaultPassphrase});
+  await context.setOffline(true);
+  // Linux Playwright WebKit raises an internal error on offline navigation.
+  // Keep WebKit offline read/write coverage; cold offline reload remains unverified on WebKit.
+  if(browserName==='chromium')await page.reload();
+  const result=await page.evaluate(async p=>{
+   const vault=window.__shiftStep6Vault;
+   const before=await vault.read(p);
+   const updated=structuredClone(before.data);updated.stores[0].store='オフラインの架空店舗';
+   const revision=await vault.write(updated,p,before.revision);
+   return {online:navigator.onLine,revision,after:await vault.read(p)};
+  },step6VaultPassphrase);
+  expect(result.online).toBe(false);
+  expect(result.revision).toBe(2);
+  expect(result.after.data.stores[0].store).toBe('オフラインの架空店舗');
+ }finally{await context.close();}
+});
+
+test('STEP6: 旧形式からの架空移行は失敗時も成功時も旧データを維持',async({page})=>{
+ await openStep6Vault(page);
+ const result=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();
+  const key='STEP6-FAKE-LEGACY-KEY',old=JSON.stringify(data);localStorage.setItem(key,old);
+  let aborted=false;
+  try{await vault.write(data,p,0,true);}catch(e){if(e.message!=='TRANSACTION_ABORTED')throw e;aborted=true;}
+  const afterAbort={legacy:localStorage.getItem(key)===old,active:await vault.row()};
+  const revision=await vault.write(data,p,0);
+  const retained=localStorage.getItem(key)===old;
+  localStorage.removeItem(key);
+  return {aborted,afterAbort,revision,retained};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(result).toEqual({aborted:true,afterAbort:{legacy:true,active:null},revision:1,retained:true});
 });

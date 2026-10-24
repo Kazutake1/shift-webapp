@@ -419,21 +419,21 @@ function openCloudSync(){
    ?'別端末の更新を検出しています。クラウドから最新データを読み込んでください。'
    :current.unsynced
     ?`クラウド未同期です。端末には保存済みです。${current.revision?` 最終同期 rev.${current.revision}`:''}`
-    :`クラウド同期：${current.enabled?'有効':'接続確認中'}${current.revision?`（rev.${current.revision}）`:''}`);
+    :`シフト表のみ同期：${current.enabled?'有効':'接続確認中'}${current.revision?`（rev.${current.revision}）`:''}`);
   const error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
   const reloadButton=button('クラウドから最新を読み込む',async()=>{
    const warning=current.unsynced
-    ?'この端末にはクラウド未同期の変更があります。最新データを読み込むと、この端末の未同期変更は失われます。続けますか？'
-    :'この端末の現在データをクラウドの最新データで置き換えますか？';
+    ?'この端末には未同期のシフト変更があります。最新のシフト表を読み込むと、その変更は失われます。従業員情報と備考はこの端末に残ります。続けますか？'
+    :'シフト表をクラウドの最新データで更新しますか？従業員情報と備考はこの端末に残ります。';
    if(!confirm(warning))return;
    const ok=await runCloudAction(reloadButton,()=>cloudSync.reloadFromCloud(),error);
    if(ok){stateManager.clearCloudConflict();render();close();}
   });
   const logoutButton=button('クラウド同期からログアウト',async()=>{await runCloudAction(logoutButton,()=>cloudSync.signOut(),error);close();});
-  hint(body,'ログアウトしても、この端末のシフトデータと管理者アカウントの紐付けは保持されます。');
+  hint(body,'ログアウトしても、この端末のシフト表・従業員情報・備考は削除されません。');
   actions.append(logoutButton,reloadButton);body.append(error,actions);return;
  }
- hint(body,'登録済みの管理者アカウントでログインすると、同じシフトデータを複数端末で共有します。未ログイン時は従来どおりこの端末だけに保存されます。');
+ hint(body,'同期されるのはシフト表の内容です。従業員台帳・誕生日／クオカード情報・備考はこの端末だけに保存され、同期されません。共有する表示はシフト表名です（未設定またはフルネームと同じ場合は「従業員」と表示します）。');
  const email=el('input',{type:'email',autocomplete:'username',required:'',placeholder:'メールアドレス'});
  const password=el('input',{type:'password',autocomplete:'current-password',required:'',minlength:'8',placeholder:'8文字以上'});
  body.append(field('メールアドレス',email),field('パスワード',password));

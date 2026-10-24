@@ -1279,6 +1279,57 @@ test('前週コピーは今週へ戻るの右側に表示する',async({page})=>
  await expect(page.locator('#shift-page #copy-week')).toHaveCount(0);
 });
 
+test('旧クラウド全量データを読み込むと個人情報を除いたシフト表だけへ置き換える',async({page})=>{
+ let legacyPayload=null,cleanedPayload=null,revision=7;
+ await openApp(page);
+ legacyPayload=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),store=root.stores.find(item=>item.id===root.activeStoreId);
+  const employee=store.employees[0];
+  employee.name='個人情報フルネーム';employee.shiftName='シフト表示A';employee.employeeNumber='秘密社員番号';
+  employee.birthDate='1990-01-02';employee.hireDate='2020-03-04';employee.retirementDate='';
+  store.weeks[store.current].days[0].notes='秘密の備考';
+  root.birthdayAcknowledgements=['秘密誕生日確認'];
+  root.birthdayGiftDelivered=['秘密QUO記録'];
+  root.birthdayGiftDeliveryStores={'秘密QUO記録':{storeId:store.id,storeName:store.store}};
+  localStorage.setItem(key,JSON.stringify(root));
+  return root;
+ },STORAGE_KEY);
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
+  const request=route.request(),url=new URL(request.url());
+  if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
+   const userId=(url.searchParams.get('user_id')||'').replace(/^eq\./,'');
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify(userId?[{user_id:userId}]:[])});
+  }
+  if(url.pathname==='/auth/v1/token'&&url.searchParams.get('grant_type')==='password'){
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify({
+    access_token:'migration-access',refresh_token:'migration-refresh',expires_in:3600,expires_at:Math.floor(Date.now()/1000)+3600,
+    user:{id:'12121212-1212-1212-1212-121212121212',email:'manager@example.com'}
+   })});
+  }
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='GET')return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload:legacyPayload,updated_at:'2026-10-06T00:00:00Z'}])});
+  if(url.pathname==='/rest/v1/shift_app_state'&&request.method()==='PATCH'){
+   const body=request.postDataJSON();cleanedPayload=body.payload;revision=body.revision;
+   return route.fulfill({status:200,contentType:'application/json',body:JSON.stringify([{revision,payload:cleanedPayload,updated_at:'2026-10-06T00:01:00Z'}])});
+  }
+  return route.fulfill({status:404,contentType:'application/json',body:'{}'});
+ });
+ await page.locator('#settings').click();
+ await page.locator('#cloud-sync').click();
+ await page.getByLabel('メールアドレス').fill('manager@example.com');
+ await page.getByLabel('パスワード').fill('password123');
+ await page.getByRole('button',{name:'ログイン',exact:true}).click();
+ expect(cleanedPayload?.syncFormat).toBe('shift-sheet-v1');
+ expect(cleanedPayload?.stores?.every(store=>store.employees.length===0)).toBe(true);
+ expect(Object.hasOwn(cleanedPayload,'birthdayAcknowledgements')).toBe(false);
+ expect(Object.hasOwn(cleanedPayload,'birthdayGiftDelivered')).toBe(false);
+ expect(Object.hasOwn(cleanedPayload,'birthdayGiftDeliveryStores')).toBe(false);
+ const serialized=JSON.stringify(cleanedPayload);
+ for(const secret of ['個人情報フルネーム','秘密社員番号','1990-01-02','2020-03-04','秘密の備考','秘密誕生日確認','秘密QUO記録'])expect(serialized).not.toContain(secret);
+ const local=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
+ expect(local.stores.find(store=>store.id===local.activeStoreId).employees[0].name).toBe('個人情報フルネーム');
+ expect(local.stores.find(store=>store.id===local.activeStoreId).weeks[local.stores.find(store=>store.id===local.activeStoreId).current].days[0].notes).toBe('秘密の備考');
+});
+
 test('複数端末共有はログイン後に初期アップロードし編集をrevision付きで同期する',async({page})=>{
  let revision=0,posted=null,patched=null;
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
@@ -1312,13 +1363,19 @@ test('複数端末共有はログイン後に初期アップロードし編集�
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
  await expect(page.locator('#cloud-sync-status')).toContainText('rev.1');
  expect(posted?.payload?.version).toBe(2);
+ expect(posted?.payload?.syncFormat).toBe('shift-sheet-v1');
+ expect(posted?.payload?.stores?.every(store=>store.employees.length===0)).toBe(true);
+ expect(posted?.payload?.stores?.some(store=>Object.values(store.weeks).some(week=>week.days.some(day=>day.notes!=='')))).toBe(false);
+ expect(Object.hasOwn(posted.payload,'birthdayAcknowledgements')).toBe(false);
  expect(posted?.owner_id).toBe('11111111-1111-1111-1111-111111111111');
  await page.locator('#settings-back').click();
  await page.locator('td.notes-cell button').first().click();
  await page.locator('#dialog-body textarea').fill('複数端末同期テスト');
  await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
  await expect.poll(()=>revision).toBe(2);
- expect(patched?.payload?.stores?.some(store=>Object.values(store.weeks).some(week=>week.days.some(day=>day.notes==='複数端末同期テスト')))).toBe(true);
+ expect(patched?.payload?.stores?.some(store=>Object.values(store.weeks).some(week=>week.days.some(day=>day.notes==='')))).toBe(true);
+ const local=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
+ expect(local.stores.find(store=>store.id===local.activeStoreId).weeks[local.stores.find(store=>store.id===local.activeStoreId).current].days[0].notes).toBe('複数端末同期テスト');
 });
 
 test('クラウド競合時は検知時と保存拒否時に警告を表示する',async({page})=>{
@@ -1415,13 +1472,14 @@ test('別端末の更新は画面復帰時に安全なら自動反映する',asy
  await page.locator('#settings-back').click();
 
  const store=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
- store.weeks[store.current].days[0].notes='別端末から更新';
+ const previous=store.weeks[store.current].days[0].shifts[0][0];
+ store.weeks[store.current].days[0].shifts[0][0]={...previous,name:'別端末のシフト変更'};
  remoteRevision=2;
  await page.evaluate(()=>window.dispatchEvent(new Event('focus')));
 
- await expect(page.locator('td.notes-cell button').first()).toHaveText('別端末から更新');
+ await expect(page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button')).toContainText('別端末のシフト変更');
  const stored=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
- expect(stored.stores.find(item=>item.id===stored.activeStoreId).weeks[store.current].days[0].notes).toBe('別端末から更新');
+ expect(stored.stores.find(item=>item.id===stored.activeStoreId).weeks[store.current].days[0].shifts[0][0].name).toBe('別端末のシフト変更');
 });
 
 test('編集中に別端末更新を検知した場合は自動反映せず競合警告にする',async({page})=>{
@@ -1528,7 +1586,7 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
  networkDown=false;
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await expect.poll(()=>remoteRevision).toBe(2);
- expect(cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId).weeks[localStore.current].days[0].notes).toBe('オフライン編集を保持');
+ expect(cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId).weeks[localStore.current].days[0].notes).toBe('');
  await expect(page.locator('#cloud-sync-alert')).toBeHidden();
  expect(patchCount).toBeGreaterThanOrEqual(2);
 });

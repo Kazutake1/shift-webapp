@@ -1148,7 +1148,7 @@ test('複数端末共有は端末を最初の管理者アカウントへ固定�
  assert.match(cloud,/既存のシフトデータ保護のため、別アカウントではログインできません/);
  assert.match(cloud,/await rejectForeignSession\(data\);throw error/);
  assert.match(app,/クラウド同期からログアウト/);
- assert.match(app,/管理者アカウントの紐付けは保持されます/);
+ assert.match(app,/ログアウトしても、この端末のシフト表・従業員情報・備考は削除されません/);
 });
 
 
@@ -1158,7 +1158,7 @@ test('管理者共有は既存アカウントのログイン専用で新規signu
  assert.equal(app.includes('管理者アカウントを作成'),false);
  assert.equal(app.includes('cloudSync.signUp'),false);
  assert.equal(cloud.includes('async function signUp('),false);
- assert.match(app,/登録済みの管理者アカウントでログイン/);
+ assert.match(app,/同期されるのはシフト表の内容です/);
 });
 
 
@@ -1272,6 +1272,34 @@ test('保存中に延期したクラウド更新確認は保存終了後に再�
  assert.match(cloud,/if\(pendingSaves===0&&deferredRemoteCheck&&!conflicted\)\{[\s\S]*queueMicrotask\(\(\)=>checkForRemoteUpdate\(\{force:true\}\)\)/);
 });
 
+
+test('クラウド同期payloadはシフト表だけに制限し従業員情報と備考を含めない',async()=>{
+ const {projectScheduleRoot,mergeScheduleRoot}=await import('../schedule-sync.js');
+ const {initialState}=await import('../model.js');
+ const {migrate}=await import('../stores.js');
+ const local=migrate(initialState()),store=local.stores[0],employee=store.employees[0];
+ employee.name='個人情報フルネーム';employee.shiftName='表記A';employee.employeeNumber='社員番号-秘';
+ employee.birthDate='1990-01-02';employee.hireDate='2020-03-04';employee.retirementDate='';
+ const week=store.weeks[store.current];
+ week.days[0].notes='個人情報を含む備考';
+ week.confirmation={confirmedAt:'2026-10-01T00:00:00.000Z',snapshot:structuredClone(week),changes:[{at:'2026-10-01T00:00:00.000Z',day:0,kind:'notes',before:'秘密',after:'秘密2'}]};
+ local.birthdayAcknowledgements=['個人誕生日'];
+ local.birthdayGiftDelivered=['個人QUO'];
+ local.birthdayGiftDeliveryStores={'個人QUO':{storeId:store.id,storeName:store.store}};
+ const cloud=projectScheduleRoot(local),serialized=JSON.stringify(cloud);
+ assert.equal(cloud.syncFormat,'shift-sheet-v1');
+ assert.equal(cloud.stores[0].employees.length,0);
+ assert.equal(cloud.stores[0].weeks[store.current].days[0].notes,'');
+ assert.equal(cloud.stores[0].weeks[store.current].days[0].shifts[0][0].name,'表記A');
+ assert.equal(Object.hasOwn(cloud,'birthdayAcknowledgements'),false);
+ assert.equal(Object.hasOwn(cloud,'birthdayGiftDelivered'),false);
+ assert.equal(Object.hasOwn(cloud,'birthdayGiftDeliveryStores'),false);
+ assert.equal(Object.hasOwn(cloud.stores[0].weeks[store.current].confirmation,'changes'),false);
+ for(const secret of ['個人情報フルネーム','社員番号-秘','1990-01-02','2020-03-04','個人情報を含む備考','個人誕生日','個人QUO','秘密2'])assert.equal(serialized.includes(secret),false,secret);
+ const merged=mergeScheduleRoot(cloud,local);
+ assert.equal(merged.stores[0].employees[0].name,'個人情報フルネーム');
+ assert.equal(merged.stores[0].weeks[store.current].days[0].notes,'個人情報を含む備考');
+});
 
 test('同期済み端末はクラウド更新でも選択店舗と表示週を保持する',async()=>{
  const {preserveLocalView}=await import('../cloud-sync.js');

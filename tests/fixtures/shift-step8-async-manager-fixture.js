@@ -48,7 +48,10 @@
     if(confirmation&&typeof confirmation.then==='function')throw Error('ASYNC_BEFORE_SAVE_NOT_ALLOWED');
     validate(candidate);
     const changed=JSON.stringify(candidate)!==JSON.stringify(before);
-    const next=await vault.write(candidate,passphrase,oldRevision,abort);
+    const mustSync=Boolean(sync||confirmation?.sync);
+    // STEP9: the durable outbox marker and encrypted root must share one transaction.
+    // Older STEP6 vault fixtures simply ignore the extra metadata argument.
+    const next=await vault.write(candidate,passphrase,oldRevision,abort,{sync:mustSync});
     // The write may already be durable even if its acknowledgement is unexpected.
     // Freeze the manager: never pretend the persistent store was rolled back.
     if(next!==oldRevision+1)throw Error('COMMIT_OUTCOME_UNKNOWN');
@@ -59,7 +62,6 @@
 
     // Cloud and UI notifications must run only after the vault reports a commit.
     // A failed notification is not a failed disk write. Surface its failure.
-    const mustSync=Boolean(sync||confirmation?.sync);
     let warning='';
     try{if(mustSync)onSaved(clone(root),{sync:true,revision});}
     catch{warning='POST_COMMIT_NOTIFICATION_FAILED';onStatus(warning);}

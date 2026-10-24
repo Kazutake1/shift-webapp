@@ -41,7 +41,7 @@ export function createBirthdayUi({
       ...(candidate.birthdayAcknowledgements||[]),
       notice.key
      ];
-     if(!replaceRoot(candidate,{edit:false,sync:true,success:'誕生日の確認済みを保存しました'}))return;
+     if(!replaceRoot(candidate,{edit:false,sync:false,success:'誕生日の確認済みを保存しました'}))return;
      renderBirthdayUi();
     })
    );
@@ -141,7 +141,7 @@ export function createBirthdayUi({
      }
      current.birthdayGiftDelivered=[...set];
      current.birthdayGiftDeliveryStores=deliveryStores;
-    });
+    },true,false);
     if(!ok){
      checkbox.checked=!checked;
      return;

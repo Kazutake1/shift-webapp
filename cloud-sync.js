@@ -1,5 +1,5 @@
 import {SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY} from './supabase-config.js';
-import {validateRoot} from './stores.js';
+import {mergeScheduleRoot,projectScheduleRoot} from './schedule-sync.js';
 
 const SESSION_KEY='shift-supabase-session-v1';
 const SYNC_META_KEY='shift-supabase-sync-v1';
@@ -8,6 +8,8 @@ const UNSYNCED_STATUS='複数端末共有：クラウド未同期（端末には
 const SESSION_STORE_ERROR='ログイン情報を端末に保存できません。空き容量を確認してください。';
 const SESSION_CLEAR_ERROR='ログイン情報を端末から削除できません。再読み込みせず、空き容量を確認してください。';
 
+const canonical=value=>Array.isArray(value)?value.map(canonical):value&&typeof value==='object'?Object.fromEntries(Object.keys(value).sort().map(key=>[key,canonical(value[key])])):value;
+const sameJson=(a,b)=>JSON.stringify(canonical(a))===JSON.stringify(canonical(b));
 const readJson=(storage,key)=>{try{return JSON.parse(storage.getItem(key)||'null');}catch{return null;}};
 const readStoredSession=storage=>readJson(storage,SESSION_KEY);
 const writeStoredSession=(storage,session)=>{
@@ -39,14 +41,7 @@ const writeStoredOwner=(storage,userId)=>{
 };
 
 export function preserveLocalView(remoteRoot,localRoot){
- const remote=validateRoot(structuredClone(remoteRoot));
- if(!localRoot||localRoot.version!==2||!Array.isArray(localRoot.stores))return remote;
- if(remote.stores.some(store=>store.id===localRoot.activeStoreId))remote.activeStoreId=localRoot.activeStoreId;
- for(const store of remote.stores){
-  const localStore=localRoot.stores.find(item=>item.id===store.id);
-  if(localStore?.current&&Object.hasOwn(store.weeks,localStore.current))store.current=localStore.current;
- }
- return remote;
+ return mergeScheduleRoot(remoteRoot,localRoot);
 }
 
 async function responseJson(response){
@@ -173,7 +168,7 @@ export function createCloudSync({
   return Array.isArray(rows)&&rows.length?Number(rows[0].revision):null;
  }
  async function createCloud(){
-  const payload=validateRoot(structuredClone(getRoot()));
+  const payload=projectScheduleRoot(getRoot());
   const rows=await dataRequest('shift_app_state',{
    method:'POST',prefer:'return=representation',
    body:{owner_id:session.user.id,payload,revision:1}
@@ -183,10 +178,20 @@ export function createCloudSync({
   status(`複数端末共有：同期済み（rev.${revision}）`);
  }
  async function loadRemote(row){
-  const remote=validateRoot(structuredClone(row.payload));
-  const payload=revision===null?remote:preserveLocalView(remote,getRoot());
-  if(!replaceRoot(payload))throw Error('クラウドのデータを端末へ保存できませんでした。');
-  revision=Number(row.revision);
+  const remote=projectScheduleRoot(row.payload);
+  let loadedRevision=Number(row.revision);
+  if(!sameJson(remote,row.payload)){
+   const next=loadedRevision+1;
+   const rows=await dataRequest(`shift_app_state?owner_id=eq.${encodeURIComponent(session.user.id)}&revision=eq.${loadedRevision}`,{
+    method:'PATCH',prefer:'return=representation',
+    body:{payload:remote,revision:next,updated_at:new Date().toISOString()}
+   });
+   if(!Array.isArray(rows)||rows.length===0){setConflict();throw Error('クラウドのデータを安全に切り替えられませんでした。最新データを読み込んでください。');}
+   loadedRevision=Number(rows[0].revision||next);
+  }
+  const payload=mergeScheduleRoot(remote,getRoot());
+  if(!replaceRoot(payload))throw Error('クラウドのシフト表を端末へ保存できませんでした。');
+  revision=loadedRevision;
   enabled=true;conflicted=false;unsynced=false;persistSyncMeta();
   onRemoteLoaded();
   status(`複数端末共有：同期済み（rev.${revision}）`);
@@ -204,7 +209,7 @@ export function createCloudSync({
   const expected=revision,next=expected+1;
   const rows=await dataRequest(`shift_app_state?owner_id=eq.${encodeURIComponent(session.user.id)}&revision=eq.${expected}`,{
    method:'PATCH',prefer:'return=representation',
-   body:{payload:validateRoot(structuredClone(snapshot)),revision:next,updated_at:new Date().toISOString()}
+   body:{payload:projectScheduleRoot(snapshot),revision:next,updated_at:new Date().toISOString()}
   });
   if(!Array.isArray(rows)||rows.length===0){setConflict();return false;}
   revision=Number(rows[0].revision||next);persistSyncMeta();

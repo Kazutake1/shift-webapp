@@ -300,7 +300,7 @@ test('シフトデータの書き込み経路をstate-managerへ共通化',()=>{
  assert.equal((manager.match(/storage\.setItem\(storageKey,/g)||[]).length,1);
  assert.match(manager,/function save\(edit=true,sync=edit,trackConfirmation=true\)/);
  assert.match(manager,/replaceRoot\(candidate,\{edit:false,sync:true,trackConfirmation:true,success:'直前の操作を取り消しました'\}\)/);
- assert.match(birthdayUi,/replaceRoot\(candidate,\{edit:false,sync:true,success:'誕生日の確認済みを保存しました'\}\)/);
+ assert.match(birthdayUi,/replaceRoot\(candidate,\{edit:false,sync:false,success:'誕生日の確認済みを保存しました'\}\)/);
  assert.match(backup,/replaceRoot\(candidate,\{edit:false,sync:true,allowStorageError:true,success:'全店舗を復元しました'\}\)/);
 });
 
@@ -1067,7 +1067,7 @@ test('Undo対象外の共有データ変更と端末UI操作でクラウド同�
  assert.match(app,/persistChange\(\(\)=>\{copied=copyPreviousWeekEmployeeShifts\(state,state\.current\);\}\s*,false,true\)/);
  assert.match(app,/persistChange\(\(\)=>\{copied=ensureWeek\(state,next\);state\.current=next;\},false,!existed\)/);
  assert.match(backup,/edit:false,sync:true,allowStorageError:true/);
- assert.match(birthdays,/edit:false,sync:true,success:'誕生日の確認済みを保存しました'/);
+ assert.match(birthdays,/edit:false,sync:false,success:'誕生日の確認済みを保存しました'/);
  assert.match(stores,/persistChange\(\(\)=>\{[\s\S]*activeStoreId=id;[\s\S]*\},false\)/);
 });
 
@@ -1148,7 +1148,7 @@ test('複数端末共有は端末を最初の管理者アカウントへ固定�
  assert.match(cloud,/既存のシフトデータ保護のため、別アカウントではログインできません/);
  assert.match(cloud,/await rejectForeignSession\(data\);throw error/);
  assert.match(app,/クラウド同期からログアウト/);
- assert.match(app,/管理者アカウントの紐付けは保持されます/);
+ assert.match(app,/ログアウトしても、この端末のシフト表・従業員情報・備考は削除されません/);
 });
 
 
@@ -1158,7 +1158,7 @@ test('管理者共有は既存アカウントのログイン専用で新規signu
  assert.equal(app.includes('管理者アカウントを作成'),false);
  assert.equal(app.includes('cloudSync.signUp'),false);
  assert.equal(cloud.includes('async function signUp('),false);
- assert.match(app,/登録済みの管理者アカウントでログイン/);
+ assert.match(app,/同期されるのはシフト表の内容です/);
 });
 
 
@@ -1272,6 +1272,45 @@ test('保存中に延期したクラウド更新確認は保存終了後に再�
  assert.match(cloud,/if\(pendingSaves===0&&deferredRemoteCheck&&!conflicted\)\{[\s\S]*queueMicrotask\(\(\)=>checkForRemoteUpdate\(\{force:true\}\)\)/);
 });
 
+
+test('従業員情報・誕生日管理・備考のローカル変更はクラウド同期を起動しない',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ const employee=readFileSync(new URL('../employee-dialog.js',import.meta.url),'utf8');
+ const birthday=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ assert.match(app,/function commit\(fn,sync=true\)\{if\(!persistChange\(fn,true,sync\)\)/);
+ assert.match(app,/commit\(\(\)=>week\(\)\.days\[d\]\.notes=input\.value,false\)/);
+ assert.match(employee,/const persistEmployeeChange=change=>persistChange\(change,true,false\)/);
+ assert.match(employee,/persistEmployeeChange\(\(\)=>/);
+ assert.match(birthday,/current\.birthdayGiftDelivered=\[\.\.\.set\];[\s\S]*?\},true,false\)/);
+});
+
+test('クラウド同期payloadはシフト表だけに制限し従業員情報と備考を含めない',async()=>{
+ const {projectScheduleRoot,mergeScheduleRoot}=await import('../schedule-sync.js');
+ const {initialState}=await import('../model.js');
+ const {migrate}=await import('../stores.js');
+ const local=migrate(initialState()),store=local.stores[0],employee=store.employees[0];
+ employee.name='個人情報フルネーム';employee.shiftName='表記A';employee.employeeNumber='社員番号-秘';
+ employee.birthDate='1990-01-02';employee.hireDate='2020-03-04';employee.retirementDate='';
+ const week=store.weeks[store.current];
+ week.days[0].notes='個人情報を含む備考';
+ week.confirmation={confirmedAt:'2026-10-01T00:00:00.000Z',snapshot:structuredClone(week),changes:[{at:'2026-10-01T00:00:00.000Z',day:0,kind:'notes',before:'秘密',after:'秘密2'}]};
+ local.birthdayAcknowledgements=['個人誕生日'];
+ local.birthdayGiftDelivered=['個人QUO'];
+ local.birthdayGiftDeliveryStores={'個人QUO':{storeId:store.id,storeName:store.store}};
+ const cloud=projectScheduleRoot(local),serialized=JSON.stringify(cloud);
+ assert.equal(cloud.syncFormat,'shift-sheet-v1');
+ assert.equal(cloud.stores[0].employees.length,0);
+ assert.equal(cloud.stores[0].weeks[store.current].days[0].notes,'');
+ assert.equal(cloud.stores[0].weeks[store.current].days[0].shifts[0][0].name,'表記A');
+ assert.equal(Object.hasOwn(cloud,'birthdayAcknowledgements'),false);
+ assert.equal(Object.hasOwn(cloud,'birthdayGiftDelivered'),false);
+ assert.equal(Object.hasOwn(cloud,'birthdayGiftDeliveryStores'),false);
+ assert.equal(Object.hasOwn(cloud.stores[0].weeks[store.current].confirmation,'changes'),false);
+ for(const secret of ['個人情報フルネーム','社員番号-秘','1990-01-02','2020-03-04','個人情報を含む備考','個人誕生日','個人QUO','秘密2'])assert.equal(serialized.includes(secret),false,secret);
+ const merged=mergeScheduleRoot(cloud,local);
+ assert.equal(merged.stores[0].employees[0].name,'個人情報フルネーム');
+ assert.equal(merged.stores[0].weeks[store.current].days[0].notes,'個人情報を含む備考');
+});
 
 test('同期済み端末はクラウド更新でも選択店舗と表示週を保持する',async()=>{
  const {preserveLocalView}=await import('../cloud-sync.js');
@@ -1462,7 +1501,7 @@ test('誕生日通知は起動ポップアップへ移り既存の確認済み�
  assert.match(app,/showStartupBirthdayPopup\(\)/);
  assert.match(birth,/popupShownThisOpening/);
  assert.match(birth,/birthdayAcknowledgements/);
- assert.match(birth,/replaceRoot\(candidate,\{edit:false,sync:true,success:'誕生日の確認済みを保存しました'\}\)/);
+ assert.match(birth,/replaceRoot\(candidate,\{edit:false,sync:false,success:'誕生日の確認済みを保存しました'\}\)/);
  assert.match(app,/renderBirthdays/);
 });
 

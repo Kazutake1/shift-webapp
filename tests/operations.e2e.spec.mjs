@@ -195,6 +195,73 @@ test('印刷プレビュー用レイアウトは変更強調と確定ラベル�
  await expect(page.locator('#week-confirm-status')).toBeVisible();
 });
 
+test('誕生日のお知らせはアプリ起動時だけ中央ポップアップで表示し、あとで閉じても次回起動で確認できる',async({page})=>{
+ await openApp(page);
+ await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key));
+  const now=new Intl.DateTimeFormat('en-US',{timeZone:'Asia/Tokyo',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(new Date());
+  const date=Object.fromEntries(now.filter(part=>part.type!=='literal').map(part=>[part.type,part.value]));
+  const store=root.stores.find(item=>item.id===root.activeStoreId);
+  Object.assign(store.employees[0],{name:'起動通知対象',birthDate:`1990-${date.month}-${date.day}`,hireDate:'2000-01-01',retirementDate:'',hidden:false});
+  root.birthdayAcknowledgements=[];
+  localStorage.setItem(key,JSON.stringify(root));
+ },STORAGE_KEY);
+ await page.reload();
+ const popup=page.locator('#birthday-notices');
+ await expect(popup).toBeVisible();
+ await expect(popup).toHaveJSProperty('open',true);
+ await expect(popup).toContainText('起動通知対象');
+ await expect(popup).toContainText('今日が誕生日');
+ const positioning=await popup.evaluate(node=>{
+  const box=node.getBoundingClientRect();
+  return {x:box.left+box.width/2-window.innerWidth/2,y:box.top+box.height/2-window.innerHeight/2};
+ });
+ expect(Math.abs(positioning.x)).toBeLessThan(3);
+ expect(Math.abs(positioning.y)).toBeLessThan(3);
+ await popup.getByRole('button',{name:'あとで閉じる'}).click();
+ await expect(popup).not.toBeVisible();
+ await page.locator('#next').click();
+ await page.locator('#prev').click();
+ await expect(popup).not.toBeVisible();
+ await page.reload();
+ await expect(popup).toBeVisible();
+ await popup.getByRole('button',{name:'確認済み'}).click();
+ await expect(popup).not.toBeVisible();
+ await page.reload();
+ await expect(popup).not.toBeVisible();
+ const entries=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)).birthdayAcknowledgements||[],STORAGE_KEY);
+ expect(entries).toHaveLength(1);
+});
+
+test('誕生日通知対象がいなければ起動時ポップアップは表示されない',async({page})=>{
+ await openApp(page);
+ await expect(page.locator('#birthday-notices')).not.toBeVisible();
+});
+
+test('17時〜22時枠に17時〜20時の勤務ショートカットを追加し既存22時枠は維持',async({page})=>{
+ await openApp(page);
+ const evening=page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').nth(3);
+ await evening.locator('button').click();
+ await expect(page.locator('#editor').getByRole('button',{name:'17:00〜20:00'})).toBeVisible();
+ await page.locator('#editor').getByRole('button',{name:'17:00〜20:00'}).click();
+ const inputs=page.locator('#editor input[type=time]');
+ await expect(inputs.first()).toHaveValue('17:00');
+ await expect(inputs.last()).toHaveValue('20:00');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#editor').getByRole('button',{name:'保存',exact:true}).click();
+ const selected=await page.evaluate(key=>{
+  const root=JSON.parse(localStorage.getItem(key)),s=root.stores.find(item=>item.id===root.activeStoreId);
+  return s.weeks[s.current].days[0].shifts[0][3];
+ },STORAGE_KEY);
+ expect(selected.start).toBe(1020);
+ expect(selected.end).toBe(1200);
+ await expect(page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').nth(3)).toContainText('〜20:00');
+ const night=page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').nth(4);
+ await night.locator('button').click();
+ await expect(page.locator('#editor').getByRole('button',{name:'22:00〜翌1:00'})).toBeVisible();
+ await expect(page.locator('#editor').getByRole('button',{name:'22:00〜翌6:00'})).toBeVisible();
+});
+
 const STORAGE_KEY='shift-ipad-stores-v2';
 
 test('PDFの横方向の細線を重複描画しない',async({page,context,browserName})=>{
@@ -429,6 +496,8 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  },STORAGE_KEY);
  await stale.reload();
  await expect(stale.locator('#birthday-notices')).toBeVisible();
+ await stale.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+ await expect(stale.locator('#birthday-notices')).not.toBeVisible();
 
  // 古い画面側にも変更履歴を1件作る。
  await editFirstNote(stale,'古い画面の変更');
@@ -453,12 +522,15 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  await expect(stale.locator('#saved')).toContainText('別の画面でデータが変更されました');
 
  // 誕生日の「確認済み」から古いroot全体を書き戻せないことを確認。
+ // 閉じたダイアログをテスト内で再度開き、競合中の確認操作を検査する。
+ await stale.locator('#birthday-notices').evaluate(dialog=>dialog.showModal());
  await stale.locator('#birthday-notices').getByRole('button',{name:'確認済み'}).first().click();
  await expect(stale.locator('#birthday-notices')).toBeVisible();
  let root=await savedRoot(latest);
  let store=root.stores.find(s=>s.id===root.activeStoreId);
  expect(store.weeks[store.current].days[0].notes).toBe('最新画面の変更');
  expect(root.birthdayAcknowledgements||[]).toHaveLength(0);
+ await stale.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
 
  // バックアップ復元も競合中は停止する。
  const restoreCandidate=structuredClone(root);

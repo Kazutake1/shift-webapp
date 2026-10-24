@@ -15,15 +15,22 @@ export function createBirthdayUi({
  const activeTab=document.querySelector('#employee-active-tab');
  const retiredTab=document.querySelector('#employee-retired-tab');
  let employeeListMode='active';
+ let popupShownThisOpening=false;
 
  function renderNotices(){
   const root=getRoot();
   noticeHost.replaceChildren();
   const notices=birthdayNotices(root);
-  noticeHost.hidden=!notices.length;
-  if(!notices.length)return;
-
-  noticeHost.append(el('h2',{},'誕生日のお知らせ'));
+  if(!notices.length){
+   if(noticeHost.open)noticeHost.close();
+   noticeHost.hidden=true;
+   return 0;
+  }
+  noticeHost.hidden=false;
+  const header=el('div',{class:'birthday-popup-header'});
+  header.append(el('h2',{},'誕生日のお知らせ'),button('×',()=>noticeHost.close(),'birthday-popup-close'));
+  header.lastElementChild.setAttribute('aria-label','誕生日のお知らせを閉じる');
+  noticeHost.append(header);
   for(const notice of notices){
    const row=el('div',{class:'birthday-notice'});
    row.append(
@@ -39,6 +46,18 @@ export function createBirthdayUi({
     })
    );
    noticeHost.append(row);
+  }
+  const actions=el('div',{class:'birthday-popup-actions'});
+  actions.append(button('あとで閉じる',()=>noticeHost.close()));
+  noticeHost.append(actions);
+  return notices.length;
+ }
+
+ function showStartupBirthdayPopup(){
+  if(popupShownThisOpening)return;
+  popupShownThisOpening=true;
+  if(renderNotices()>0&&!noticeHost.open){
+   noticeHost.showModal();
   }
  }
 
@@ -149,5 +168,5 @@ export function createBirthdayUi({
  document.addEventListener('visibilitychange',()=>{if(!document.hidden)refresh();});
  setInterval(()=>{if(!document.hidden)refresh();},60000);
 
- return {renderBirthdays:renderBirthdayUi};
+ return {renderBirthdays:renderBirthdayUi,showStartupBirthdayPopup};
 }

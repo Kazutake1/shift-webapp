@@ -435,7 +435,7 @@ test('誕生日通知UIをapp.jsから分離する',()=>{
  const birthdayUi=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
  assert.match(app,/import \{createBirthdayUi\} from '\.\/birthday-ui\.js'/);
  assert.equal(app.includes('function renderBirthdays(){'),false);
- assert.match(app,/const \{renderBirthdays\}=createBirthdayUi\(/);
+ assert.match(app,/const \{renderBirthdays,showStartupBirthdayPopup\}=createBirthdayUi\(/);
  assert.match(birthdayUi,/export function createBirthdayUi\(/);
  assert.match(birthdayUi,/誕生日のお知らせ/);
  assert.match(birthdayUi,/giftHost\.querySelector\('h2'\)\.textContent='従業員リスト'/);
@@ -1451,4 +1451,27 @@ test('退職者管理の追加は既存従業員ID・保存形式や過去シフ
  assert.equal(backup.version,2);
  assert.equal(backup.stores[0].employees[0].id,id);
  assert.deepEqual(backup.stores[0].weeks[store.current].days[0].shifts[0][0],shift);
+});
+
+test('誕生日通知は起動ポップアップへ移り既存の確認済み保存方式を維持',()=>{
+ const html=readFileSync(new URL('../index.html',import.meta.url),'utf8');
+ const birth=readFileSync(new URL('../birthday-ui.js',import.meta.url),'utf8');
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(html,/<dialog id="birthday-notices" class="birthday-popup no-print"/);
+ assert.match(birth,/noticeHost\.showModal\(\)/);
+ assert.match(app,/showStartupBirthdayPopup\(\)/);
+ assert.match(birth,/popupShownThisOpening/);
+ assert.match(birth,/birthdayAcknowledgements/);
+ assert.match(birth,/replaceRoot\(candidate,\{edit:false,sync:true,success:'誕生日の確認済みを保存しました'\}\)/);
+ assert.match(app,/renderBirthdays/);
+});
+
+test('17:00〜20:00ショートカットは夕方帯の編集時だけにあり既存の夜勤ボタンを維持',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(app,/if\(b===3\)\{body\.append\(button\('17:00〜20:00'/);
+ assert.match(app,/if\(b===4\)\{body\.append\(button\('22:00〜翌1:00'/);
+ assert.deepEqual(workingTimes('17:00','20:00'),{start:1020,end:1200});
+ const example={name:'夕勤',start:1020,end:1200};
+ assert.equal(shiftLabel(example,3),'夕勤（〜20:00）');
+ assert.deepEqual(workingTimes('22:00','01:00'),{start:1320,end:1500});
 });

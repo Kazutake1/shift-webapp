@@ -4,11 +4,12 @@ import {vault,fakeRoot,nextFakeRoot,verifyFakeRoot} from './vault.js';
 const $=id=>document.getElementById(id);
 let current=null,revision=null,undo=null,secret=null,busy=false;
 const safeError=e=>{
- const code=String(e?.message||e||'UNKNOWN_ERROR');
+ const code=e?.name==='OperationError'?'DECRYPT_FAILED':String(e?.message||e||'UNKNOWN_ERROR');
  return ({
   REVISION_CONFLICT:'他のタブが先に保存しました。上書きを停止しました。この画面では追加保存しないでください。',
   TRANSACTION_ABORTED:'試験用の保存中断を検出しました。以前のデータを保持しています。',
-  QuotaExceededError:'保存容量が不足しています。現在の状態は変更していません。'
+  QuotaExceededError:'保存容量が不足しています。現在の状態は変更していません。',
+  DECRYPT_FAILED:'解除できません。パスフレーズが違うか、暗号化データが破損しています。'
  })[code]||code;
 };
 const setMessage=(message,kind='info')=>{
@@ -59,6 +60,7 @@ async function initialize(){
   const password=$('password').value;
   const next=await vault.write(fakeRoot(),password,0,{sync:false});
   $('password').value='';
+  $('initialize').hidden=true;$('unlock').hidden=false;
   $('unlock').focus();
   setMessage('架空の台帳を暗号化保存しました（版 '+next+'）。同じパスフレーズで解除してください。','ok');
  });
@@ -74,10 +76,13 @@ async function unlock(){
   setMessage('解除できました。表示中は架空データのみです。','ok');
  });
 }
-function lock(){
- if(busy)return;
+function clearSession(){
  current=null;revision=null;undo=null;secret=null;
  $('password').value='';$('backup-file').value='';
+}
+function lock(){
+ if(busy)return;
+ clearSession();
  setMessage('ロックしました。復号済みの表示内容を消去しました。','info');
  draw();
 }
@@ -172,7 +177,8 @@ async function resetFake(){
  if(!confirm('この検証ページで作成した架空のデータだけを全削除します。続けますか？'))return;
  await action(async()=>{
   await vault.resetOnlyFakeDatabase();
-  lock();
+  clearSession();
+  $('initialize').hidden=false;$('unlock').hidden=true;
   setMessage('STEP 10の架空データだけを削除しました。','ok');
  });
 }

@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#1f3b4d">
+<meta name="robots" content="noindex,nofollow,noarchive">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self'; img-src 'self'; manifest-src 'self'; worker-src 'self'; connect-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<title>STEP 10 | iPad 暗号化・オフライン実機検証</title>
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="icon" href="./icon.svg" type="image/svg+xml">
+<link rel="stylesheet" href="./style.css">
+<script type="module" src="./app.js"></script>
+</head>
+<body>
+<main>
+<header>
+  <p class="eyebrow">SHIFT APP — SECURITY LAB / STEP 10</p>
+  <h1>iPad 暗号化・オフライン実機検証</h1>
+  <p>このページは<strong>架空データ専用</strong>です。実際の従業員情報やシフトは読み込みません。クラウド同期も行いません。</p>
+</header>
+<section class="status-strip" aria-label="実行環境">
+  <span id="online" role="status">通信状態：確認中</span>
+  <span id="sw" role="status">オフライン用キャッシュ：確認中</span>
+</section>
+<p id="offline-proof" class="offline-notice" hidden>オフライン状態で試験ページを表示できました。暗号化保存の復号も確認してください。</p>
+<section class="panel">
+  <h2>1. 架空データの暗号化・解除</h2>
+  <p class="hint">12文字以上の<strong>試験専用</strong>パスフレーズを指定してください。本番のパスワードは入力しないでください。この文字列は保存されません。</p>
+  <div id="locked-state">
+    <label for="password">試験用パスフレーズ</label>
+    <input id="password" type="password" minlength="12" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="12文字以上・試験専用" aria-describedby="password-hint">
+    <p id="password-hint" class="small">同じパスフレーズを、iPadのオフライン再起動後にも入力してください。</p>
+    <div class="actions">
+      <button id="initialize" class="primary" type="button">架空データを初期化</button>
+      <button id="unlock" class="primary" type="button" hidden>暗号化データを解除</button>
+    </div>
+  </div>
+  <div id="details" hidden>
+    <div class="stats">
+      <div><span>架空の従業員</span><strong id="employee"></strong></div>
+      <div><span>架空のシフト</span><strong id="shift"></strong></div>
+      <div><span>端末内データ版</span><strong id="revision"></strong></div>
+      <div><span>同期記録（クラウド送信なし）</span><strong id="pending"></strong></div>
+    </div>
+    <p id="json-proof" class="small"></p>
+    <div class="actions"><button id="lock" type="button">ロックして情報を隠す</button></div>
+  </div>
+</section>
+<section class="panel">
+  <h2>2. 安全性の確認</h2>
+  <p class="hint">解除後に押せます。失敗試験でも既存の実データにはアクセスせず、試験用データ以外は変更しません。</p>
+  <div class="test-grid">
+    <div class="test-item"><h3>暗号化保存</h3><p>架空勤務時間を1つ切り替え、再起動後も残るか確認。</p><button id="save" type="button" disabled>架空シフトを変更・保存</button></div>
+    <div class="test-item"><h3>保存中断</h3><p>IndexedDBの保存トランザクションを中断し、旧版を維持。</p><button id="abort" type="button" disabled>保存失敗を再現</button></div>
+    <div class="test-item"><h3>競合拒否</h3><p>古い版による上書きを拒否し、保存済みデータを保持。</p><button id="conflict" type="button" disabled>競合を再現</button></div>
+    <div class="test-item"><h3>改ざん検知</h3><p>暗号文のコピーだけを変更し、検出できるか確認。</p><button id="tamper" type="button" disabled>改ざん検知テスト</button></div>
+    <div class="test-item"><h3>Undo</h3><p>直前に保存した架空シフトへ戻す。</p><button id="undo" type="button" disabled>直前の変更を取り消す</button></div>
+    <div class="test-item"><h3>平文漏えい確認</h3><p>暗号化レコードや未同期記録に架空の個人情報が含まれないか確認。</p><button id="check-meta" type="button" disabled>平文保存を確認</button></div>
+  </div>
+</section>
+<section class="panel">
+  <h2>3. 暗号化バックアップ・復元</h2>
+  <p class="hint">出力されるのは架空データだけです。実際のシフトアプリのバックアップは<strong>選択しないでください</strong>。異なる形式は拒否します。</p>
+  <div class="actions">
+    <button id="backup" type="button" disabled>試験用暗号化バックアップを作成</button>
+  </div>
+  <label for="backup-file">試験用バックアップファイル</label>
+  <input id="backup-file" type="file" accept=".json,application/json">
+  <div class="actions"><button id="restore" type="button" disabled>試験用バックアップを復元</button></div>
+</section>
+<section class="panel">
+  <h2>4. オフライン再起動を確認</h2>
+  <ol>
+    <li>Wi-Fi接続中に、このページをSafariで開き、架空データを初期化して解除します。</li>
+    <li>架空シフトを変更・保存し、通信状態を確認します。</li>
+    <li>Safariの共有メニューから「ホーム画面に追加」を選びます。</li>
+    <li>iPadを機内モードにし、Wi-Fiがオフであることを確認します。</li>
+    <li>試験ページを終了し、ホーム画面から再起動します。</li>
+    <li>再起動後、同じ試験用パスフレーズで解除して、保存済みの架空シフトと端末内データ版を確認します。</li>
+  </ol>
+  <p class="small">Linux版WebKitでのオフライン再読み込みは未確認です。ここでは実機iPad Safariで確認します。</p>
+</section>
+<section class="panel danger">
+  <h2>5. 試験データの後片付け</h2>
+  <p>このページで作成した<strong>専用の架空データだけ</strong>を削除します。通常のシフトアプリには影響しません。</p>
+  <button id="reset-fake" type="button">この検証ページの架空データを削除</button>
+</section>
+<div class="feedback" role="status" aria-live="polite" id="message">準備しています。</div>
+<footer>独立した検証環境専用 · 外部API・解析送信なし · 本番シフト情報は入力不可</footer>
+</main>
+</body>
+</html>

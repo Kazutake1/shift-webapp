@@ -39,7 +39,7 @@
    return true;
   }
   async function commit(candidate,{edit=true,sync=edit,trackConfirmation=true,abort=false}={}){
-   if(phase!=='ready')return result(false,phase==='conflict'?'REVISION_CONFLICT':phase==='busy'?'BUSY':'LOCKED');
+   if(phase!=='ready')return result(false,phase==='conflict'?'REVISION_CONFLICT':phase==='uncertain'?'COMMIT_OUTCOME_UNKNOWN':phase==='busy'?'BUSY':'LOCKED');
    phase='busy';
    const before=clone(root),oldRevision=revision,oldUndo=undoData;
    try{
@@ -49,7 +49,9 @@
     validate(candidate);
     const changed=JSON.stringify(candidate)!==JSON.stringify(before);
     const next=await vault.write(candidate,passphrase,oldRevision,abort);
-    if(next!==oldRevision+1)throw Error('UNEXPECTED_COMMITTED_REVISION');
+    // The write may already be durable even if its acknowledgement is unexpected.
+    // Freeze the manager: never pretend the persistent store was rolled back.
+    if(next!==oldRevision+1)throw Error('COMMIT_OUTCOME_UNKNOWN');
     root=clone(candidate);
     revision=next;
     undoData=edit&&changed?before:null;
@@ -65,13 +67,13 @@
    }catch(error){
     // In-memory data/Undo remain unchanged after a failed disk write.
     root=before;revision=oldRevision;undoData=oldUndo;
-    phase=error.message==='REVISION_CONFLICT'?'conflict':'ready';
+    phase=error.message==='REVISION_CONFLICT'?'conflict':error.message==='COMMIT_OUTCOME_UNKNOWN'?'uncertain':'ready';
     onRollback(error.message||'SAVE_FAILED');
     return result(false,error.message||'SAVE_FAILED',{revision});
    }
   }
   async function persistChange(change,options={}){
-   if(phase!=='ready')return result(false,phase==='conflict'?'REVISION_CONFLICT':phase==='busy'?'BUSY':'LOCKED');
+   if(phase!=='ready')return result(false,phase==='conflict'?'REVISION_CONFLICT':phase==='uncertain'?'COMMIT_OUTCOME_UNKNOWN':phase==='busy'?'BUSY':'LOCKED');
    const candidate=clone(root);
    try{
     const value=change(candidate);
@@ -86,7 +88,7 @@
    return commit(clone(candidate),{edit:false,...options});
   }
   async function undoLast(options={}){
-   if(phase!=='ready')return result(false,phase==='conflict'?'REVISION_CONFLICT':phase==='busy'?'BUSY':'LOCKED');
+   if(phase!=='ready')return result(false,phase==='conflict'?'REVISION_CONFLICT':phase==='uncertain'?'COMMIT_OUTCOME_UNKNOWN':phase==='busy'?'BUSY':'LOCKED');
    if(!undoData)return result(false,'EMPTY_UNDO');
    return commit(clone(undoData),{edit:false,sync:true,...options});
   }

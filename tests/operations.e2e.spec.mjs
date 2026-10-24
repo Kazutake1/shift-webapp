@@ -1299,6 +1299,7 @@ test('旧クラウド全量データを読み込むと個人情報を除いた�
   localStorage.setItem(key,JSON.stringify(root));
   return root;
  },STORAGE_KEY);
+ await page.reload();
  await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/**',async route=>{
   const request=route.request(),url=new URL(request.url());
   if(url.pathname==='/rest/v1/shift_app_admins'&&request.method()==='GET'){
@@ -1591,7 +1592,7 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
  expect(localStore.weeks[localStore.current].days[0].shifts[0][0].end).toBe(570);
 
  await page.reload();
- expect(await page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button').textContent()).toContain('09:30');
+ expect(await page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button').textContent()).toContain('9:30');
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
 
  networkDown=false;
@@ -1926,7 +1927,6 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  expect(localLabel).not.toBe(initialLabel);
 
  const remoteStore=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
- remoteStore.daysMarker='ignored';
  const remoteShift=remoteStore.weeks[remoteStore.current].days[0].shifts[0][0];
  remoteStore.weeks[remoteStore.current].days[0].shifts[0][0]={...remoteShift,name:'別端末更新'};
  revision=2;

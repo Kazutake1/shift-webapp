@@ -1661,7 +1661,7 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  const message=await warning;
  expect(message).toContain('別の端末でシフトが更新されています');
- await expect(page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button')).toContainText('09:30');
+ await expect(page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button')).toContainText('9:30');
  await expect(page.locator('#cloud-sync-alert')).toContainText('別の端末で更新されています');
 });
 

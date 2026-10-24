@@ -343,6 +343,11 @@ async function openApp(page){
  await page.waitForFunction(key=>!!localStorage.getItem(key),STORAGE_KEY);
 }
 
+async function setFirstShiftEnd(page,end='09:30'){
+ await page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button').click();
+ await page.getByLabel('終了時刻').fill(end);
+}
+
 test('設定の戻る操作は店名の右側に表示し、各サブページの戻り先を維持する',async({page})=>{
  await page.setViewportSize({width:390,height:844});
  await openApp(page);
@@ -1318,7 +1323,7 @@ test('旧クラウド全量データを読み込むと個人情報を除いた�
  await page.getByLabel('メールアドレス').fill('manager@example.com');
  await page.getByLabel('パスワード').fill('password123');
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
- expect(cleanedPayload?.syncFormat).toBe('shift-sheet-v1');
+ await expect.poll(()=>cleanedPayload?.syncFormat).toBe('shift-sheet-v1');
  expect(cleanedPayload?.stores?.every(store=>store.employees.length===0)).toBe(true);
  expect(Object.hasOwn(cleanedPayload,'birthdayAcknowledgements')).toBe(false);
  expect(Object.hasOwn(cleanedPayload,'birthdayGiftDelivered')).toBe(false);
@@ -1422,30 +1427,24 @@ test('クラウド競合時は検知時と保存拒否時に警告を表示す�
  await page.getByRole('button',{name:'ログイン',exact:true}).click();
  await page.locator('#settings-back').click();
 
- const firstWarning=new Promise(resolve=>page.once('dialog',async dialog=>{
-  const message=dialog.message();
-  await dialog.accept();
-  resolve(message);
- }));
- await page.locator('td.notes-cell button').first().click();
- await page.locator('#dialog-body textarea').fill('競合を発生させる');
- await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
- const firstMessage=await firstWarning;
- expect(firstMessage).toContain('別の端末でシフトが更新されています');
+ const messages=[];
+ const handleDialog=async dialog=>{messages.push(dialog.message());await dialog.accept();};
+ page.on('dialog',handleDialog);
+ await setFirstShiftEnd(page);
+ await page.locator('#dialog-body').getByRole('button',{name:'保存',exact:true}).click();
+ await expect.poll(()=>messages.some(message=>message.includes('別の端末でシフトが更新されています'))).toBe(true);
+ const firstMessage=messages.find(message=>message.includes('別の端末でシフトが更新されています'));
  expect(firstMessage).toContain('クラウドから最新を読み込む');
  await expect.poll(()=>patchCount).toBe(1);
 
- const secondWarning=new Promise(resolve=>page.once('dialog',async dialog=>{
-  const message=dialog.message();
-  await dialog.accept();
-  resolve(message);
- }));
- await page.locator('td.notes-cell button').nth(1).click();
- await page.locator('#dialog-body textarea').fill('拒否される変更');
- await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
- const secondMessage=await secondWarning;
+ const previousMessageCount=messages.length;
+ await setFirstShiftEnd(page,'10:00');
+ await page.locator('#dialog-body').getByRole('button',{name:'保存',exact:true}).click();
+ await expect.poll(()=>messages.length).toBeGreaterThan(previousMessageCount);
+ const secondMessage=messages.at(-1);
  expect(secondMessage).toContain('保存・削除は停止しました');
  await expect(page.locator('#editor')).toBeVisible();
+ page.off('dialog',handleDialog);
 });
 
 
@@ -1528,7 +1527,8 @@ test('編集中に別端末更新を検知した場合は自動反映せず競�
  await page.locator('td.notes-cell button').first().click();
  await page.locator('#dialog-body textarea').fill('入力途中');
  const store=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
- store.weeks[store.current].days[0].notes='別端末から更新';
+ const previous=store.weeks[store.current].days[0].shifts[0][0];
+ store.weeks[store.current].days[0].shifts[0][0]={...previous,name:'別端末のシフト変更'};
  remoteRevision=2;
 
  const warning=new Promise(resolve=>page.once('dialog',async dialog=>{
@@ -1538,7 +1538,7 @@ test('編集中に別端末更新を検知した場合は自動反映せず競�
  const message=await warning;
  expect(message).toContain('別の端末でシフトが更新されています');
  await expect(page.locator('#dialog-body textarea')).toHaveValue('入力途中');
- await expect(page.locator('td.notes-cell button').first()).not.toHaveText('別端末から更新');
+ await expect(page.locator('#dialog-body textarea')).toHaveValue('入力途中');
 });
 
 
@@ -1582,21 +1582,22 @@ test('通信失敗中の編集は端末保存と未同期状態を維持し復�
  await page.locator('#settings-back').click();
 
  networkDown=true;
- await page.locator('td.notes-cell button').first().click();
- await page.locator('#dialog-body textarea').fill('オフライン編集を保持');
- await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ await setFirstShiftEnd(page);
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#dialog-body').getByRole('button',{name:'保存',exact:true}).click();
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
  const localBeforeReload=await page.evaluate(key=>JSON.parse(localStorage.getItem(key)),STORAGE_KEY);
  const localStore=localBeforeReload.stores.find(item=>item.id===localBeforeReload.activeStoreId);
- expect(localStore.weeks[localStore.current].days[0].notes).toBe('オフライン編集を保持');
+ expect(localStore.weeks[localStore.current].days[0].shifts[0][0].end).toBe(570);
 
  await page.reload();
- await expect(page.locator('td.notes-cell button').first()).toHaveText('オフライン編集を保持');
+ expect(await page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button').textContent()).toContain('09:30');
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
 
  networkDown=false;
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await expect.poll(()=>remoteRevision).toBe(2);
+ expect(cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId).weeks[localStore.current].days[0].shifts[0][0].end).toBe(570);
  expect(cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId).weeks[localStore.current].days[0].notes).toBe('');
  await expect(page.locator('#cloud-sync-alert')).toBeHidden();
  expect(patchCount).toBeGreaterThanOrEqual(2);
@@ -1641,14 +1642,15 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await page.locator('#settings-back').click();
 
  networkDown=true;
- await page.locator('td.notes-cell button').first().click();
- await page.locator('#dialog-body textarea').fill('この端末の未同期変更');
- await page.locator('#dialog-body').getByRole('button',{name:'保存'}).click();
+ await setFirstShiftEnd(page);
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#dialog-body').getByRole('button',{name:'保存',exact:true}).click();
  await expect(page.locator('#cloud-sync-alert')).toContainText('クラウド未同期');
  await expect.poll(()=>failedPatchCount).toBe(1);
 
  const remoteStore=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
- remoteStore.weeks[remoteStore.current].days[0].notes='別端末の変更';
+ const remoteShift=remoteStore.weeks[remoteStore.current].days[0].shifts[0][0];
+ remoteStore.weeks[remoteStore.current].days[0].shifts[0][0]={...remoteShift,name:'別端末の変更'};
  remoteRevision=2;
  networkDown=false;
 
@@ -1658,7 +1660,7 @@ test('未同期中に別端末が更新した場合は復旧時に上書きせ�
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  const message=await warning;
  expect(message).toContain('別の端末でシフトが更新されています');
- await expect(page.locator('td.notes-cell button').first()).toHaveText('この端末の未同期変更');
+ await expect(page.locator('#schedule tbody tr').nth(1).locator('td.employee-slot').first().locator('button')).toContainText('09:30');
  await expect(page.locator('#cloud-sync-alert')).toContainText('別の端末で更新されています');
 });
 
@@ -1925,7 +1927,8 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
 
  const remoteStore=cloudPayload.stores.find(item=>item.id===cloudPayload.activeStoreId);
  remoteStore.daysMarker='ignored';
- remoteStore.weeks[remoteStore.current].days[0].notes='別端末更新';
+ const remoteShift=remoteStore.weeks[remoteStore.current].days[0].shifts[0][0];
+ remoteStore.weeks[remoteStore.current].days[0].shifts[0][0]={...remoteShift,name:'別端末更新'};
  revision=2;
  await page.evaluate(()=>window.dispatchEvent(new Event('online')));
  await expect(page.locator('#cloud-sync-status')).toContainText('rev.2');

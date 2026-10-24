@@ -1003,6 +1003,10 @@ test('従業員リストは選択中の店舗ごとに切り替わる',async({pa
   localStorage.setItem(key,JSON.stringify(root));
  },STORAGE_KEY);
  await page.reload();
+ // Birthday notifications may be due on the day CI runs; close the modal before navigation.
+ if(await page.locator('#birthday-notices').isVisible()){
+  await page.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+ }
  await page.locator('#settings').click();
  await page.locator('#birthday-list').click();
  await expect(page.locator('#birthday-gift-list')).toContainText('現在店舗従業員');

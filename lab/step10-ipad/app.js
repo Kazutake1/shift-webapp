@@ -197,7 +197,7 @@ vault.row('active').then(item=>{
  if(item)setMessage('暗号化された架空データがあります。解除パスフレーズを入力してください。');
  else setMessage('最初に架空データを初期化してください。パスフレーズは12文字以上です。');
 }).catch(error=>setMessage(safeError(error),'error'));
-if('serviceWorker' in navigator&&location.protocol==='https:'){
+if('serviceWorker' in navigator&&(location.protocol==='https:'||location.hostname==='127.0.0.1'||location.hostname==='localhost')){
  navigator.serviceWorker.register('./sw.js',{scope:'./'}).then(()=>{$('sw').textContent='オフライン用キャッシュ：登録済み';},
   ()=>{$('sw').textContent='オフライン用キャッシュ：登録失敗';});
 }else{$('sw').textContent='オフライン再起動にはHTTPSが必要です';}

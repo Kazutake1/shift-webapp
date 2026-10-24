@@ -4,3 +4,12 @@ playwright-report/
 blob-report/
 .DS_Store
 dist/
+
+# Keep credentials and local secrets out of git, including subdirectories.
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx
+*.credentials.json

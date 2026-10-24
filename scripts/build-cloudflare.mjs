@@ -1,23 +1,45 @@
-import {copyFile,mkdir,readdir,rm,stat} from 'node:fs/promises';
-import {extname,join} from 'node:path';
+import {copyFile,mkdir,rm,stat} from 'node:fs/promises';
+import {join} from 'node:path';
 
 const output='dist';
-const allowedExtensions=new Set(['.html','.css','.js','.webmanifest','.svg','.png']);
-const allowedNames=new Set(['_headers']);
-const required=['index.html','style.css','app.js','sw.js','manifest.webmanifest','_headers'];
+
+// GitHub Pages / Cloudflare Pages: publish only explicitly reviewed assets.
+// New root-level .js, .html or credential files must never be copied automatically.
+const publicAssets=[
+  'index.html',
+  'style.css',
+  'app.js',
+  'print-pdf.js',
+  'backup-dialog.js',
+  'employee-dialog.js',
+  'employee-identity.js',
+  'store-dialog.js',
+  'state-manager.js',
+  'week-finalization.js',
+  'cloud-sync.js',
+  'schedule-sync.js',
+  'supabase-config.js',
+  'model.js',
+  'stores.js',
+  'crypto-backup.js',
+  'birthdays.js',
+  'birthday-ui.js',
+  'holidays.js',
+  'manifest.webmanifest',
+  'icon.svg',
+  'icon-180.png',
+  'icon-192.png',
+  'icon-512.png',
+  'sw.js',
+  '_headers',
+];
 
 await rm(output,{recursive:true,force:true});
 await mkdir(output,{recursive:true});
 
-for(const entry of await readdir('.',{withFileTypes:true})){
- if(!entry.isFile())continue;
- if(!allowedNames.has(entry.name)&&!allowedExtensions.has(extname(entry.name)))continue;
- await copyFile(entry.name,join(output,entry.name));
+for(const name of publicAssets){
+ const info=await stat(name).catch(()=>null);
+ if(!info?.isFile())throw Error(`Public build is missing required reviewed asset: ${name}`);
+ await copyFile(name,join(output,name));
 }
-
-for(const name of required){
- const info=await stat(join(output,name)).catch(()=>null);
- if(!info?.isFile())throw Error(`Cloudflare Pages build is missing ${name}`);
-}
-
-console.log(`Cloudflare Pages build ready: ${output}`);
+console.log(`Public build ready: ${output} (${publicAssets.length} reviewed assets)`);

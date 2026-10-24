@@ -1,6 +1,9 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {readFileSync} from 'node:fs';
+import {readFileSync,writeFileSync,readdirSync,copyFileSync,mkdirSync,mkdtempSync,rmSync} from 'node:fs';
+import {execFileSync} from 'node:child_process';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
 import {webcrypto} from 'node:crypto';
 
 if(!globalThis.crypto)globalThis.crypto=webcrypto;
@@ -1527,4 +1530,36 @@ test('空欄の夕方・深夜枠は追加時に勤務終了時刻を選ばせ�
  assert.match(app,/\{start:1020,end:1320,label:'17:00〜22:00'\}/);
  assert.match(app,/\{start:1320,end:1500,label:'22:00〜翌1:00'\}/);
  assert.match(app,/\{start:1320,end:1800,label:'22:00〜翌6:00'\}/);
+});
+
+test('公開ビルドは明示的に確認済みのファイルのみを配信対象にする',()=>{
+ const sw=readFileSync(new URL('../sw.js',import.meta.url),'utf8');
+ const included=sw.match(/const FILES=\[([^\]]+)\]/);
+ assert.ok(included,'service worker assets should be explicitly enumerated');
+ const assets=[...new Set([
+  ...[...included[1].matchAll(/'([^']+)'/g)].map(match=>match[1].replace(/^\.\//,'')).filter(Boolean),
+  '_headers'
+ ])].sort();
+ const folder=mkdtempSync(join(tmpdir(),'shift-public-artifacts-'));
+ try{
+  mkdirSync(join(folder,'scripts'));
+  copyFileSync(new URL('../scripts/build-cloudflare.mjs',import.meta.url),join(folder,'scripts','build-cloudflare.mjs'));
+  for(const filename of assets)writeFileSync(join(folder,filename),'reviewed test fixture');
+  writeFileSync(join(folder,'accidental-secret.js'),'UNREVIEWED_TEST_CONTENT');
+  writeFileSync(join(folder,'.env'),'UNREVIEWED_ENV_TEST_CONTENT');
+  execFileSync(process.execPath,['scripts/build-cloudflare.mjs'],{cwd:folder,timeout:20000,stdio:'pipe'});
+  const actual=readdirSync(join(folder,'dist')).sort();
+  assert.deepEqual(actual,assets);
+  assert.equal(actual.includes('accidental-secret.js'),false);
+  assert.equal(actual.includes('.env'),false);
+ }finally{
+  rmSync(folder,{recursive:true,force:true});
+ }
+});
+
+test('秘密情報ファイルのGit登録を誤って許可しない',()=>{
+ const ignores=readFileSync(new URL('../.gitignore',import.meta.url),'utf8');
+ for(const pattern of ['.env','.env.*','*.pem','*.key','*.p12','*.pfx','*.credentials.json']){
+  assert.ok(ignores.split(/\r?\n/).includes(pattern),`gitignore must include ${pattern}`);
+ }
 });

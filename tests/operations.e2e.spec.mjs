@@ -981,8 +981,9 @@ for(const device of ['iPad','iPhone'])test(`${device}向けの印刷用PDFはA4�
  await page.getByRole('button',{name:'← シフト表に戻る'}).click();
  await page.evaluate(()=>{navigator.canShare=()=>false;});
  await page.locator('#preview').click();
- await expect(page.getByRole('button',{name:'PDFを共有して印刷'})).toBeHidden();
+ // The PDF is generated asynchronously; share visibility is finalized afterward.
  await expect(page.getByRole('link',{name:'PDFを開く'})).toBeVisible();
+ await expect(page.getByRole('button',{name:'PDFを共有して印刷'})).toBeHidden();
  await expect(page.locator('.preview-meta [role="status"]')).toBeHidden();
 });
 

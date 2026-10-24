@@ -1475,3 +1475,12 @@ test('17:00〜20:00ショートカットは夕方帯の編集時だけにあり�
  assert.equal(shiftLabel(example,3),'夕勤（〜20:00）');
  assert.deepEqual(workingTimes('22:00','01:00'),{start:1320,end:1500});
 });
+
+test('空欄の夕方・深夜枠は追加時に勤務終了時刻を選ばせる',()=>{
+ const app=readFileSync(new URL('../app.js',import.meta.url),'utf8');
+ assert.match(app,/if\(b===3\|\|b===4\)return chooseShiftDuration\(d,row,b,e\)/);
+ assert.match(app,/\{start:1020,end:1200,label:'17:00〜20:00'\}/);
+ assert.match(app,/\{start:1020,end:1320,label:'17:00〜22:00'\}/);
+ assert.match(app,/\{start:1320,end:1500,label:'22:00〜翌1:00'\}/);
+ assert.match(app,/\{start:1320,end:1800,label:'22:00〜翌6:00'\}/);
+});

@@ -1538,6 +1538,7 @@ test('公開ビルドは明示的に確認済みのファイルのみを配信�
  assert.ok(included,'service worker assets should be explicitly enumerated');
  const assets=[...new Set([
   ...[...included[1].matchAll(/'([^']+)'/g)].map(match=>match[1].replace(/^\.\//,'')).filter(Boolean),
+  'sw.js',
   '_headers'
  ])].sort();
  const folder=mkdtempSync(join(tmpdir(),'shift-public-artifacts-'));

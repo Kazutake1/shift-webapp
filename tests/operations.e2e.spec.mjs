@@ -2233,3 +2233,28 @@ test('STEP8: 同期通知の例外は保存済みデータを取り消さず警�
  expect(actual.state).toEqual({phase:'ready',revision:2,canUndo:true});
  expect(actual.disk.data.stores[0].store).toBe('通知失敗でも保存済み');
 });
+
+
+test('STEP8: 保存確定応答が不明なら再保存せず照合待ち',async({page})=>{
+ await openStep8(page);
+ const actual=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+  const events=[];
+  const repository={
+   read:vault.read,
+   write:async(...args)=>(await vault.write(...args))+10
+  };
+  const manager=window.__shiftStep8AsyncManager({vault:repository,onSaved:()=>events.push('incorrect-sync')});
+  await manager.unlock(p);
+  const unknown=await manager.persistChange(r=>{r.stores[0].store='保存結果が不明な架空店';});
+  const stale=await manager.persistChange(r=>{r.stores[0].store='後続保存を拒否';});
+  return {unknown,stale,status:manager.getStatus(),memory:manager.getRoot(),disk:await vault.read(p),events};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(actual.unknown).toMatchObject({ok:false,reason:'COMMIT_OUTCOME_UNKNOWN',revision:1});
+ expect(actual.stale).toEqual({ok:false,reason:'COMMIT_OUTCOME_UNKNOWN'});
+ expect(actual.status).toEqual({phase:'uncertain',revision:1,canUndo:false});
+ expect(actual.memory).toEqual(step6VaultRecord);
+ expect(actual.disk.revision).toBe(2);
+ expect(actual.disk.data.stores[0].store).toBe('保存結果が不明な架空店');
+ expect(actual.events).toEqual([]);
+});

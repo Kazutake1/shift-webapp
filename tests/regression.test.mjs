@@ -1564,3 +1564,23 @@ test('秘密情報ファイルのGit登録を誤って許可しない',()=>{
   assert.ok(ignores.split(/\r?\n/).includes(pattern),`gitignore must include ${pattern}`);
  }
 });
+
+test('別タブのlocalStorage全消去は保存を停止し、他の保存領域は無視する',()=>{
+ const values=new Map();
+ const storage={
+  getItem:key=>values.has(key)?values.get(key):null,
+  setItem:(key,value)=>values.set(key,value),
+  removeItem:key=>values.delete(key)
+ };
+ const manager=createStateManager({storage});
+ const original=JSON.stringify(manager.getRoot());
+ assert.equal(manager.handleStorageEvent({key:null,storageArea:{}}),false);
+ assert.equal(manager.handleStorageEvent({key:'unrelated-key',storageArea:storage}),false);
+ assert.equal(manager.isExternalChangeDetected(),false);
+ // In a real browser, clearing localStorage from another tab emits key=null.
+ assert.equal(manager.handleStorageEvent({key:null,storageArea:storage}),true);
+ assert.equal(manager.isExternalChangeDetected(),true);
+ assert.equal(manager.persistChange(()=>{manager.getState().store='再書込禁止';}),false);
+ assert.equal(JSON.stringify(manager.getRoot()),original);
+ assert.equal(storage.getItem('shift-ipad-stores-v2'),null);
+});

@@ -429,7 +429,10 @@ function openCloudSync(){
    const ok=await runCloudAction(reloadButton,()=>cloudSync.reloadFromCloud(),error);
    if(ok){stateManager.clearCloudConflict();render();close();}
   });
-  const logoutButton=button('クラウド同期からログアウト',async()=>{await runCloudAction(logoutButton,()=>cloudSync.signOut(),error);close();});
+  const logoutButton=button('クラウド同期からログアウト',async()=>{
+    const ok=await runCloudAction(logoutButton,()=>cloudSync.signOut(),error);
+    if(ok)close();
+   });
   hint(body,'ログアウトしても、この端末のシフト表・従業員情報・備考は削除されません。');
   actions.append(logoutButton,reloadButton);body.append(error,actions);return;
  }

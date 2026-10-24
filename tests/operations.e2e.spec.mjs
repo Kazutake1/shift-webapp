@@ -2056,3 +2056,180 @@ test('STEP6: 旧形式からの架空移行は失敗時も成功時も旧デー�
  },{data:step6VaultRecord,p:step6VaultPassphrase});
  expect(result).toEqual({aborted:true,afterAbort:{legacy:true,active:null},revision:1,retained:true});
 });
+
+
+// STEP8: independent asynchronous state manager; production source is untouched.
+const step8ManagerBootstrap=readFileSync(new URL('./fixtures/shift-step8-async-manager-fixture.js',import.meta.url),'utf8');
+async function openStep8(page){
+ await page.addInitScript({content:step6VaultBootstrap});
+ await page.addInitScript({content:step8ManagerBootstrap});
+ await page.goto('/');
+ await page.waitForFunction(()=>!!window.__shiftStep6Vault&&!!window.__shiftStep8AsyncManager);
+}
+
+test('STEP8: ロック中はデータを取得できず解除失敗後も保存禁止',async({page})=>{
+ await openStep8(page);
+ const actual=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+  const manager=window.__shiftStep8AsyncManager({vault});
+  const before={root:manager.getRoot(),status:manager.getStatus(),save:await manager.persistChange(r=>{r.stores[0].store='拒否';})};
+  const wrong=await manager.unlock('WRONG-SYNTHETIC-ONLY-PASSWORD');
+  const afterWrong={root:manager.getRoot(),status:manager.getStatus()};
+  const opened=await manager.unlock(p);
+  const detached=manager.getRoot();detached.stores[0].store='不正な参照変更';
+  const afterDetached=manager.getRoot().stores[0].store;
+  const locked=manager.lock();
+  return {before,wrong,afterWrong,opened,afterDetached,locked,afterLock:manager.getRoot(),disk:await vault.read(p)};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(actual.before).toEqual({root:null,status:{phase:'locked',revision:null,canUndo:false},save:{ok:false,reason:'LOCKED'}});
+ expect(actual.wrong.ok).toBe(false);
+ expect(actual.afterWrong).toEqual({root:null,status:{phase:'locked',revision:null,canUndo:false}});
+ expect(actual.opened).toEqual({ok:true,reason:'',revision:1});
+ expect(actual.afterDetached).toBe('架空店舗テストA');
+ expect(actual.locked).toBe(true);
+ expect(actual.afterLock).toBeNull();
+ expect(actual.disk).toEqual({revision:1,data:step6VaultRecord});
+});
+
+test('STEP8: 暗号化保存の確定まで画面・Undo・同期通知を変更しない',async({page})=>{
+ await openStep8(page);
+ const actual=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+  let release;const gate=new Promise(resolve=>{release=resolve;});
+  const events=[];
+  let manager;
+  manager=window.__shiftStep8AsyncManager({
+   vault:{read:vault.read,write:async(...args)=>{await gate;return vault.write(...args);}},
+   onSaved:(saved,meta)=>events.push({store:saved.stores[0].store,meta,phase:manager.getStatus().phase})
+  });
+  await manager.unlock(p);
+  const write=manager.persistChange(candidate=>{candidate.stores[0].store='確定後のみ表示する架空店';});
+  const during={state:manager.getStatus(),root:manager.getRoot(),events:events.length,
+   concurrent:await manager.persistChange(r=>{r.stores[0].store='同時操作';})};
+  release();const response=await write;
+  return {during,response,after:manager.getStatus(),root:manager.getRoot(),events,disk:await vault.read(p)};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(actual.during.state).toEqual({phase:'busy',revision:1,canUndo:false});
+ expect(actual.during.root).toEqual(step6VaultRecord);
+ expect(actual.during.events).toBe(0);
+ expect(actual.during.concurrent).toEqual({ok:false,reason:'BUSY'});
+ expect(actual.response).toEqual({ok:true,reason:'',revision:2,warning:''});
+ expect(actual.after).toEqual({phase:'ready',revision:2,canUndo:true});
+ expect(actual.root.stores[0].store).toBe('確定後のみ表示する架空店');
+ expect(actual.disk.data).toEqual(actual.root);
+ expect(actual.events).toEqual([{store:'確定後のみ表示する架空店',meta:{sync:true,revision:2},phase:'ready'}]);
+});
+
+test('STEP8: IndexedDB保存の中断時にUndoと同期通知を保持し再操作できる',async({page})=>{
+ await openStep8(page);
+ const actual=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+  const events=[],rollbacks=[];
+  const manager=window.__shiftStep8AsyncManager({
+   vault,onSaved:(_snapshot,meta)=>events.push(meta),onRollback:message=>rollbacks.push(message)
+  });
+  await manager.unlock(p);
+  const failed=await manager.persistChange(r=>{r.stores[0].store='保存失敗の架空店';},{abort:true});
+  const afterFailure={root:manager.getRoot(),status:manager.getStatus(),events:events.length,disk:await vault.read(p)};
+  const success=await manager.persistChange(r=>{r.stores[0].store='保存成功の架空店';});
+  const failedUndo=await manager.undoLast({abort:true});
+  const afterUndoFailure={root:manager.getRoot(),status:manager.getStatus(),events:events.length,disk:await vault.read(p)};
+  const undo=await manager.undoLast();
+  return {failed,afterFailure,success,failedUndo,afterUndoFailure,undo,after:manager.getStatus(),
+   restored:manager.getRoot(),disk:await vault.read(p),events,rollbacks};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(actual.failed).toMatchObject({ok:false,reason:'TRANSACTION_ABORTED',revision:1});
+ expect(actual.afterFailure).toEqual({root:step6VaultRecord,status:{phase:'ready',revision:1,canUndo:false},events:0,disk:{revision:1,data:step6VaultRecord}});
+ expect(actual.success.ok).toBe(true);
+ expect(actual.failedUndo).toMatchObject({ok:false,reason:'TRANSACTION_ABORTED',revision:2});
+ expect(actual.afterUndoFailure.status).toEqual({phase:'ready',revision:2,canUndo:true});
+ expect(actual.afterUndoFailure.root.stores[0].store).toBe('保存成功の架空店');
+ expect(actual.afterUndoFailure.events).toBe(1);
+ expect(actual.undo).toEqual({ok:true,reason:'',revision:3,warning:''});
+ expect(actual.restored).toEqual(step6VaultRecord);
+ expect(actual.disk).toEqual({revision:3,data:step6VaultRecord});
+ expect(actual.after).toEqual({phase:'ready',revision:3,canUndo:false});
+ expect(actual.events.map(e=>e.revision)).toEqual([2,3]);
+ expect(actual.rollbacks).toEqual(['TRANSACTION_ABORTED','TRANSACTION_ABORTED']);
+});
+
+test('STEP8: シフト自動確定相当の更新は保存成功後だけ同期を通知',async({page})=>{
+ await openStep8(page);
+ const actual=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+  const notifications=[];
+  const manager=window.__shiftStep8AsyncManager({
+   vault,
+   onBeforeSave:candidate=>{candidate.syntheticWeekConfirmation='FAKE-CONFIRMATION';return {sync:true};},
+   onSaved:(saved,meta)=>notifications.push({snapshot:saved,meta})
+  });
+  await manager.unlock(p);
+  const failed=await manager.persistChange(r=>{r.activeStoreId='TEST-ONLY-STORE';},{edit:false,sync:false,abort:true});
+  const afterFailed=await vault.read(p);
+  const success=await manager.persistChange(r=>{r.activeStoreId='TEST-ONLY-STORE';},{edit:false,sync:false});
+  const afterSuccess=await vault.read(p);
+  return {failed,afterFailed,success,afterSuccess,notifications,undo:manager.getStatus().canUndo};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(actual.failed.ok).toBe(false);
+ expect(actual.afterFailed).toEqual({revision:1,data:step6VaultRecord});
+ expect(actual.success).toEqual({ok:true,reason:'',revision:2,warning:''});
+ expect(actual.afterSuccess.data.syntheticWeekConfirmation).toBe('FAKE-CONFIRMATION');
+ expect(actual.notifications).toHaveLength(1);
+ expect(actual.notifications[0].meta).toEqual({sync:true,revision:2});
+ expect(actual.notifications[0].snapshot).toEqual(actual.afterSuccess.data);
+ expect(actual.undo).toBe(false);
+});
+
+test('STEP8: 実2タブ競合時に失敗した画面の変更・クラウド通知を停止',async({browser})=>{
+ const context=await browser.newContext({serviceWorkers:'block'});
+ try{
+  await context.addInitScript({content:step6VaultBootstrap});
+  await context.addInitScript({content:step8ManagerBootstrap});
+  const first=await context.newPage(),second=await context.newPage();
+  await first.goto('/');await second.goto('/');
+  await first.evaluate(async({data,p})=>{
+   const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+   window.__step8Saved=[];
+   window.__step8=window.__shiftStep8AsyncManager({vault,onSaved:(_r,meta)=>window.__step8Saved.push(meta)});
+   await window.__step8.unlock(p);
+  },{data:step6VaultRecord,p:step6VaultPassphrase});
+  await second.evaluate(async p=>{
+   window.__step8Saved=[];
+   window.__step8=window.__shiftStep8AsyncManager({vault:window.__shiftStep6Vault,onSaved:(_r,meta)=>window.__step8Saved.push(meta)});
+   await window.__step8.unlock(p);
+  },step6VaultPassphrase);
+  const a=await first.evaluate(()=>window.__step8.persistChange(r=>{r.stores[0].store='先に確定した架空店';}));
+  const b=await second.evaluate(async()=>{
+   const failure=await window.__step8.persistChange(r=>{r.stores[0].store='古い画面の上書き';});
+   const again=await window.__step8.persistChange(r=>{r.stores[0].store='再試行も拒否';});
+   return {failure,again,state:window.__step8.getStatus(),root:window.__step8.getRoot(),events:window.__step8Saved};
+  });
+  const disk=await first.evaluate(p=>window.__shiftStep6Vault.read(p),step6VaultPassphrase);
+  expect(a).toEqual({ok:true,reason:'',revision:2,warning:''});
+  expect(b.failure).toMatchObject({ok:false,reason:'REVISION_CONFLICT',revision:1});
+  expect(b.again).toEqual({ok:false,reason:'REVISION_CONFLICT'});
+  expect(b.state).toEqual({phase:'conflict',revision:1,canUndo:false});
+  expect(b.root).toEqual(step6VaultRecord);
+  expect(b.events).toEqual([]);
+  expect(disk.data.stores[0].store).toBe('先に確定した架空店');
+ }finally{await context.close();}
+});
+
+test('STEP8: 同期通知の例外は保存済みデータを取り消さず警告として残す',async({page})=>{
+ await openStep8(page);
+ const actual=await page.evaluate(async({data,p})=>{
+  const vault=window.__shiftStep6Vault;await vault.reset();await vault.write(data,p,0);
+  const warnings=[];
+  const manager=window.__shiftStep8AsyncManager({
+   vault,onSaved:()=>{throw Error('FAKE-NETWORK-SEND-FAILED');},
+   onStatus:message=>warnings.push(message)
+  });
+  await manager.unlock(p);
+  const done=await manager.persistChange(r=>{r.stores[0].store='通知失敗でも保存済み';});
+  return {done,warnings,state:manager.getStatus(),disk:await vault.read(p)};
+ },{data:step6VaultRecord,p:step6VaultPassphrase});
+ expect(actual.done).toEqual({ok:true,reason:'',revision:2,warning:'POST_COMMIT_NOTIFICATION_FAILED'});
+ expect(actual.warnings).toEqual(['POST_COMMIT_NOTIFICATION_FAILED']);
+ expect(actual.state).toEqual({phase:'ready',revision:2,canUndo:true});
+ expect(actual.disk.data.stores[0].store).toBe('通知失敗でも保存済み');
+});

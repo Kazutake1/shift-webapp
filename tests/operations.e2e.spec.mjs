@@ -1934,3 +1934,110 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  await expect(page.locator('#cloud-sync-status')).toContainText('rev.2');
  await expect(page.locator('#week-label')).toHaveText(localLabel);
 });
+
+
+// STEP10: isolated, fictional-data-only browser lab; not included in the production allowlist.
+const STEP10_PASS='FAKE-STEP10-ONLY-PASSPHRASE-2026';
+async function step10Init(page){
+ await page.goto('/lab/step10-ipad/');
+ await page.locator('#password').fill(STEP10_PASS);
+ await page.locator('#initialize').click();
+ await expect(page.locator('#unlock')).toBeVisible();
+ await page.locator('#password').fill(STEP10_PASS);
+ await page.locator('#unlock').click();
+ await expect(page.locator('#details')).toBeVisible();
+}
+
+test('STEP10: 独立したiPad試験ページは初期化前とロック中に架空の名簿を隠す',async({page})=>{
+ await page.goto('/lab/step10-ipad/');
+ await expect(page.locator('#details')).toBeHidden();
+ await expect(page.locator('#employee')).toHaveText('');
+ await expect(page.locator('#unlock')).toBeHidden();
+ await page.locator('#password').fill(STEP10_PASS);
+ await page.locator('#initialize').click();
+ await expect(page.locator('#unlock')).toBeVisible();
+ await expect(page.locator('#details')).toBeHidden();
+ await page.locator('#password').fill('WRONG-TEST-PASS-12345');
+ await page.locator('#unlock').click();
+ await expect(page.locator('#details')).toBeHidden();
+ await page.locator('#password').fill(STEP10_PASS);
+ await page.locator('#unlock').click();
+ await expect(page.locator('#employee')).toHaveText('架空従業員A（架空データ）');
+ await expect(page.locator('#revision')).toHaveText('1');
+ await page.locator('#lock').click();
+ await expect(page.locator('#details')).toBeHidden();
+ await expect(page.locator('#employee')).toHaveText('');
+});
+
+test('STEP10: 変更・中断・競合・改ざん・Undoは固定架空データだけで安全に実行',async({page})=>{
+ await step10Init(page);
+ await page.locator('#save').click();
+ await expect(page.locator('#revision')).toHaveText('2');
+ await expect(page.locator('#pending')).toContainText('2');
+ const shift=await page.locator('#shift').textContent();
+ for(const action of ['abort','conflict','tamper','check-meta']){
+  await page.locator('#'+action).click();
+  await expect(page.locator('#message')).toContainText('合格');
+  await expect(page.locator('#revision')).toHaveText('2');
+  await expect(page.locator('#shift')).toHaveText(shift);
+ }
+ await page.locator('#undo').click();
+ await expect(page.locator('#revision')).toHaveText('3');
+ await expect(page.locator('#shift')).toHaveText('架空勤務 09:00–13:00');
+ const persisted=await page.evaluate(()=>new Promise((resolve,reject)=>{
+  const opening=indexedDB.open('shift-step10-fake-vault-20261025');
+  opening.onerror=()=>reject(opening.error);
+  opening.onsuccess=()=>{
+   const db=opening.result,tx=db.transaction('records','readonly');
+   const r=tx.objectStore('records').get('active');
+   r.onsuccess=()=>{db.close();resolve(JSON.stringify(r.result));};
+   r.onerror=()=>{db.close();reject(r.error);};
+  };
+ }));
+ for(const value of ['架空従業員A','FAKE-0001','1992-04-01','架空の備考だけ'])expect(persisted).not.toContain(value);
+});
+
+test('STEP10: 試験用暗号化バックアップ復元と専用DB削除',async({page})=>{
+ await step10Init(page);
+ await page.locator('#save').click();
+ await expect(page.locator('#revision')).toHaveText('2');
+ const downloadEvent=page.waitForEvent('download');
+ await page.locator('#backup').click();
+ const download=await downloadEvent;
+ expect(download.suggestedFilename()).toBe('step10-fake-encrypted-backup.json');
+ const location=await download.path();
+ await page.locator('#backup-file').setInputFiles(location);
+ await page.locator('#restore').click();
+ await expect(page.locator('#message')).toContainText('復元しました');
+ await expect(page.locator('#revision')).toHaveText('3');
+ page.once('dialog',dialog=>dialog.accept());
+ await page.locator('#reset-fake').click();
+ await expect(page.locator('#details')).toBeHidden();
+ await expect(page.locator('#initialize')).toBeVisible();
+ await expect(page.locator('#unlock')).toBeHidden();
+ const databases=await page.evaluate(()=>indexedDB.databases());
+ expect(databases.some(d=>d.name==='shift-step10-fake-vault-20261025')).toBe(false);
+});
+
+test('STEP10: Safari相当の通信遮断中は保存でき、Chromiumのみオフライン再起動を試す',async({browser,browserName})=>{
+ test.setTimeout(55000);
+ const ctx=await browser.newContext({serviceWorkers:'allow',viewport:{width:820,height:1180}});
+ try{
+  const page=await ctx.newPage();
+  await step10Init(page);
+  await page.waitForFunction(()=>navigator.serviceWorker?.controller!==null,null,{timeout:18000});
+  await page.locator('#save').click();
+  await expect(page.locator('#revision')).toHaveText('2');
+  await ctx.setOffline(true);
+  if(browserName==='chromium')await page.reload();
+  await expect(page.locator('#online')).toContainText('オフライン');
+  if(browserName==='chromium'){
+   await page.locator('#password').fill(STEP10_PASS);
+   await page.locator('#unlock').click();
+   await expect(page.locator('#revision')).toHaveText('2');
+  }
+  await page.locator('#save').click();
+  await expect(page.locator('#revision')).toHaveText('3');
+  await ctx.setOffline(false);
+ }finally{await ctx.close();}
+});

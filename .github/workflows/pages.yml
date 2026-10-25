@@ -48,7 +48,12 @@ jobs:
         if: steps.current.outputs.deploy == 'true'
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: '24'
+          node-version: '24.22.1'
+      - name: Verify patched Node.js
+        if: steps.current.outputs.deploy == 'true'
+        run: |
+          node --version
+          test "$(node --version)" = "v24.22.1"
       - name: Configure GitHub Pages
         if: steps.current.outputs.deploy == 'true'
         uses: actions/configure-pages@45bfe0192ca1faeb007ade9deae92b16b8254a0d # v6

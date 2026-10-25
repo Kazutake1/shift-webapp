@@ -48,7 +48,7 @@ export function createBirthdayUi({
    noticeHost.append(row);
   }
   const actions=el('div',{class:'birthday-popup-actions'});
-  actions.append(button('あとで閉じる',()=>noticeHost.close()));
+  actions.append(button('閉じる',()=>noticeHost.close()));
   noticeHost.append(actions);
   return notices.length;
  }

@@ -218,7 +218,7 @@ test('誕生日のお知らせはアプリ起動時だけ中央ポップアッ�
  });
  expect(Math.abs(positioning.x)).toBeLessThan(3);
  expect(Math.abs(positioning.y)).toBeLessThan(3);
- await popup.getByRole('button',{name:'あとで閉じる'}).click();
+ await popup.getByRole('button',{name:'閉じる',exact:true}).click();
  await expect(popup).not.toBeVisible();
  await page.locator('#next').click();
  await page.locator('#prev').click();
@@ -535,7 +535,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  },STORAGE_KEY);
  await stale.reload();
  await expect(stale.locator('#birthday-notices')).toBeVisible();
- await stale.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+ await stale.locator('#birthday-notices').getByRole('button',{name:'閉じる',exact:true}).click();
  await expect(stale.locator('#birthday-notices')).not.toBeVisible();
 
  // 古い画面側にも変更履歴を1件作る。
@@ -548,7 +548,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  await openApp(latest);
  // 別ウィンドウでも起動時のお知らせが出るため、備考編集の前に閉じる。
  await expect(latest.locator('#birthday-notices')).toBeVisible();
- await latest.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+ await latest.locator('#birthday-notices').getByRole('button',{name:'閉じる',exact:true}).click();
  latest.on('dialog',dialog=>dialog.accept());
 
  const staleDialogs=[];
@@ -572,7 +572,7 @@ test('複数画面の競合後は誕生日確認・復元で古いデータを�
  let store=root.stores.find(s=>s.id===root.activeStoreId);
  expect(store.weeks[store.current].days[0].notes).toBe('最新画面の変更');
  expect(root.birthdayAcknowledgements||[]).toHaveLength(0);
- await stale.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+ await stale.locator('#birthday-notices').getByRole('button',{name:'閉じる',exact:true}).click();
 
  // バックアップ復元も競合中は停止する。
  const restoreCandidate=structuredClone(root);
@@ -1003,9 +1003,9 @@ test('従業員リストは選択中の店舗ごとに切り替わる',async({pa
   localStorage.setItem(key,JSON.stringify(root));
  },STORAGE_KEY);
  await page.reload();
- // A due birthday popup may overlap navigation in CI; dismiss if present.
+ // A due birthday notice can block the settings button on the CI date.
  if(await page.locator('#birthday-notices').isVisible()){
-  await page.locator('#birthday-notices').getByRole('button',{name:'あとで閉じる'}).click();
+  await page.locator('#birthday-notices').getByRole('button',{name:'閉じる',exact:true}).click();
  }
  await page.locator('#settings').click();
  await page.locator('#birthday-list').click();
@@ -1938,7 +1938,6 @@ test('別端末更新を反映してもこの端末の表示週を勝手に切�
  await expect(page.locator('#cloud-sync-status')).toContainText('rev.2');
  await expect(page.locator('#week-label')).toHaveText(localLabel);
 });
-
 
 // STEP10: isolated, fictional-data-only browser lab; not included in the production allowlist.
 const STEP10_PASS='FAKE-STEP10-ONLY-PASSPHRASE-2026';

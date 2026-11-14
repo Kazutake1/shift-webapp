@@ -31,7 +31,11 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7
         with:
-          node-version: '24'
+          node-version: '24.22.1'
+      - name: Verify patched Node.js
+        run: |
+          node --version
+          test "$(node --version)" = "v24.22.1"
       - name: Fetch published holidays
         run: |
           curl --fail --location --show-error --silent --retry 3 --max-time 45 \

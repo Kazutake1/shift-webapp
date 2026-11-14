@@ -1,0 +1,52 @@
+name: STEP10 Synthetic iPad Lab Bundle
+
+on:
+  pull_request:
+    paths:
+      - 'lab/step10-ipad/**'
+      - '.github/workflows/step10-ipad-bundle.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  bundle:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Checkout pull request
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Verify and assemble exactly eight synthetic assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          source_dir="lab/step10-ipad"
+          site_dir="$RUNNER_TEMP/step10-site"
+          mkdir -p "$site_dir"
+          required=(index.html app.js vault.js style.css sw.js manifest.webmanifest icon.svg _headers)
+          for name in "${required[@]}"; do
+            test -f "$source_dir/$name"
+            cp "$source_dir/$name" "$site_dir/$name"
+          done
+          test "$(find "$site_dir" -maxdepth 1 -type f | wc -l)" -eq 8
+          if find "$site_dir" -name '.env*' -o -iname '*secret*' -o -name 'supabase-config.js' | grep -q .; then
+            echo 'Unexpected sensitive file in test bundle' >&2
+            exit 1
+          fi
+          if grep -Ein 'SUPABASE_URL|SUPABASE_PUBLISHABLE_KEY|service_role|https?://[^/[:space:]]+' "$site_dir/app.js" "$site_dir/vault.js" "$site_dir/sw.js"; then
+            echo 'Unexpected network destination or production credential reference' >&2
+            exit 1
+          fi
+          (
+            cd "$site_dir"
+            zip -q "$RUNNER_TEMP/shift-step10-ipad-fake-only.zip" "${required[@]}"
+          )
+          unzip -l "$RUNNER_TEMP/shift-step10-ipad-fake-only.zip"
+      - name: Attach inspected archive for separate-origin test deployment
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: shift-step10-ipad-fake-only
+          path: ${{ runner.temp }}/shift-step10-ipad-fake-only.zip
+          if-no-files-found: error
+          retention-days: 14

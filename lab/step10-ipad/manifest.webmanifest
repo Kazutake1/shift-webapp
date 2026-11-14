@@ -1,0 +1,18 @@
+{
+  "name": "シフト暗号化検証・架空データ専用",
+  "short_name": "シフト検証",
+  "description": "架空データだけを使う暗号化保存検証用アプリ",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#f4f6f7",
+  "theme_color": "#1f3b4d",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

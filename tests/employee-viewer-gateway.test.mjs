@@ -19,16 +19,16 @@ function sample(){
  const store=root.stores[0],week=store.weeks[WEEK];
  store.store='TEST-STORE';
  store.fixed[0]='売上日報';
- store.employees[0].name='Confidential Legal Full Name';
+ store.employees[0].name='SecretRealName';
  store.employees[0].shiftName='朝A';
  store.employees[0].employeeNumber='SENSITIVE-NUMBER';
  store.employees[0].birthDate='1990-01-02';
  week.days[0].shifts[0][0]={
-  employeeId:store.employees[0].id,name:'Confidential Legal Full Name',start:360,end:540
+  employeeId:store.employees[0].id,name:'SecretRealName',start:360,end:540
  };
  week.days[0].notes='PRIVATE-DAILY-NOTE';
  week.days[0].extras[0]={type:'task',text:'補充',start:360,end:540};
- week.days[0].extras[1]={type:'training',employeeId:store.employees[0].id,name:'Confidential Legal Full Name',start:540,end:780};
+ week.days[0].extras[1]={type:'training',employeeId:store.employees[0].id,name:'SecretRealName',start:540,end:780};
  week.confirmation={confirmedAt:'2026-09-14T08:00:00.000Z',snapshot:{days:structuredClone(week.days)}};
  return root;
 }
@@ -52,7 +52,7 @@ test('gateway projected week has the existing 7-day, 3-row, 5-band fixed/extra l
  const json=JSON.stringify(pub);
  for(const secret of ['employeeId','employees','sharedId','employeeNumber','birthDate',
   'retirementDate','confirmation','confirmedAt','snapshot','notes','owner_id','activeStoreId',
-  'Confidential Legal Full Name','SENSITIVE-NUMBER','PRIVATE-DAILY-NOTE',storeSecret(cloud)]){
+  'SecretRealName','SENSITIVE-NUMBER','PRIVATE-DAILY-NOTE',storeSecret(cloud)]){
   assert.equal(json.includes(secret),false,'unexpected data: '+secret);
  }
 });

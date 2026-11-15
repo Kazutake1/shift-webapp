@@ -2,7 +2,7 @@ import {holidays} from './holidays.js';
 
 // This is a SEPARATE website. Never import manager app.js, cloud-sync.js,
 // stores.js, employee records, or any password/owner data into this bundle.
-const ACCESS_URL='https://wpyhkewwzsdcstypcbmq.supabase.co/functions/v1/employee-viewer-access';
+const ACCESS_URL='https://employee-viewer.invalid/functions/v1/employee-viewer-access';
 const STORAGE_KEY='shift-employee-viewer-session-v1';
 const bands=[{start:360,end:540},{start:540,end:780},{start:780,end:1020},{start:1020,end:1320},{start:1320,end:1800}];
 const $=id=>document.getElementById(id);

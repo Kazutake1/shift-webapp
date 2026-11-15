@@ -48,3 +48,11 @@ test('employee view is a separate artifact, never copied into manager deployment
  assert.doesNotMatch(viewer,/copyFile\(.+cloud-sync/);
  assert.doesNotMatch(viewer,/\bdist\b[^-]/);
 });
+
+
+test('viewer build refuses to target the manager backend',async()=>{
+ const {SUPABASE_URL}=await import('../supabase-config.js');
+ assert.throws(()=>execFileSync(process.execPath,['scripts/build-employee-viewer.mjs'],{
+  cwd:root,stdio:'pipe',env:{...process.env,VIEWER_ACCESS_ORIGIN:SUPABASE_URL}
+ }),/separate HTTPS Supabase project/);
+});

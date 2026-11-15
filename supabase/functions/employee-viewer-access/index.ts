@@ -8,6 +8,18 @@ import {validViewerCode,validWeekStart,verifyPin,createViewerToken,sha256Hex,
 import {allowedOrigins,corsHeaders,reply,readSmallJson} from '../_shared/viewer-http.mjs';
 
 const denied={error:'パスワードまたはアクセス先を確認してください。'};
+// Hosted functions inherit project-level secrets. Do not run this function in
+// the manager project, even when its own queries use a restricted role.
+function assertIsolatedViewerHost(){
+ const runtime=Deno.env.get('SUPABASE_URL');
+ const manager=Deno.env.get('VIEWER_MANAGER_PROJECT_URL');
+ const projectOrigin=/^https:\/\/[a-z0-9-]+\.supabase\.co$/;
+ if(!runtime||!manager||!projectOrigin.test(runtime)||!projectOrigin.test(manager)||
+  runtime===manager||runtime==='https://wpyhkewwzsdcstypcbmq.supabase.co'||
+  Deno.env.get('VIEWER_WEEK_PUBLISHER_DB_URL')){
+  throw Error('viewer runtime must be isolated from manager runtime');
+ }
+}
 function clientSource(req){
  // Opt in only after the deployed ingress is verified to replace this
  // header on every path. Without that assurance use one shared bucket.
@@ -60,6 +72,7 @@ Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:corsHeaders(req,origins)});
  if(req.method!=='POST'&&req.method!=='GET')return reply(req,origins,405,{error:'method not allowed'});
  try{
+  assertIsolatedViewerHost();
   const pepper=Deno.env.get('VIEWER_PIN_PEPPER');
   if(!pepper||pepper.length<32)throw Error('viewer pepper not configured');
   const db=await viewerAuth();

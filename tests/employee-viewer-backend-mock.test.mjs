@@ -142,7 +142,7 @@ function memoryDatabase(cloud) {
   return database;
 }
 
-function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_reader', authRole='shift_viewer_auth'} = {}) {
+function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_reader', authRole='shift_viewer_auth', viewerHost='https://viewer-fixture.supabase.co', carryPublisherSecret=false} = {}) {
   const {cloud,storeA,storeB} = fakeCloud();
   const db = memoryDatabase(cloud);
   // These are independently published copies; changing the manager fixtures
@@ -219,7 +219,13 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
     const source = raw.replace(/^import[\s\S]*?;\s*\n/gm,'');
     assert.doesNotMatch(source,/^import /m);
     let served;
-    const Deno = {env:{get:key => env.get(key)},serve:fn => {served=fn;}};
+    const runtimeEnv=new Map(env);
+    if(relativePath.includes('employee-viewer-access')){
+      runtimeEnv.set('VIEWER_MANAGER_PROJECT_URL',env.get('SUPABASE_URL'));
+      runtimeEnv.set('SUPABASE_URL',viewerHost);
+      if(!carryPublisherSecret)runtimeEnv.delete('VIEWER_WEEK_PUBLISHER_DB_URL');
+    }
+    const Deno = {env:{get:key => runtimeEnv.get(key)},serve:fn => {served=fn;}};
     const symbols = Object.keys(deps);
     const evaluator = new Function('Deno',...symbols,source);
     evaluator(Deno,...symbols.map(x => deps[x]));
@@ -456,4 +462,19 @@ test('mock backend: the viewer refuses a connection with the wrong auth role',as
   const [{viewer_code}]=f.db.tables.employee_viewer_passwords;
   assert.equal((await f.login(viewer_code,'583941')).status,503);
   assert.equal(f.db.tables.employee_viewer_sessions.length,0);
+});
+
+
+test('mock backend: the viewer will not run on the manager host or beside publishing credentials',async () => {
+  for(const flags of [
+    {viewerHost:'https://fake-project.supabase.co'},
+    {viewerHost:'https://wpyhkewwzsdcstypcbmq.supabase.co'},
+    {carryPublisherSecret:true}
+  ]){
+    const f=makeFixture(flags);
+    assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+    const [{viewer_code}]=f.db.tables.employee_viewer_passwords;
+    assert.equal((await f.login(viewer_code,'583941')).status,503);
+    assert.equal(f.db.tables.employee_viewer_sessions.length,0);
+  }
 });

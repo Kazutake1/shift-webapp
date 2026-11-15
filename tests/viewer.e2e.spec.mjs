@@ -25,7 +25,7 @@ function replies(origin){
 
 test('従業員用サイト：店舗共通6桁パスワードで既存の週間シフト表だけを閲覧',async({page})=>{
  const requests=[];
- await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/functions/v1/employee-viewer-access**',async route=>{
+ await page.route('https://employee-viewer.invalid/functions/v1/employee-viewer-access**',async route=>{
   const req=route.request();
   requests.push({method:req.method(),url:req.url(),body:req.postData()});
   const headers=replies('http://127.0.0.1:4173');
@@ -70,7 +70,7 @@ test('従業員用サイト：QRコードの店舗識別子がなければログ
 });
 
 test('従業員用サイト：連続失敗制限を説明し、間違ったパスワードは残さない',async({page})=>{
- await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/functions/v1/employee-viewer-access**',route=>
+ await page.route('https://employee-viewer.invalid/functions/v1/employee-viewer-access**',route=>
   route.fulfill({status:429,headers:replies('http://127.0.0.1:4173'),body:'{}'}));
  await page.goto('/dist-viewer/index.html?code='+code);
  await page.locator('#viewer-pin').fill('583941');
@@ -84,7 +84,7 @@ test('従業員用サイト：スマホ幅で制限を案内し、解除後に�
  await page.setViewportSize({width:390,height:844});
  await page.clock.setFixedTime(new Date('2026-11-10T10:00:00+09:00'));
  let locked=true;
- await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/functions/v1/employee-viewer-access**',async route=>{
+ await page.route('https://employee-viewer.invalid/functions/v1/employee-viewer-access**',async route=>{
   const headers=replies('http://127.0.0.1:4173');
   const method=route.request().method();
   if(method==='OPTIONS')return route.fulfill({status:204,headers});

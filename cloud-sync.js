@@ -1,5 +1,6 @@
 import {SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY} from './supabase-config.js';
 import {mergeScheduleRoot,projectScheduleRoot} from './schedule-sync.js';
+import {validateViewerPassword} from './employee-viewer/rotation-policy.mjs';
 
 const SESSION_KEY='shift-supabase-session-v1';
 const SYNC_META_KEY='shift-supabase-sync-v1';
@@ -300,6 +301,39 @@ export function createCloudSync({
   await bootstrap();
   return true;
  }
+ async function viewerPasswordRequest(storeId,password=null){
+  const method=password===null?'GET':'POST';
+  if(typeof storeId!=='string'||!storeId||!getRoot().stores.some(store=>store.id===storeId)){
+   throw Error('対象の店舗が存在しません。');
+  }
+  if(password!==null){
+   const problem=validateViewerPassword(password);
+   if(problem)throw Error(problem);
+  }
+  const current=await ensureSession();
+  if(!current?.access_token||!current?.user?.id)throw Error('管理者としてログインしてください。');
+  verifyOwnerBinding(current.user.id);
+  // The server must independently enforce membership and store ownership too.
+  if(!await verifyAdminMembership(current))throw Error('管理者権限を確認できません。');
+  const endpoint=`${SUPABASE_URL}/functions/v1/employee-viewer-admin`;
+  const response=await fetchImpl(method==='GET'?`${endpoint}?storeId=${encodeURIComponent(storeId)}`:endpoint,{
+   method,
+   headers:{...authHeaders(current.access_token),'Cache-Control':'no-store',...(method==='POST'?{'Content-Type':'application/json'}:{})},
+   ...(method==='POST'?{body:JSON.stringify({storeId,password})}:{})
+  });
+  // Return only non-sensitive metadata, never a password/hash/session token.
+  if(!response.ok)throw Error('従業員用パスワード管理サーバーに接続できません。');
+  const status=await responseJson(response);
+  if(typeof status?.configured!=='boolean'||
+   (status.configured&&(typeof status.lastChangedAt!=='string'||!Number.isFinite(Date.parse(status.lastChangedAt))))||
+   (!status.configured&&status.lastChangedAt!==null)){
+   throw Error('管理サーバーの応答を確認できません。');
+  }
+  return {configured:status.configured,lastChangedAt:status.lastChangedAt};
+ }
+ async function getViewerPasswordStatus(storeId){return viewerPasswordRequest(storeId);}
+ async function changeViewerPassword(storeId,newPassword){return viewerPasswordRequest(storeId,newPassword);}
+
  async function signOut(){
   try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}
   const cleared=writeStoredSession(storage,null);
@@ -386,6 +420,7 @@ export function createCloudSync({
 
  return {
   initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
+  getViewerPasswordStatus,changeViewerPassword,
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
    enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed,sessionStorageWriteFailed

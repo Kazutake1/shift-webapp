@@ -318,3 +318,28 @@ test('mock backend: unverified ingress uses one shared source limit',async () =>
   }
   assert.equal((await f.login(code,'583941','198.51.100.6')).status,429);
 });
+
+test('mock backend: shared IPv6 blocks the same network without blocking another network or store',async () => {
+  const f = makeFixture({verifiedIpHeader:true});
+  for(const store of [f.storeA,f.storeB]) {
+    assert.equal((await f.adminSet(store,'583941')).status,200);
+  }
+  const [a,b] = f.db.tables.employee_viewer_passwords;
+  for(let i=0;i<5;i++) {
+    assert.equal((await f.login(a.viewer_code,'583940','2001:db8::1')).status,401);
+  }
+  assert.equal((await f.login(a.viewer_code,'583941','2001:0DB8:0:0:0:0:0:1')).status,429);
+  assert.equal((await f.login(a.viewer_code,'583941','2001:db8::2')).status,200);
+  assert.equal((await f.login(b.viewer_code,'583941','2001:db8::1')).status,200);
+});
+
+test('mock backend: requests with no ingress address use the shared fallback limit',async () => {
+  const f = makeFixture({verifiedIpHeader:true});
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  const [{viewer_code}] = f.db.tables.employee_viewer_passwords;
+  for(let i=0;i<5;i++) {
+    assert.equal((await f.login(viewer_code,'583940',null)).status,401);
+  }
+  assert.equal((await f.login(viewer_code,'583941',null)).status,429);
+  assert.equal((await f.login(viewer_code,'583941','198.51.100.1')).status,200);
+});

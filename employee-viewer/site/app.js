@@ -19,7 +19,7 @@ const el=(tag,attrs={},text='')=>{
  node.textContent=text;
  return node;
 };
-const two=value=>String(value).padStart(2,'0');
+function two(value){return String(value).padStart(2,'0');}
 function isoDate(date){
  return `${date.getUTCFullYear()}-${two(date.getUTCMonth()+1)}-${two(date.getUTCDate())}`;
 }

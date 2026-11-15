@@ -575,13 +575,14 @@ cloudSync=createCloudSync({
   if(ok)stateManager.clearCloudConflict();return ok;
  },
  onStatus:updateCloudSyncStatus,
+ onViewerPublishStatus:()=>viewerPasswordUi?.renderNotice(),
  onConflict:()=>{stateManager.setCloudConflict();alert(CLOUD_CONFLICT_MESSAGE);},
  onRemoteLoaded:()=>{render();autoConfirmOverdue();},
  canAutoApply:()=>!$('#editor')?.open&&!preview&&!printLayoutActive
 });
 viewerPasswordUi=createViewerPasswordAdminUi({
  cloudSync,
- getStore:()=>{const state=stateManager.getState();return {id:state.id,name:state.store};},
+ getStore:()=>{const state=stateManager.getState();return {id:state.id,name:state.store,weekStart:state.current};},
  openDialog,close,el,field,button,hint,
  noticeHost:$('#viewer-password-notice')
 });

@@ -119,3 +119,54 @@ test('viewer admin API: a manager without a current allowlist entry cannot acces
  assert.equal(calledViewer,false);
 });
 
+
+test('viewer copies are queued after a successful cloud save and can be retried without saving again',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const {migrate}=await import('../stores.js');
+ const {initialState}=await import('../model.js');
+ const root=migrate(initialState()),store=root.stores[0],week=store.weeks[store.current];
+ week.confirmation={confirmedAt:'2026-09-14T00:00:00.000Z',snapshot:{days:structuredClone(week.days)}};
+ const user={id:'manager-id'};
+ const map=new Map([
+  ['shift-supabase-session-v1',JSON.stringify({access_token:'manager-token',expires_at:4102444800,user})],
+  ['shift-supabase-sync-v1',JSON.stringify({userId:user.id,revision:1})]
+ ]);
+ const calls=[];
+ const response=(value,status=200)=>({ok:status<400,status,text:async()=>JSON.stringify(value)});
+ let releaseSave;
+ const awaitSave=new Promise(resolve=>{releaseSave=resolve;});
+ let firstCopy;
+ const attempted=new Promise(resolve=>{firstCopy=resolve;});
+ const cloud=createCloudSync({
+  getRoot:()=>root,replaceRoot:()=>true,
+  storage:{getItem:key=>map.get(key)||null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)},
+  fetchImpl:async(url,options={})=>{
+   if(url.includes('/rest/v1/shift_app_admins?'))return response([{user_id:user.id}]);
+   if(options.method==='PATCH'){
+    calls.push('save-start');
+    await awaitSave;
+    calls.push('save-accepted');
+    return response([{revision:2}]);
+   }
+   if(url.includes('/functions/v1/employee-viewer-admin')){
+    if(options.method==='GET')return response({configured:true,lastChangedAt:'2026-11-15T04:00:00Z',publishingReady:true});
+    assert.deepEqual(JSON.parse(options.body),{action:'syncPublishedWeek',storeId:store.id,weekStart:store.current});
+    calls.push('copy');
+    if(calls.filter(call=>call==='copy').length===1){firstCopy();return response({},503);}
+    return response({applied:true});
+   }
+   throw Error('unexpected request');
+  }
+ });
+ await cloud.getViewerPasswordStatus(store.id);
+ cloud.queueSave(root);
+ await new Promise(resolve=>setImmediate(resolve));
+ assert.deepEqual(calls,['save-start']);
+ releaseSave();
+ await attempted;
+ assert.equal(cloud.hasPendingViewerCopies(store.id),true);
+ assert.equal(cloud.getStatus().unsynced,false);
+ assert.equal(await cloud.retryViewerCopies(store.id,store.current),true);
+ assert.equal(cloud.hasPendingViewerCopies(store.id),false);
+ assert.deepEqual(calls,['save-start','save-accepted','copy','copy']);
+});

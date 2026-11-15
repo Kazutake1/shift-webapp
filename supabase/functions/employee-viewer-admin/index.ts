@@ -82,8 +82,11 @@ Deno.serve(async req=>{
    const applied=await writeWeekCopy(current.viewer_code,weekStart,revision,sheet);
    return reply(req,origins,200,{applied});
   }
+  const publishingReady=Deno.env.get('VIEWER_AUTO_PUBLISH_ENABLED')==='true'&&
+   Boolean(Deno.env.get('VIEWER_WEEK_PUBLISHER_DB_URL'));
   if(req.method==='GET'){
-   return reply(req,origins,200,{configured:Boolean(current),lastChangedAt:current?.changed_at||null});
+   return reply(req,origins,200,{configured:Boolean(current),lastChangedAt:current?.changed_at||null,
+    ...(publishingReady?{publishingReady:true}:{})});
   }
 
   if(current&&await verifyPin(pin,pepper,current)){
@@ -104,7 +107,7 @@ Deno.serve(async req=>{
   const {error:limitError}=await db.from('employee_viewer_pin_limits')
    .delete().eq('owner_id',owner).eq('store_id',storeId);
   if(limitError)console.error('viewer login-limit cleanup failed');
-  return reply(req,origins,200,{configured:true,lastChangedAt:changedAt});
+  return reply(req,origins,200,{configured:true,lastChangedAt:changedAt,...(publishingReady?{publishingReady:true}:{})});
  }catch(error){
   // No details to clients, especially never include passwords, keys, or payloads.
   console.error('viewer admin handler failed',error instanceof Error?error.name:'error');

@@ -14,7 +14,9 @@ export function createViewerPasswordAdminUi({
 
  function renderNotice(){
   const store=getStore(),status=store&&statusByStore.get(store.id);
-  const message=cloudSync.getStatus().signedIn&&status?viewerRotationMessage(status,{now:now()}):'';
+  const pending=store&&cloudSync.hasPendingViewerCopies?.(store.id);
+  const message=pending?'従業員向けシフト表への反映待ちです。設定から再試行できます。':
+   cloudSync.getStatus().signedIn&&status?viewerRotationMessage(status,{now:now()}):'';
   noticeHost.textContent=message?`${store.name}：${message}`:'';
   noticeHost.hidden=!message;
  }
@@ -92,6 +94,18 @@ export function createViewerPasswordAdminUi({
    ?`最終変更日：${displayDate(status.lastChangedAt)}${reminder.due?'　変更時期です。':''}`
    :'まだパスワードが設定されていません。';
   save.disabled=false;
+  if(status.publishingReady&&store.weekStart){
+   const result=el('p',{role:'status',class:'hint'});
+   const retry=button('従業員向けシフト表への反映を再試行',async()=>{
+    retry.disabled=true;
+    const ok=await cloudSync.retryViewerCopies(store.id,store.weekStart);
+    result.textContent=ok?'反映の確認が完了しました。':
+     '反映できませんでした。複数端末共有の保存状況と通信を確認してください。';
+    retry.disabled=false;
+    renderNotice();
+   });
+   body.append(retry,result);
+  }
  }
  return {open,refresh,renderNotice,clear};
 }

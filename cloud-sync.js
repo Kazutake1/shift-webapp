@@ -55,7 +55,7 @@ async function responseJson(response){
 
 export function createCloudSync({
  getRoot,replaceRoot,storage=globalThis.localStorage,fetchImpl=globalThis.fetch,
- onStatus=()=>{},onConflict=()=>{},onRemoteLoaded=()=>{},canAutoApply=()=>true
+ onStatus=()=>{},onConflict=()=>{},onRemoteLoaded=()=>{},onViewerPublishStatus=()=>{},canAutoApply=()=>true
 }={}){
  let session=readStoredSession(storage);
  let storedMeta=readStoredSyncMeta(storage);
@@ -77,6 +77,58 @@ export function createCloudSync({
  let syncMetaWriteFailed=false;
  let saveQueue=Promise.resolve(),pendingSaves=0,lastRemoteCheckAt=0,checkPromise=null,deferredRemoteCheck=false;
 
+ let lastCommitted=null,viewerQueue=Promise.resolve();
+ const publishingStores=new Set(),pendingViewerWeeks=new Map();
+ const notifyViewer=()=>onViewerPublishStatus();
+ const viewerKey=(storeId,weekStart)=>JSON.stringify([storeId,weekStart]);
+
+ function queueViewerCopies(payload){
+  const before=lastCommitted;
+  lastCommitted=payload;
+  for(const store of payload.stores){
+   if(!publishingStores.has(store.id))continue;
+   const old=before?.stores.find(item=>item.id===store.id);
+   for(const weekStart of new Set([...Object.keys(old?.weeks||{}),...Object.keys(store.weeks||{})])){
+    const prior=old?.weeks?.[weekStart],week=store.weeks?.[weekStart];
+    if(!prior?.confirmation?.confirmedAt&&!week?.confirmation?.confirmedAt)continue;
+    if(old&&sameJson(prior,week)&&sameJson(old.fixed,store.fixed)&&old.store===store.store)continue;
+    const job={storeId:store.id,weekStart};
+    pendingViewerWeeks.set(viewerKey(store.id,weekStart),job);
+   }
+  }
+  if(pendingViewerWeeks.size)notifyViewer();
+ }
+ function retryViewerCopies(storeId,weekStart){
+  if(!enabled||conflicted||unsynced||pendingSaves>0)return Promise.resolve(false);
+  if(storeId&&weekStart&&publishingStores.has(storeId)){
+   pendingViewerWeeks.set(viewerKey(storeId,weekStart),{storeId,weekStart});
+  }
+  const owner=session?.user?.id;
+  if(!owner)return Promise.resolve(false);
+  viewerQueue=viewerQueue.then(async()=>{
+   if(session?.user?.id!==owner||conflicted||unsynced||pendingSaves>0)return false;
+   let ok=true;
+   for(const [key,job] of [...pendingViewerWeeks]){
+    if(session?.user?.id!==owner||conflicted||unsynced||pendingSaves>0)return false;
+    if(storeId&&job.storeId!==storeId)continue;
+    if(!publishingStores.has(job.storeId)){ok=false;continue;}
+    try{
+     const current=await ensureSession();
+     if(current?.user?.id!==owner||!current.access_token)return false;
+     const res=await fetchImpl(`${SUPABASE_URL}/functions/v1/employee-viewer-admin`,{
+      method:'POST',signal:AbortSignal.timeout(10000),
+      headers:{...authHeaders(current.access_token),'Content-Type':'application/json','Cache-Control':'no-store'},
+      body:JSON.stringify({action:'syncPublishedWeek',...job})
+     });
+     if(!res.ok||typeof (await responseJson(res))?.applied!=='boolean')throw Error('viewer sync failed');
+     if(pendingViewerWeeks.get(key)===job)pendingViewerWeeks.delete(key);
+    }catch{ok=false;}
+    notifyViewer();
+   }
+   return ok;
+  }).catch(()=>false);
+  return viewerQueue;
+ }
  const status=message=>onStatus([
   message,
   sessionStorageWriteFailed?'端末のログイン情報を保存・削除できません。再読み込みせず、空き容量を確認してください。':'',
@@ -176,6 +228,7 @@ export function createCloudSync({
   });
   revision=Number(rows?.[0]?.revision||1);
   enabled=true;conflicted=false;unsynced=false;persistSyncMeta();
+  lastCommitted=payload;
   status(`複数端末共有：同期済み（rev.${revision}）`);
  }
  async function loadRemote(row){
@@ -194,6 +247,7 @@ export function createCloudSync({
   if(!replaceRoot(payload))throw Error('クラウドのシフト表を端末へ保存できませんでした。');
   revision=loadedRevision;
   enabled=true;conflicted=false;unsynced=false;persistSyncMeta();
+  lastCommitted=remote;
   onRemoteLoaded();
   status(`複数端末共有：同期済み（rev.${revision}）`);
  }
@@ -207,13 +261,15 @@ export function createCloudSync({
  }
  async function saveSnapshot(snapshot){
   if(!enabled||conflicted||!session?.user?.id||revision===null)return false;
+  const payload=projectScheduleRoot(snapshot);
   const expected=revision,next=expected+1;
   const rows=await dataRequest(`shift_app_state?owner_id=eq.${encodeURIComponent(session.user.id)}&revision=eq.${expected}`,{
    method:'PATCH',prefer:'return=representation',
-   body:{payload:projectScheduleRoot(snapshot),revision:next,updated_at:new Date().toISOString()}
+   body:{payload,revision:next,updated_at:new Date().toISOString()}
   });
   if(!Array.isArray(rows)||rows.length===0){setConflict();return false;}
   revision=Number(rows[0].revision||next);persistSyncMeta();
+  queueViewerCopies(payload);
   return true;
  }
  function queueSave(root){
@@ -236,6 +292,7 @@ export function createCloudSync({
    pendingSaves=Math.max(0,pendingSaves-1);
    if(saved&&pendingSaves===0&&!conflicted){
     unsynced=false;persistSyncMeta();
+    if(pendingViewerWeeks.size)void retryViewerCopies();
     status(`複数端末共有：同期済み（rev.${revision}）`);
    }
    if(pendingSaves===0&&deferredRemoteCheck&&!conflicted){
@@ -257,6 +314,7 @@ export function createCloudSync({
   if(!saved)return {checked:true,synced:false,conflicted};
   unsynced=false;persistSyncMeta();
   status(`複数端末共有：再同期しました（rev.${revision}）`);
+  if(pendingViewerWeeks.size)void retryViewerCopies();
   return {checked:true,synced:true};
  }
 
@@ -329,7 +387,9 @@ export function createCloudSync({
    (!status.configured&&status.lastChangedAt!==null)){
    throw Error('管理サーバーの応答を確認できません。');
   }
-  return {configured:status.configured,lastChangedAt:status.lastChangedAt};
+  if(status.configured&&status.publishingReady===true)publishingStores.add(storeId);
+  else publishingStores.delete(storeId);
+  return {configured:status.configured,lastChangedAt:status.lastChangedAt,...(publishingStores.has(storeId)?{publishingReady:true}:{})};
  }
  async function getViewerPasswordStatus(storeId){return viewerPasswordRequest(storeId);}
  async function changeViewerPassword(storeId,newPassword){return viewerPasswordRequest(storeId,newPassword);}
@@ -338,6 +398,7 @@ export function createCloudSync({
   try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}
   const cleared=writeStoredSession(storage,null);
   session=null;enabled=false;revision=null;conflicted=false;unsynced=false;
+  lastCommitted=null;publishingStores.clear();pendingViewerWeeks.clear();notifyViewer();
   sessionStorageWriteFailed=!cleared;
   status('複数端末共有：未接続');
   if(!cleared)throw Error(SESSION_CLEAR_ERROR);
@@ -420,7 +481,8 @@ export function createCloudSync({
 
  return {
   initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
-  getViewerPasswordStatus,changeViewerPassword,
+  getViewerPasswordStatus,changeViewerPassword,retryViewerCopies,
+  hasPendingViewerCopies:storeId=>[...pendingViewerWeeks.values()].some(job=>job.storeId===storeId),
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
    enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed,sessionStorageWriteFailed

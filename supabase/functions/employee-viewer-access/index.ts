@@ -1,6 +1,7 @@
 // Employee-only password gateway. NEVER return or expose admin state, user
 // profiles, owner identity, password hashes, or raw cloud shift objects.
 // Supabase platform verify_jwt=false: all authorization happens here.
+import {isIP} from 'node:net';
 import {createClient} from 'npm:@supabase/supabase-js@2.95.0';
 import {validViewerCode,validWeekStart,verifyPin,createViewerToken,sha256Hex,
  SESSION_DURATION_HOURS} from '../_shared/viewer-security.mjs';
@@ -9,12 +10,15 @@ import {projectCloudViewerWeek} from '../_shared/viewer-projection.mjs';
 
 const denied={error:'パスワードまたはアクセス先を確認してください。'};
 function clientSource(req){
- // These headers must be verified against the edge platform in a staging audit.
- // Even if an attacker spoofs them, a second *store-global* SQL limit applies.
- const ip=(req.headers.get('cf-connecting-ip')||
-  req.headers.get('x-real-ip')||
-  req.headers.get('x-forwarded-for')?.split(',')[0]||'unavailable').trim().slice(0,120);
- return ip;
+ // Opt in only after the deployed ingress is verified to replace this
+ // header on every path. Without that assurance use one shared bucket.
+ if(Deno.env.get('VIEWER_VERIFIED_IP_HEADER')!=='cf-connecting-ip')return 'unavailable';
+ const ip=req.headers.get('cf-connecting-ip')?.trim();
+ if(!ip)return 'unavailable';
+ const family=isIP(ip);
+ if(family===4)return ip;
+ if(family===6&&!ip.includes('%'))return new URL('http://['+ip+']').hostname;
+ return 'unavailable';
 }
 function tokenFromRequest(req){
  const header=req.headers.get('authorization')||'';

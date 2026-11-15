@@ -1,3 +1,4 @@
+import {isIP} from 'node:net';
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
@@ -138,7 +139,7 @@ function memoryDatabase(cloud) {
   return database;
 }
 
-function makeFixture() {
+function makeFixture({verifiedIpHeader=false} = {}) {
   const {cloud,storeA,storeB} = fakeCloud();
   const db = memoryDatabase(cloud);
   const env = new Map([
@@ -148,7 +149,9 @@ function makeFixture() {
     ['VIEWER_ADMIN_ORIGINS',ADMIN_ORIGIN],
     ['VIEWER_EMPLOYEE_ORIGIN',EMPLOYEE_ORIGIN]
   ]);
+  if(verifiedIpHeader)env.set('VIEWER_VERIFIED_IP_HEADER','cf-connecting-ip');
   const deps = {
+    isIP,
     createClient: () => db,
     ...security,
     ...http,
@@ -173,7 +176,7 @@ function makeFixture() {
   const request = (url,method,origin,body,authorization,ip) => {
     const headers = {'Origin':origin,'Content-Type':'application/json'};
     if (authorization) headers.Authorization = 'Bearer ' + authorization;
-    if (ip) headers['x-real-ip'] = ip;
+    if (ip) headers['cf-connecting-ip'] = ip;
     return new Request(url,{method,headers,...(body?{body:JSON.stringify(body)}:{})});
   };
   return {
@@ -261,7 +264,7 @@ test('mock backend: store passwords are isolated, and rotation revokes old token
 });
 
 test('mock backend: fifth wrong PIN locks this source and prevents correct PIN',async () => {
-  const f = makeFixture();
+  const f = makeFixture({verifiedIpHeader:true});
   assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
   const code = f.db.tables.employee_viewer_passwords[0].viewer_code;
   for(let i=0;i<5;i++) {
@@ -304,4 +307,14 @@ test('mock backend: logout revokes only the current viewing session',async () =>
   assert.equal((await f.view(first)).status,401);
   assert.equal((await f.logout(first)).status,200);
   assert.equal((await f.view(second)).status,200);
+});
+
+test('mock backend: unverified ingress uses one shared source limit',async () => {
+  const f = makeFixture();
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  const code = f.db.tables.employee_viewer_passwords[0].viewer_code;
+  for(let i=1;i<=5;i++) {
+    assert.equal((await f.login(code,'583940','198.51.100.'+i)).status,401);
+  }
+  assert.equal((await f.login(code,'583941','198.51.100.6')).status,429);
 });

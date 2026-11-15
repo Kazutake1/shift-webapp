@@ -3,10 +3,9 @@
 // Supabase platform verify_jwt=false: all authorization happens here.
 import {isIP} from 'node:net';
 import postgres from 'npm:postgres@3.4.7';
-import {createClient} from 'npm:@supabase/supabase-js@2.95.0';
 import {validViewerCode,validWeekStart,verifyPin,createViewerToken,sha256Hex,
  SESSION_DURATION_HOURS} from '../_shared/viewer-security.mjs';
-import {allowedOrigins,corsHeaders,reply,readSmallJson,secureEnvironment} from '../_shared/viewer-http.mjs';
+import {allowedOrigins,corsHeaders,reply,readSmallJson} from '../_shared/viewer-http.mjs';
 
 const denied={error:'パスワードまたはアクセス先を確認してください。'};
 function clientSource(req){
@@ -25,8 +24,16 @@ function tokenFromRequest(req){
  const token=header.startsWith('Bearer ')?header.slice(7):'';
  return /^[A-Za-z0-9_-]{43}$/.test(token)?token:null;
 }
-function serverClient(project,secret){
- return createClient(project,secret,{auth:{persistSession:false,autoRefreshToken:false}});
+let viewerAuthClient;
+async function viewerAuth(){
+ const connection=Deno.env.get('VIEWER_AUTH_DB_URL');
+ if(!connection)throw Error('viewer auth not configured');
+ viewerAuthClient??=postgres(connection,{
+  prepare:false,max:1,connect_timeout:5,idle_timeout:20,ssl:{rejectUnauthorized:true}
+ });
+ const [role]=await viewerAuthClient`select current_user as auth_role`;
+ if(role?.auth_role!=='shift_viewer_auth')throw Error('unexpected viewer auth role');
+ return viewerAuthClient;
 }
 
 let publishedWeekReader;
@@ -53,17 +60,16 @@ Deno.serve(async req=>{
  if(req.method==='OPTIONS')return new Response(null,{status:204,headers:corsHeaders(req,origins)});
  if(req.method!=='POST'&&req.method!=='GET')return reply(req,origins,405,{error:'method not allowed'});
  try{
-  const {project,secret,pepper}=secureEnvironment(Deno.env);
-  const db=serverClient(project,secret);
+  const pepper=Deno.env.get('VIEWER_PIN_PEPPER');
+  if(!pepper||pepper.length<32)throw Error('viewer pepper not configured');
+  const db=await viewerAuth();
 
   if(req.method==='POST'){
    const input=await readSmallJson(req);
    if(input.action==='logout'){
     const token=tokenFromRequest(req);
     if(!token)return reply(req,origins,401,{error:'ログインしてください。'});
-    const {error}=await db.from('employee_viewer_sessions').delete()
-     .eq('token_hash',await sha256Hex(token));
-    if(error)return reply(req,origins,503,{error:'service unavailable'});
+    await db`delete from public.employee_viewer_sessions where token_hash=${await sha256Hex(token)}`;
     return reply(req,origins,200,{ok:true});
    }
    const viewerCode=input.viewerCode;
@@ -71,39 +77,38 @@ Deno.serve(async req=>{
    if(!validViewerCode(viewerCode)||!(/^[0-9]{6}$/.test(pin))){
     return reply(req,origins,401,denied);
    }
-   const {data:credential,error:credentialError}=await db.from('employee_viewer_passwords')
-    .select('owner_id,store_id,password_salt,password_hash,kdf_iterations,session_epoch')
-    .eq('viewer_code',viewerCode).maybeSingle();
-   if(credentialError)return reply(req,origins,503,{error:'service unavailable'});
+   const [credential]=await db`
+    select owner_id,store_id,password_salt,password_hash,kdf_iterations,session_epoch
+    from public.employee_viewer_passwords where viewer_code=${viewerCode}::uuid
+   `;
    if(!credential)return reply(req,origins,401,denied);
 
    const fingerprint=await sha256Hex(pepper+'|'+clientSource(req));
-   const {data:admitted,error:limitError}=await db.rpc('reserve_employee_viewer_pin_attempt',{
-    p_owner_id:credential.owner_id,p_store_id:credential.store_id,p_source_hash:fingerprint
-   });
-   if(limitError)return reply(req,origins,503,{error:'service unavailable'});
+   const [{admitted}]=await db`
+    select public.reserve_employee_viewer_pin_attempt(
+     ${credential.owner_id}::uuid,${credential.store_id},${fingerprint}
+    ) as admitted
+   `;
    if(!admitted)return reply(req,origins,429,{error:'入力回数の制限に達しました。15分後にお試しください。'});
 
    const matched=await verifyPin(pin,pepper,credential);
-   const {error:finishError}=await db.rpc('complete_employee_viewer_pin_attempt',{
-    p_owner_id:credential.owner_id,p_store_id:credential.store_id,
-    p_source_hash:fingerprint,p_success:matched
-   });
-   if(finishError)return reply(req,origins,503,{error:'service unavailable'});
+   await db`
+    select public.complete_employee_viewer_pin_attempt(
+     ${credential.owner_id}::uuid,${credential.store_id},${fingerprint},${matched}::boolean
+    )
+   `;
    if(!matched)return reply(req,origins,401,denied);
 
-   const {data:membership,error:memberError}=await db.from('shift_app_admins')
-    .select('user_id').eq('user_id',credential.owner_id).maybeSingle();
-   if(memberError||membership?.user_id!==credential.owner_id)return reply(req,origins,403,denied);
+   const [membership]=await db`select user_id from public.shift_app_admins where user_id=${credential.owner_id}::uuid`;
+   if(!membership)return reply(req,origins,403,denied);
 
    const token=createViewerToken();
    const tokenHash=await sha256Hex(token);
    const expiresAt=new Date(Date.now()+SESSION_DURATION_HOURS*3600000).toISOString();
-   const {error:saveError}=await db.from('employee_viewer_sessions').insert({
-    token_hash:tokenHash,owner_id:credential.owner_id,store_id:credential.store_id,
-    session_epoch:credential.session_epoch,expires_at:expiresAt
-   });
-   if(saveError)return reply(req,origins,503,{error:'service unavailable'});
+   await db`
+    insert into public.employee_viewer_sessions(token_hash,owner_id,store_id,session_epoch,expires_at)
+    values (${tokenHash},${credential.owner_id}::uuid,${credential.store_id},${credential.session_epoch}::uuid,${expiresAt}::timestamptz)
+   `;
    return reply(req,origins,200,{token,expiresAt});
   }
 
@@ -112,19 +117,19 @@ Deno.serve(async req=>{
   if(!token)return reply(req,origins,401,{error:'ログインしてください。'});
   if(!validWeekStart(weekStart))return reply(req,origins,400,{error:'invalid week'});
   const tokenHash=await sha256Hex(token);
-  const {data:session,error:sessionError}=await db.from('employee_viewer_sessions')
-   .select('owner_id,store_id,session_epoch,expires_at')
-   .eq('token_hash',tokenHash).maybeSingle();
-  if(sessionError)return reply(req,origins,503,{error:'service unavailable'});
-  if(!session||Date.parse(session.expires_at)<=Date.now())return reply(req,origins,401,{error:'ログインし直してください。'});
-  const {data:credential,error:credError}=await db.from('employee_viewer_passwords')
-   .select('session_epoch,viewer_code').eq('owner_id',session.owner_id).eq('store_id',session.store_id).maybeSingle();
-  if(credError||!credential||credential.session_epoch!==session.session_epoch){
+  const [session]=await db`
+   select owner_id,store_id,session_epoch,expires_at from public.employee_viewer_sessions where token_hash=${tokenHash}
+  `;
+  if(!session||new Date(session.expires_at).getTime()<=Date.now())return reply(req,origins,401,{error:'ログインし直してください。'});
+  const [credential]=await db`
+   select session_epoch,viewer_code from public.employee_viewer_passwords
+   where owner_id=${session.owner_id}::uuid and store_id=${session.store_id}
+  `;
+  if(!credential||credential.session_epoch!==session.session_epoch){
    return reply(req,origins,401,{error:'ログインし直してください。'});
   }
-  const {data:membership,error:memberError}=await db.from('shift_app_admins')
-   .select('user_id').eq('user_id',session.owner_id).maybeSingle();
-  if(memberError||membership?.user_id!==session.owner_id)return reply(req,origins,403,denied);
+  const [membership]=await db`select user_id from public.shift_app_admins where user_id=${session.owner_id}::uuid`;
+  if(!membership)return reply(req,origins,403,denied);
   const projection=await readPublishedWeek(credential.viewer_code,weekStart);
   if(!projection)return reply(req,origins,404,{error:'この週のシフト表は表示できません。'});
   return reply(req,origins,200,projection);

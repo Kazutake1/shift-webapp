@@ -147,7 +147,8 @@ test('Edge handlers have no direct client route to admin state or password hashe
  assert.match(viewer,/verifyPin/);
  assert.match(viewer,/reserve_employee_viewer_pin_attempt/);
  assert.match(viewer,/session_epoch/);
- assert.match(viewer,/\.eq\('owner_id',session\.owner_id\)/);
+ assert.match(viewer,/where owner_id=\$\{session\.owner_id\}::uuid and store_id=\$\{session\.store_id\}/);
+ assert.doesNotMatch(viewer,/secureEnvironment|SUPABASE_SECRET_KEYS|createClient/);
  assert.doesNotMatch(viewer,/reply\(req,origins,200,state/);
  assert.match(admin,/db\.auth\.getUser\(token\)/);
  assert.match(admin,/shift_app_admins/);

@@ -212,3 +212,48 @@ begin
 end $$;
 SQL
 echo 'PASS: store revocation removes credentials, view sessions, PIN limits and published copies'
+
+"${psql[@]}" -q <<'SQL'
+alter table public.shift_app_admins enable row level security;
+insert into public.shift_app_admins values ('00000000-0000-4000-8000-000000000001');
+insert into public.shift_app_state values
+ ('00000000-0000-4000-8000-000000000001','{"stores":[{"id":"store-auth"}]}');
+insert into public.employee_viewer_passwords(owner_id,store_id,password_salt,password_hash,kdf_iterations)
+values ('00000000-0000-4000-8000-000000000001','store-auth','test','test',600000);
+SQL
+"${psql[@]}" -q -f employee-viewer/backend/viewer-auth-role-draft.sql
+"${psql[@]}" -q <<'SQL'
+set role shift_viewer_auth;
+do $$
+declare
+ v_owner uuid:='00000000-0000-4000-8000-000000000001';
+ v_epoch uuid;
+begin
+ select session_epoch into v_epoch from public.employee_viewer_passwords where store_id='store-auth';
+ if v_epoch is null or not exists(select 1 from public.shift_app_admins where user_id=v_owner)
+ or not public.reserve_employee_viewer_pin_attempt(v_owner,'store-auth',repeat('a',64)) then
+  raise exception 'Authentication operations are not accessible';
+ end if;
+ perform public.complete_employee_viewer_pin_attempt(v_owner,'store-auth',repeat('a',64),true);
+ insert into public.employee_viewer_sessions(token_hash,owner_id,store_id,session_epoch,expires_at)
+ values (repeat('b',64),v_owner,'store-auth',v_epoch,now()+interval '1 day');
+ if not exists(select token_hash from public.employee_viewer_sessions where token_hash=repeat('b',64)) then
+  raise exception 'Session read is not accessible';
+ end if;
+ delete from public.employee_viewer_sessions where token_hash=repeat('b',64);
+ if exists(select token_hash from public.employee_viewer_sessions where token_hash=repeat('b',64)) then
+  raise exception 'Session revocation did not work';
+ end if;
+ if has_table_privilege(current_user,'public.employee_viewer_passwords','INSERT,UPDATE,DELETE')
+ or has_schema_privilege(current_user,'shift_viewer_private','USAGE')
+ or has_schema_privilege(current_user,'auth','USAGE') then
+  raise exception 'Authentication role has excess access';
+ end if;
+ begin
+  perform payload from public.shift_app_state;
+  raise exception 'Authentication role can read manager data';
+ exception when insufficient_privilege then null;
+ end;
+end $$;
+SQL
+echo 'PASS: restricted viewer authentication and session operations without manager data access'

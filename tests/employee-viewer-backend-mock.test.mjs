@@ -142,7 +142,7 @@ function memoryDatabase(cloud) {
   return database;
 }
 
-function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_reader'} = {}) {
+function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_reader', authRole='shift_viewer_auth'} = {}) {
   const {cloud,storeA,storeB} = fakeCloud();
   const db = memoryDatabase(cloud);
   // These are independently published copies; changing the manager fixtures
@@ -155,6 +155,7 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
     ['SUPABASE_URL','https://fake-project.supabase.co'],
     ['SUPABASE_SECRET_KEYS',JSON.stringify({default:'sb_secret_SYNTHETIC_NOT_A_REAL_KEY'})],
     ['VIEWER_PIN_PEPPER',PEPPER],
+    ['VIEWER_AUTH_DB_URL','postgresql://fake.example.invalid/auth'],
     ['VIEWER_WEEK_READER_DB_URL','postgresql://fake.example.invalid/viewer'],
     ['VIEWER_WEEK_PUBLISHER_DB_URL','postgresql://fake.example.invalid/publisher'],
     ['VIEWER_ADMIN_ORIGINS',ADMIN_ORIGIN],
@@ -167,7 +168,34 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
     ...security,
     ...http,
     projectCloudViewerWeek,
-    postgres: connection => async (query,code,week,revision,sheet) => {
+    postgres: connection => async (query,code,week,revision,sheet,expires) => {
+      if(connection.endsWith('/auth')){
+        const sql=query.join('?').trim();
+        const rows=db.tables;
+        if(sql.includes('as auth_role'))return [{auth_role:authRole}];
+        if(sql.includes('reserve_employee_viewer_pin_attempt')){
+          const {data}=await db.rpc('reserve_employee_viewer_pin_attempt',{p_owner_id:code,p_store_id:week,p_source_hash:revision});
+          return [{admitted:data}];
+        }
+        if(sql.includes('complete_employee_viewer_pin_attempt')){
+          await db.rpc('complete_employee_viewer_pin_attempt',{p_owner_id:code,p_store_id:week,p_source_hash:revision,p_success:sheet});
+          return [];
+        }
+        if(sql.startsWith('delete from public.employee_viewer_sessions')){
+          rows.employee_viewer_sessions=rows.employee_viewer_sessions.filter(row=>row.token_hash!==code);
+          return [];
+        }
+        if(sql.startsWith('insert into public.employee_viewer_sessions')){
+          rows.employee_viewer_sessions.push({token_hash:code,owner_id:week,store_id:revision,session_epoch:sheet,expires_at:expires});
+          return [];
+        }
+        if(sql.includes('from public.employee_viewer_sessions'))return rows.employee_viewer_sessions.filter(row=>row.token_hash===code);
+        if(sql.includes('from public.shift_app_admins'))return rows.shift_app_admins.filter(row=>row.user_id===code);
+        if(sql.includes('from public.employee_viewer_passwords')){
+          return rows.employee_viewer_passwords.filter(row=>week===undefined?row.viewer_code===code:row.owner_id===code&&row.store_id===week);
+        }
+        assert.fail('unexpected auth query');
+      }
       if(connection.endsWith('/publisher')){
         assert.match(query.join(''), /shift_viewer_private\.apply_published_week/);
         const credential = db.tables.employee_viewer_passwords.find(row => row.viewer_code===code);
@@ -419,4 +447,13 @@ test('mock backend: a manager can stop one store without stopping another',async
   assert.equal((await f.login(a.viewer_code,'583941')).status,401);
   assert.equal((await f.view(bToken)).status,200);
   assert.equal((await f.stop(f.storeA)).status,200);
+});
+
+
+test('mock backend: the viewer refuses a connection with the wrong auth role',async () => {
+  const f=makeFixture({authRole:'postgres'});
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  const [{viewer_code}]=f.db.tables.employee_viewer_passwords;
+  assert.equal((await f.login(viewer_code,'583941')).status,503);
+  assert.equal(f.db.tables.employee_viewer_sessions.length,0);
 });

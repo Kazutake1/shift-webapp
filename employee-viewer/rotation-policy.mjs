@@ -15,6 +15,7 @@ export function validateViewerPassword(password){
 }
 
 function japanDate(value){
+ if(value===null||value===undefined||value==='')return null;
  const date=value instanceof Date?value:new Date(value);
  if(!Number.isFinite(date.getTime()))return null;
  const parts=new Intl.DateTimeFormat('en-US',{

@@ -84,3 +84,46 @@ SQL
 test "$(reserve store-a 42)" = t
 test "$("${psql[@]}" -Atq -c "select attempts=1 and locked_until is null from public.employee_viewer_pin_limits where store_id='store-a' and source_hash=lpad('42',64,'0')")" = t
 echo 'PASS: RLS, grants, concurrent limits, source/store isolation and 15-minute recovery'
+
+
+# Fake the manager's data contract without reading a production system.
+"${psql[@]}" -q <<'SQL'
+create table public.shift_app_state(owner_id uuid primary key, payload jsonb not null);
+create table public.shift_app_admins(user_id uuid primary key);
+insert into public.shift_app_state values
+ ('00000000-0000-4000-8000-000000000001','{"employees":[{"birthDate":"2000-01-01","name":"SYNTHETIC ADMIN ONLY"}]}');
+SQL
+"${psql[@]}" -q -f employee-viewer/backend/published-week-schema-draft.sql
+"${psql[@]}" -q <<'SQL'
+insert into shift_viewer_private.published_weeks
+select viewer_code,'2026-11-09',
+ '{"format":"employee-schedule-only-v1","weekStart":"2026-11-09","storeName":"SYNTHETIC STORE","fixed":[],"days":[]}'
+ from public.employee_viewer_passwords where store_id='store-a';
+set role shift_viewer_week_reader;
+do $$
+begin
+ if (select count(*) from shift_viewer_private.published_weeks where sheet->>'storeName'='SYNTHETIC STORE')<>1 then
+  raise exception 'The limited role cannot read the published data';
+ end if;
+ if has_table_privilege(current_user,'shift_viewer_private.published_weeks','INSERT,UPDATE,DELETE')
+  or has_table_privilege(current_user,'public.shift_app_admins','SELECT')
+  or has_table_privilege(current_user,'public.employee_viewer_passwords','SELECT')
+  or has_table_privilege(current_user,'public.employee_viewer_sessions','SELECT') then
+  raise exception 'The limited role has excess privileges';
+ end if;
+ begin
+  perform payload from public.shift_app_state;
+  raise exception 'The limited role can read the manager payload';
+ exception when insufficient_privilege then null;
+ end;
+end $$;
+reset role;
+do $$
+begin
+ if has_schema_privilege('anon','shift_viewer_private','USAGE')
+  or has_schema_privilege('authenticated','shift_viewer_private','USAGE') then
+  raise exception 'Client roles must not see the unpublished schema';
+ end if;
+end $$;
+SQL
+echo 'PASS: published shift read role cannot access manager records or modify published shifts'

@@ -136,25 +136,37 @@ test('スマホ幅：2店舗のPIN・閲覧制限・更新・停止を実際の�
   await route.fulfill({status:result.status,headers:Object.fromEntries(result.headers),body:await result.text()});
  });
  const open=record=>page.goto('/dist-viewer/index.html?code='+record.viewer_code);
- const login=async pin=>{
-  await page.locator('#viewer-pin').fill(pin);
-  await page.locator('#viewer-login-button').click();
+ const pinField=page.locator('#viewer-pin');
+ const loginButton=page.locator('#viewer-login-button');
+ const login=async(pin,expectedStatus)=>{
+  // A repeated validation message can still be from the previous attempt.
+  // Wait for this request and the form's cleanup before sending another PIN.
+  await expect(loginButton).toBeEnabled();
+  await expect(pinField).toHaveValue('');
+  await pinField.fill(pin);
+  const [response]=await Promise.all([
+   page.waitForResponse(resp=>resp.url().endsWith('/employee-viewer-access')&&resp.request().method()==='POST'),
+   loginButton.click()
+  ]);
+  expect(response.status()).toBe(expectedStatus);
+  await expect(loginButton).toBeEnabled();
+  await expect(pinField).toHaveValue('');
  };
  const error=page.locator('#viewer-login-error');
  await open(a);
  for(let i=0;i<5;i++){
-  await login('583940');
+  await login('583940',401);
   await expect(error).toContainText('パスワードを確認');
  }
- await login('583941');
+ await login('583941',429);
  await expect(error).toContainText('15分後');
 
  await open(b);
- await login('749281');
+ await login('749281',200);
  await expect(page.locator('#viewer-store-name')).toHaveText('TEST-STORE-B');
  ip='192.0.2.11';
  await open(a);
- await login('583941');
+ await login('583941',200);
  await expect(page.locator('#viewer-store-name')).toHaveText('TEST-STORE-A');
  await expect(page.locator('#schedule')).not.toContainText('PRIVATE-');
 
@@ -169,6 +181,6 @@ test('スマホ幅：2店舗のPIN・閲覧制限・更新・停止を実際の�
  await page.reload();
  await expect(page.locator('#viewer-login')).toBeVisible();
  await expect(page.locator('#viewer-sheet-page')).toBeHidden();
- await login('583941');
+ await login('583941',401);
  await expect(error).toContainText('パスワードを確認');
 });

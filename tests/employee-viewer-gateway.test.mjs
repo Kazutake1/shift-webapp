@@ -142,7 +142,8 @@ test('SQL draft denies direct public/employee credential and session access, and
 test('Edge handlers have no direct client route to admin state or password hashes',()=>{
  const viewer=file('../supabase/functions/employee-viewer-access/index.ts');
  const admin=file('../supabase/functions/employee-viewer-admin/index.ts');
- assert.match(viewer,/projectCloudViewerWeek/);
+ assert.match(viewer,/shift_viewer_private\.published_weeks/);
+ assert.doesNotMatch(viewer,/shift_app_state/);
  assert.match(viewer,/verifyPin/);
  assert.match(viewer,/reserve_employee_viewer_pin_attempt/);
  assert.match(viewer,/session_epoch/);

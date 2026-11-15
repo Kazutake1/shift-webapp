@@ -139,13 +139,19 @@ function memoryDatabase(cloud) {
   return database;
 }
 
-function makeFixture({verifiedIpHeader=false} = {}) {
+function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_reader'} = {}) {
   const {cloud,storeA,storeB} = fakeCloud();
   const db = memoryDatabase(cloud);
+  // These are independently published copies; changing the manager fixtures
+  // afterwards cannot make a week visible to the employee endpoint.
+  const copies = new Map(cloud.stores.map(store => [
+    store.id,projectCloudViewerWeek(cloud,store.id,WEEK)
+  ]));
   const env = new Map([
     ['SUPABASE_URL','https://fake-project.supabase.co'],
     ['SUPABASE_SECRET_KEYS',JSON.stringify({default:'sb_secret_SYNTHETIC_NOT_A_REAL_KEY'})],
     ['VIEWER_PIN_PEPPER',PEPPER],
+    ['VIEWER_WEEK_READER_DB_URL','postgresql://fake.example.invalid/viewer'],
     ['VIEWER_ADMIN_ORIGINS',ADMIN_ORIGIN],
     ['VIEWER_EMPLOYEE_ORIGIN',EMPLOYEE_ORIGIN]
   ]);
@@ -155,7 +161,11 @@ function makeFixture({verifiedIpHeader=false} = {}) {
     createClient: () => db,
     ...security,
     ...http,
-    projectCloudViewerWeek
+    postgres: () => async (query,code,week) => {
+      assert.match(query.join(''), /shift_viewer_private\.published_weeks/);
+      const credential = db.tables.employee_viewer_passwords.find(row => row.viewer_code===code);
+      return [{reader_role:readerRole,sheet:week===WEEK?copies.get(credential?.store_id)??null:null}];
+    }
   };
   function handler(relativePath) {
     const raw = readFileSync(new URL(relativePath, import.meta.url),'utf8');
@@ -180,7 +190,7 @@ function makeFixture({verifiedIpHeader=false} = {}) {
     return new Request(url,{method,headers,...(body?{body:JSON.stringify(body)}:{})});
   };
   return {
-    db,cloud,storeA,storeB,
+    db,cloud,storeA,storeB,copies,
     adminSet: (storeId,password,jwt=MANAGER_TOKEN) => admin(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-admin',
       'POST',ADMIN_ORIGIN,{storeId,password},jwt)),
@@ -283,10 +293,9 @@ test('mock backend: unconfirmed week, expired token, revoked admin, bad origin d
   assert.equal((await f.login(code,'583941','203.0.113.10','https://evil.invalid')).status,403);
   const result = await f.login(code,'583941');
   const {token} = await result.json();
-  const state = f.db.tables.shift_app_state[0].payload.stores[0];
-  delete state.weeks[WEEK].confirmation;
+  f.copies.delete(f.storeA);
   assert.equal((await f.view(token)).status,404);
-  state.weeks[WEEK].confirmation = {confirmedAt:'2026-09-14T00:00:00.000Z'};
+
   f.db.tables.employee_viewer_sessions[0].expires_at = '2020-01-01T00:00:00.000Z';
   assert.equal((await f.view(token)).status,401);
   const newResult = await f.login(code,'583941');
@@ -342,4 +351,12 @@ test('mock backend: requests with no ingress address use the shared fallback lim
   }
   assert.equal((await f.login(viewer_code,'583941',null)).status,429);
   assert.equal((await f.login(viewer_code,'583941','198.51.100.1')).status,200);
+});
+
+test('mock backend: a connection with the wrong reader role does not serve a schedule',async () => {
+  const f = makeFixture({readerRole:'postgres'});
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  const [{viewer_code}] = f.db.tables.employee_viewer_passwords;
+  const {token} = await (await f.login(viewer_code,'583941')).json();
+  assert.equal((await f.view(token)).status,503);
 });

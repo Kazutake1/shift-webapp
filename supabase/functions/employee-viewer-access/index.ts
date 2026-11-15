@@ -2,11 +2,11 @@
 // profiles, owner identity, password hashes, or raw cloud shift objects.
 // Supabase platform verify_jwt=false: all authorization happens here.
 import {isIP} from 'node:net';
+import postgres from 'npm:postgres@3.4.7';
 import {createClient} from 'npm:@supabase/supabase-js@2.95.0';
 import {validViewerCode,validWeekStart,verifyPin,createViewerToken,sha256Hex,
  SESSION_DURATION_HOURS} from '../_shared/viewer-security.mjs';
 import {allowedOrigins,corsHeaders,reply,readSmallJson,secureEnvironment} from '../_shared/viewer-http.mjs';
-import {projectCloudViewerWeek} from '../_shared/viewer-projection.mjs';
 
 const denied={error:'パスワードまたはアクセス先を確認してください。'};
 function clientSource(req){
@@ -27,6 +27,24 @@ function tokenFromRequest(req){
 }
 function serverClient(project,secret){
  return createClient(project,secret,{auth:{persistSession:false,autoRefreshToken:false}});
+}
+
+let publishedWeekReader;
+async function readPublishedWeek(viewerCode,weekStart){
+ const connection=Deno.env.get('VIEWER_WEEK_READER_DB_URL');
+ if(!connection)throw Error('viewer week reader not configured');
+ publishedWeekReader??=postgres(connection,{
+  prepare:false,max:1,connect_timeout:5,idle_timeout:20,ssl:{rejectUnauthorized:true}
+ });
+ const [result]=await publishedWeekReader`
+  select current_user as reader_role, (
+   select sheet from shift_viewer_private.published_weeks
+   where viewer_code=${viewerCode}::uuid and week_start=${weekStart}::date
+     and current_user='shift_viewer_week_reader'
+  ) as sheet
+ `;
+ if(result?.reader_role!=='shift_viewer_week_reader')throw Error('unexpected viewer database role');
+ return result.sheet;
 }
 
 Deno.serve(async req=>{
@@ -100,18 +118,14 @@ Deno.serve(async req=>{
   if(sessionError)return reply(req,origins,503,{error:'service unavailable'});
   if(!session||Date.parse(session.expires_at)<=Date.now())return reply(req,origins,401,{error:'ログインし直してください。'});
   const {data:credential,error:credError}=await db.from('employee_viewer_passwords')
-   .select('session_epoch').eq('owner_id',session.owner_id).eq('store_id',session.store_id).maybeSingle();
+   .select('session_epoch,viewer_code').eq('owner_id',session.owner_id).eq('store_id',session.store_id).maybeSingle();
   if(credError||!credential||credential.session_epoch!==session.session_epoch){
    return reply(req,origins,401,{error:'ログインし直してください。'});
   }
   const {data:membership,error:memberError}=await db.from('shift_app_admins')
    .select('user_id').eq('user_id',session.owner_id).maybeSingle();
   if(memberError||membership?.user_id!==session.owner_id)return reply(req,origins,403,denied);
-  // The manager's cloud record is read ONLY within this trusted function.
-  const {data:state,error:stateError}=await db.from('shift_app_state').select('payload')
-   .eq('owner_id',session.owner_id).maybeSingle();
-  if(stateError)return reply(req,origins,503,{error:'service unavailable'});
-  const projection=projectCloudViewerWeek(state?.payload,session.store_id,weekStart);
+  const projection=await readPublishedWeek(credential.viewer_code,weekStart);
   if(!projection)return reply(req,origins,404,{error:'この週のシフト表は表示できません。'});
   return reply(req,origins,200,projection);
  }catch(error){

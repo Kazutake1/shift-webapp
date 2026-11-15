@@ -1547,11 +1547,17 @@ test('公開ビルドは明示的に確認済みのファイルのみを配信�
  try{
   mkdirSync(join(folder,'scripts'));
   copyFileSync(new URL('../scripts/build-cloudflare.mjs',import.meta.url),join(folder,'scripts','build-cloudflare.mjs'));
-  for(const filename of assets)writeFileSync(join(folder,filename),'reviewed test fixture');
+  for(const filename of assets){
+   const slash=filename.lastIndexOf('/');
+   if(slash!==-1)mkdirSync(join(folder,filename.slice(0,slash)),{recursive:true});
+   writeFileSync(join(folder,filename),'reviewed test fixture');
+  }
   writeFileSync(join(folder,'accidental-secret.js'),'UNREVIEWED_TEST_CONTENT');
   writeFileSync(join(folder,'.env'),'UNREVIEWED_ENV_TEST_CONTENT');
   execFileSync(process.execPath,['scripts/build-cloudflare.mjs'],{cwd:folder,timeout:20000,stdio:'pipe'});
-  const actual=readdirSync(join(folder,'dist')).sort();
+  const collect=(directory,prefix='')=>readdirSync(directory,{withFileTypes:true}).flatMap(entry=>
+   entry.isDirectory()?collect(join(directory,entry.name),prefix+entry.name+'/'):[prefix+entry.name]);
+  const actual=collect(join(folder,'dist')).sort();
   assert.deepEqual(actual,assets);
   assert.equal(actual.includes('accidental-secret.js'),false);
   assert.equal(actual.includes('.env'),false);

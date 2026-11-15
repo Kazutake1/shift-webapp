@@ -120,7 +120,7 @@ test('viewer admin API: a manager without a current allowlist entry cannot acces
 });
 
 
-test('viewer copies are queued after a successful cloud save and can be retried without saving again',async()=>{
+test('viewer copies are queued after a successful cloud save and can be retried after reopening without saving again',async()=>{
  const {createCloudSync}=await import('../cloud-sync.js');
  const {migrate}=await import('../stores.js');
  const {initialState}=await import('../model.js');
@@ -137,9 +137,10 @@ test('viewer copies are queued after a successful cloud save and can be retried 
  const awaitSave=new Promise(resolve=>{releaseSave=resolve;});
  let firstCopy;
  const attempted=new Promise(resolve=>{firstCopy=resolve;});
- const cloud=createCloudSync({
+ const options={
   getRoot:()=>root,replaceRoot:()=>true,
-  storage:{getItem:key=>map.get(key)||null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)},
+  storage:{get length(){return map.size;},key:index=>[...map.keys()][index]??null,
+   getItem:key=>map.get(key)||null,setItem:(key,value)=>map.set(key,value),removeItem:key=>map.delete(key)},
   fetchImpl:async(url,options={})=>{
    if(url.includes('/rest/v1/shift_app_admins?'))return response([{user_id:user.id}]);
    if(options.method==='PATCH'){
@@ -157,7 +158,8 @@ test('viewer copies are queued after a successful cloud save and can be retried 
    }
    throw Error('unexpected request');
   }
- });
+ };
+ const cloud=createCloudSync(options);
  await cloud.getViewerPasswordStatus(store.id);
  cloud.queueSave(root);
  await new Promise(resolve=>setImmediate(resolve));
@@ -166,7 +168,10 @@ test('viewer copies are queued after a successful cloud save and can be retried 
  await attempted;
  assert.equal(cloud.hasPendingViewerCopies(store.id),true);
  assert.equal(cloud.getStatus().unsynced,false);
- assert.equal(await cloud.retryViewerCopies(store.id,store.current),true);
- assert.equal(cloud.hasPendingViewerCopies(store.id),false);
+ const reopened=createCloudSync(options);
+ assert.equal(reopened.hasPendingViewerCopies(store.id),true);
+ await reopened.getViewerPasswordStatus(store.id);
+ assert.equal(await reopened.retryViewerCopies(store.id),true);
+ assert.equal(createCloudSync(options).hasPendingViewerCopies(store.id),false);
  assert.deepEqual(calls,['save-start','save-accepted','copy','copy']);
 });

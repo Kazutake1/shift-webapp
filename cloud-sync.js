@@ -5,6 +5,7 @@ import {validateViewerPassword} from './employee-viewer/rotation-policy.mjs';
 const SESSION_KEY='shift-supabase-session-v1';
 const SYNC_META_KEY='shift-supabase-sync-v1';
 const OWNER_KEY='shift-supabase-owner-v1';
+const VIEWER_PENDING_PREFIX='shift-viewer-copy-pending-v1:';
 const UNSYNCED_STATUS='複数端末共有：クラウド未同期（端末には保存済み）。通信復旧後に自動再同期します。';
 const SESSION_STORE_ERROR='ログイン情報を端末に保存できません。空き容量を確認してください。';
 const SESSION_CLEAR_ERROR='ログイン情報を端末から削除できません。再読み込みせず、空き容量を確認してください。';
@@ -81,6 +82,35 @@ export function createCloudSync({
  const publishingStores=new Set(),pendingViewerWeeks=new Map();
  const notifyViewer=()=>onViewerPublishStatus();
  const viewerKey=(storeId,weekStart)=>JSON.stringify([storeId,weekStart]);
+ let viewerPendingStorageError=false;
+ const viewerPrefix=owner=>VIEWER_PENDING_PREFIX+encodeURIComponent(owner)+':';
+ const viewerStorageKey=(owner,key)=>viewerPrefix(owner)+encodeURIComponent(key);
+
+ function restoreViewerCopies(owner){
+  try{
+   const prefix=viewerPrefix(owner);
+   for(let i=0;i<storage.length;i++){
+    const storageKey=storage.key(i);
+    if(!storageKey?.startsWith(prefix))continue;
+    const job=readJson(storage,storageKey);
+    if(typeof job?.storeId!=='string'||!job.storeId||job.storeId.length>100||
+       !/^\d{4}-\d{2}-\d{2}$/.test(job.weekStart)||typeof job.marker!=='string')continue;
+    const key=viewerKey(job.storeId,job.weekStart);
+    if(storageKey===viewerStorageKey(owner,key)&&!pendingViewerWeeks.has(key))pendingViewerWeeks.set(key,job);
+   }
+  }catch{viewerPendingStorageError=true;}
+ }
+
+ function recordViewerCopy(storeId,weekStart){
+  const owner=session?.user?.id;
+  if(!owner)return;
+  const job={storeId,weekStart,marker:globalThis.crypto.randomUUID()};
+  const key=viewerKey(storeId,weekStart);
+  pendingViewerWeeks.set(key,job);
+  try{storage.setItem(viewerStorageKey(owner,key),JSON.stringify(job));}
+  catch{viewerPendingStorageError=true;}
+ }
+ if(session?.user?.id)restoreViewerCopies(session.user.id);
 
  function queueViewerCopies(payload){
   const before=lastCommitted;
@@ -92,8 +122,7 @@ export function createCloudSync({
     const prior=old?.weeks?.[weekStart],week=store.weeks?.[weekStart];
     if(!prior?.confirmation?.confirmedAt&&!week?.confirmation?.confirmedAt)continue;
     if(old&&sameJson(prior,week)&&sameJson(old.fixed,store.fixed)&&old.store===store.store)continue;
-    const job={storeId:store.id,weekStart};
-    pendingViewerWeeks.set(viewerKey(store.id,weekStart),job);
+    recordViewerCopy(store.id,weekStart);
    }
   }
   if(pendingViewerWeeks.size)notifyViewer();
@@ -101,7 +130,8 @@ export function createCloudSync({
  function retryViewerCopies(storeId,weekStart){
   if(!enabled||conflicted||unsynced||pendingSaves>0)return Promise.resolve(false);
   if(storeId&&weekStart&&publishingStores.has(storeId)){
-   pendingViewerWeeks.set(viewerKey(storeId,weekStart),{storeId,weekStart});
+   const key=viewerKey(storeId,weekStart);
+   if(!pendingViewerWeeks.has(key))recordViewerCopy(storeId,weekStart);
   }
   const owner=session?.user?.id;
   if(!owner)return Promise.resolve(false);
@@ -118,10 +148,16 @@ export function createCloudSync({
      const res=await fetchImpl(`${SUPABASE_URL}/functions/v1/employee-viewer-admin`,{
       method:'POST',signal:AbortSignal.timeout(10000),
       headers:{...authHeaders(current.access_token),'Content-Type':'application/json','Cache-Control':'no-store'},
-      body:JSON.stringify({action:'syncPublishedWeek',...job})
+      body:JSON.stringify({action:'syncPublishedWeek',storeId:job.storeId,weekStart:job.weekStart})
      });
      if(!res.ok||typeof (await responseJson(res))?.applied!=='boolean')throw Error('viewer sync failed');
-     if(pendingViewerWeeks.get(key)===job)pendingViewerWeeks.delete(key);
+     if(pendingViewerWeeks.get(key)===job){
+      const storageKey=viewerStorageKey(owner,key);
+      try{
+       if(readJson(storage,storageKey)?.marker===job.marker)storage.removeItem(storageKey);
+      }catch{viewerPendingStorageError=true;}
+      pendingViewerWeeks.delete(key);
+     }
     }catch{ok=false;}
     notifyViewer();
    }
@@ -343,6 +379,8 @@ export function createCloudSync({
   sessionStorageWriteFailed=false;
   session=nextSession;
   if(previousUserId!==session.user?.id){
+   pendingViewerWeeks.clear();publishingStores.clear();viewerPendingStorageError=false;
+   restoreViewerCopies(session.user.id);notifyViewer();
    const meta=readStoredSyncMeta(storage);
    if(meta?.userId===session.user?.id){
     revision=Number.isFinite(Number(meta.revision))?Number(meta.revision):null;
@@ -398,7 +436,7 @@ export function createCloudSync({
   try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}
   const cleared=writeStoredSession(storage,null);
   session=null;enabled=false;revision=null;conflicted=false;unsynced=false;
-  lastCommitted=null;publishingStores.clear();pendingViewerWeeks.clear();notifyViewer();
+  lastCommitted=null;publishingStores.clear();pendingViewerWeeks.clear();viewerPendingStorageError=false;notifyViewer();
   sessionStorageWriteFailed=!cleared;
   status('複数端末共有：未接続');
   if(!cleared)throw Error(SESSION_CLEAR_ERROR);
@@ -482,10 +520,10 @@ export function createCloudSync({
  return {
   initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
   getViewerPasswordStatus,changeViewerPassword,retryViewerCopies,
-  hasPendingViewerCopies:storeId=>[...pendingViewerWeeks.values()].some(job=>job.storeId===storeId),
+  hasPendingViewerCopies:storeId=>Boolean(session?.user?.id)&&[...pendingViewerWeeks.values()].some(job=>job.storeId===storeId),
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',
-   enabled,revision,conflicted,pendingSaves,unsynced,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed,sessionStorageWriteFailed
+   enabled,revision,conflicted,pendingSaves,unsynced,viewerPendingStorageError,ownerBound:Boolean(ownerUserId),syncMetaWriteFailed,sessionStorageWriteFailed
   })
  };
 }

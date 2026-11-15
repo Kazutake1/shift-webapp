@@ -15,7 +15,7 @@ export function createViewerPasswordAdminUi({
  function renderNotice(){
   const store=getStore(),status=store&&statusByStore.get(store.id);
   const pending=store&&cloudSync.hasPendingViewerCopies?.(store.id);
-  const message=pending?'従業員向けシフト表への反映待ちです。設定から再試行できます。':
+  const message=cloudSync.getStatus().viewerPendingStorageError?'反映待ちの状態を端末に保存・更新できません。画面を閉じる前に再試行してください。':pending?'従業員向けシフト表への反映待ちです。設定から再試行できます。':
    cloudSync.getStatus().signedIn&&status?viewerRotationMessage(status,{now:now()}):'';
   noticeHost.textContent=message?`${store.name}：${message}`:'';
   noticeHost.hidden=!message;

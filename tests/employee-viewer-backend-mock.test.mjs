@@ -52,7 +52,7 @@ function fakeCloud() {
 function memoryDatabase(cloud) {
   const tables = {
     shift_app_admins: [{user_id: OWNER}],
-    shift_app_state: [{owner_id: OWNER, payload: cloud}],
+    shift_app_state: [{owner_id: OWNER, payload: cloud, revision:1}],
     employee_viewer_passwords: [],
     employee_viewer_sessions: [],
     employee_viewer_pin_limits: []
@@ -147,11 +147,13 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
   const copies = new Map(cloud.stores.map(store => [
     store.id,projectCloudViewerWeek(cloud,store.id,WEEK)
   ]));
+  const copyRevisions=new Map();
   const env = new Map([
     ['SUPABASE_URL','https://fake-project.supabase.co'],
     ['SUPABASE_SECRET_KEYS',JSON.stringify({default:'sb_secret_SYNTHETIC_NOT_A_REAL_KEY'})],
     ['VIEWER_PIN_PEPPER',PEPPER],
     ['VIEWER_WEEK_READER_DB_URL','postgresql://fake.example.invalid/viewer'],
+    ['VIEWER_WEEK_PUBLISHER_DB_URL','postgresql://fake.example.invalid/publisher'],
     ['VIEWER_ADMIN_ORIGINS',ADMIN_ORIGIN],
     ['VIEWER_EMPLOYEE_ORIGIN',EMPLOYEE_ORIGIN]
   ]);
@@ -161,7 +163,19 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
     createClient: () => db,
     ...security,
     ...http,
-    postgres: () => async (query,code,week) => {
+    projectCloudViewerWeek,
+    postgres: connection => async (query,code,week,revision,sheet) => {
+      if(connection.endsWith('/publisher')){
+        assert.match(query.join(''), /shift_viewer_private\.apply_published_week/);
+        const credential = db.tables.employee_viewer_passwords.find(row => row.viewer_code===code);
+        assert.ok(credential);
+        assert.equal(week,WEEK);
+        if(revision<=(copyRevisions.get(code)??0))return [{applied:false}];
+        copyRevisions.set(code,revision);
+        if(sheet===null)copies.delete(credential.store_id);
+        else copies.set(credential.store_id,JSON.parse(sheet));
+        return [{applied:true}];
+      }
       assert.match(query.join(''), /shift_viewer_private\.published_weeks/);
       const credential = db.tables.employee_viewer_passwords.find(row => row.viewer_code===code);
       return [{reader_role:readerRole,sheet:week===WEEK?copies.get(credential?.store_id)??null:null}];
@@ -197,6 +211,9 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
     adminGet: (storeId,jwt=MANAGER_TOKEN) => admin(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-admin?storeId='+
        encodeURIComponent(storeId),'GET',ADMIN_ORIGIN,null,jwt)),
+    publish: (storeId,extra={},jwt=MANAGER_TOKEN) => admin(request(
+      'https://fake-project.supabase.co/functions/v1/employee-viewer-admin',
+      'POST',ADMIN_ORIGIN,{action:'syncPublishedWeek',storeId,weekStart:WEEK,...extra},jwt)),
     login: (viewerCode,password,ip='192.0.2.10',origin=EMPLOYEE_ORIGIN) => access(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-access',
       'POST',origin,{viewerCode,password},null,ip)),
@@ -359,4 +376,24 @@ test('mock backend: a connection with the wrong reader role does not serve a sch
   const [{viewer_code}] = f.db.tables.employee_viewer_passwords;
   const {token} = await (await f.login(viewer_code,'583941')).json();
   assert.equal((await f.view(token)).status,503);
+});
+
+
+test('mock backend: publishing uses committed data, checks store ownership and withdraws an unconfirmed week',async () => {
+  const f = makeFixture();
+  assert.equal((await f.publish(f.storeA)).status,409);
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  const [{viewer_code}] = f.db.tables.employee_viewer_passwords;
+  const {token} = await (await f.login(viewer_code,'583941')).json();
+  assert.equal((await f.publish(f.storeA,{},token)).status,401);
+  assert.equal((await f.publish('unowned-store')).status,403);
+  const row=f.db.tables.shift_app_state[0];
+  row.payload.stores[0].store='保存済み店舗名';
+  assert.deepEqual(await (await f.publish(f.storeA,{sheet:{storeName:'UNTRUSTED'},revision:100})).json(),{applied:true});
+  assert.equal((await (await f.view(token)).json()).storeName,'保存済み店舗名');
+  row.revision=2;
+  delete row.payload.stores[0].weeks[WEEK].confirmation;
+  assert.deepEqual(await (await f.publish(f.storeA)).json(),{applied:true});
+  assert.equal((await f.view(token)).status,404);
+  assert.equal(f.copies.get(f.storeB).storeName,'TEST-STORE-B');
 });

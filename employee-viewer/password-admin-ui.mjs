@@ -47,8 +47,8 @@ export function createViewerPasswordAdminUi({
   const body=openDialog('従業員用シフト閲覧パスワード');
   hint(body,`選択中の店舗：${store.name}。店舗ごとに別のパスワードを設定します。`);
   const last=el('p',{role:'status',class:'hint'},'サーバーの設定を確認しています。');
-  const password=el('input',{type:'password',autocomplete:'new-password',minlength:'15',maxlength:'128',placeholder:'15文字以上'});
-  const repeat=el('input',{type:'password',autocomplete:'new-password',minlength:'15',maxlength:'128',placeholder:'確認のため再入力'});
+  const password=el('input',{type:'password',autocomplete:'new-password',inputmode:'numeric',pattern:'[0-9]{6}',minlength:'6',maxlength:'6',placeholder:'数字6桁'});
+  const repeat=el('input',{type:'password',autocomplete:'new-password',inputmode:'numeric',pattern:'[0-9]{6}',minlength:'6',maxlength:'6',placeholder:'数字6桁を再入力'});
   const error=el('p',{role:'alert',class:'error'});
   const save=button('パスワードを設定・変更',async()=>{
    error.textContent='';

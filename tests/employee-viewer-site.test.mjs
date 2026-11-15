@@ -16,7 +16,7 @@ test('viewer site contains only an isolated six-digit PIN login and read-only sc
  assert.match(js,/^[\s\S]*fetch\(ACCESS_URL/);
  assert.match(js,/sessionStorage/);
  assert.doesNotMatch(js,/localStorage/);
- assert.deepEqual([...js.matchAll(/^\\s*import\\s+.*?from\\s+['\"]([^'\"]+)['\"]/gm)].map(match=>match[1]),['./holidays.js']);
+ assert.deepEqual(js.split('\n').filter(line=>line.startsWith('import ')),["import {holidays} from './holidays.js';"]);
  assert.doesNotMatch(html,/cloud-sync\.js|app\.js"[^>]*data-admin|employee-dialog/);
  assert.doesNotMatch(html+js,/確定|未確定|自分のシフト/);
  assert.doesNotMatch(html+js, /innerHTML|outerHTML|insertAdjacentHTML/);

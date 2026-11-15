@@ -42,3 +42,78 @@ test('viewer rotation: invalid and future dates do not incorrectly indicate succ
  assert.equal(viewerRotationState({configured:true,lastChangedAt:'invalid'}).kind,'unknown');
  assert.equal(viewerRotationState({configured:true,lastChangedAt:'2027-01-01T00:00:00+09:00',now:new Date('2026-11-15T08:00:00+09:00')}).kind,'unknown');
 });
+
+test('viewer admin API: reject unsigned users and foreign-store requests before network',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const {migrate}=await import('../stores.js');
+ const {initialState}=await import('../model.js');
+ const root=migrate(initialState());
+ let calls=0;
+ const cloud=createCloudSync({
+  getRoot:()=>root,replaceRoot:()=>true,
+  storage:{getItem:()=>null,setItem:()=>{},removeItem:()=>{}},
+  fetchImpl:async()=>{calls++;throw Error('not expected');}
+ });
+ await assert.rejects(()=>cloud.getViewerPasswordStatus('other-store'),/店舗/);
+ await assert.rejects(()=>cloud.getViewerPasswordStatus(root.activeStoreId),/ログイン/);
+ await assert.rejects(()=>cloud.changeViewerPassword(root.activeStoreId,'weak'),/15文字以上/);
+ assert.equal(calls,0);
+});
+
+test('viewer admin API: only manager-authorized requests send a password and never cache it',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const {migrate}=await import('../stores.js');
+ const {initialState}=await import('../model.js');
+ const root=migrate(initialState());
+ const user={id:'manager-id',email:'manager@example.invalid'};
+ const session={access_token:'manager-token',refresh_token:'refresh-token',expires_at:4102444800,user};
+ const map=new Map([['shift-supabase-session-v1',JSON.stringify(session)]]);
+ const storage={
+  getItem:key=>map.get(key)||null,
+  setItem:(key,value)=>map.set(key,value),
+  removeItem:key=>map.delete(key)
+ };
+ const requests=[];
+ const response=(value,status=200)=>({ok:status<400,status,text:async()=>JSON.stringify(value)});
+ const fetchImpl=async(url,options={})=>{
+  requests.push({url,options});
+  if(url.includes('/rest/v1/shift_app_admins?'))return response([{user_id:user.id}]);
+  if(url.includes('/functions/v1/employee-viewer-admin')){
+   if(options.method==='POST')return response({configured:true,lastChangedAt:'2026-11-15T04:00:00.000Z'});
+   return response({configured:false,lastChangedAt:null});
+  }
+  throw Error('unexpected');
+ };
+ const cloud=createCloudSync({getRoot:()=>root,replaceRoot:()=>true,storage,fetchImpl});
+ assert.deepEqual(await cloud.getViewerPasswordStatus(root.activeStoreId),{configured:false,lastChangedAt:null});
+ const secret='Safe-Synthetic-Password-2026';
+ const result=await cloud.changeViewerPassword(root.activeStoreId,secret);
+ assert.equal(result.configured,true);
+ assert.equal(requests.some(r=>r.url.includes('/functions/v1/employee-viewer-admin')),true);
+ const post=requests.find(r=>r.options.method==='POST');
+ assert.equal(post.options.headers.Authorization,'Bearer manager-token');
+ assert.equal(JSON.parse(post.options.body).storeId,root.activeStoreId);
+ assert.equal(JSON.parse(post.options.body).password,secret);
+ assert.equal(JSON.stringify([...map.values()]).includes(secret),false);
+});
+
+test('viewer admin API: a manager without a current allowlist entry cannot access password settings',async()=>{
+ const {createCloudSync}=await import('../cloud-sync.js');
+ const {migrate}=await import('../stores.js');
+ const {initialState}=await import('../model.js');
+ const root=migrate(initialState()),user={id:'revoked-manager'};
+ const session={access_token:'revoked-token',refresh_token:'refresh',expires_at:4102444800,user};
+ const storage={getItem:key=>key==='shift-supabase-session-v1'?JSON.stringify(session):null,setItem:()=>{},removeItem:()=>{}};
+ let calledViewer=false;
+ const cloud=createCloudSync({
+  getRoot:()=>root,replaceRoot:()=>true,storage,
+  fetchImpl:async url=>{
+   if(url.includes('/rest/v1/shift_app_admins?'))return {ok:true,status:200,text:async()=>JSON.stringify([])};
+   if(url.includes('/functions/v1/employee-viewer-admin')){calledViewer=true;throw Error('unexpected');}
+   throw Error('unexpected');
+  }
+ });
+ await assert.rejects(()=>cloud.getViewerPasswordStatus(root.activeStoreId),/管理者権限/);
+ assert.equal(calledViewer,false);
+});
+

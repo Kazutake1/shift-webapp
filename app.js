@@ -447,7 +447,8 @@ function openCloudSync(){
 }
 $('#cloud-sync').onclick=openCloudSync;
 $('#viewer-password').onclick=()=>viewerPasswordUi?.open();
-$('#store').onchange=e=>{selectStore(e.target.value);viewerPasswordUi?.refresh();};
+$('#store').onchange=e=>selectStore(e.target.value);
+$('#store').addEventListener('change',()=>viewerPasswordUi?.refresh());
 let previewObserver=null;
 function closePreview(){
  previewPdfGeneration++;

@@ -36,6 +36,10 @@ test('isolated viewer output contains only explicitly reviewed assets, not manag
   assert.equal(distJS.includes(keyword),false,'unexpected credential/manager field in viewer static JS: '+keyword);
  }
  const headers=readFileSync(resolve(out,'_headers'),'utf8');
+ const apiOrigin=new URL(distJS.match(/ACCESS_URL='([^']+)'/)[1]).origin;
+ const html=readFileSync(resolve(out,'index.html'),'utf8');
+ assert.ok(html.includes('connect-src '+apiOrigin+';'),'HTML must allow the built viewer API origin');
+ assert.ok(headers.includes('connect-src '+apiOrigin+';'),'hosting CSP must allow the same API origin');
  assert.match(headers,/Cache-Control: no-store/);
  assert.match(headers,/X-Frame-Options: DENY/);
  assert.match(headers,/frame-ancestors 'none'/);

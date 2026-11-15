@@ -23,10 +23,11 @@ await mkdir(output,{recursive:true});
 for(const [from,to] of allowlist){
  const data=await stat(from).catch(()=>null);
  if(!data?.isFile())throw Error(`Employee viewer missing reviewed asset: ${from}`);
- if(to==='app.js'){
-  const app=await readFile(from,'utf8');
-  if(!app.includes(placeholder+'/functions/v1/employee-viewer-access'))throw Error('Viewer API placeholder missing.');
-  await writeFile(join(output,to),app.replace(placeholder,accessOrigin));
+ if(to==='app.js'||to==='index.html'){
+  const asset=await readFile(from,'utf8');
+  const expected=to==='app.js'?placeholder+'/functions/v1/employee-viewer-access':'connect-src '+placeholder+';';
+  if(!asset.includes(expected))throw Error('Viewer API placeholder missing: '+to);
+  await writeFile(join(output,to),asset.replace(placeholder,accessOrigin));
  }else await copyFile(from,join(output,to));
 }
 // A separate hosting origin is required. The backend only permits the

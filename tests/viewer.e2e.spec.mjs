@@ -1,4 +1,5 @@
 import {test,expect} from '@playwright/test';
+import {makeFixture,WEEK as fixtureWeek} from './employee-viewer-backend-fixture.mjs';
 
 const code='8b4caf62-3fd5-4a2c-8c67-5dca45d68d7f';
 const token='A'.repeat(43);
@@ -108,4 +109,66 @@ test('従業員用サイト：スマホ幅で制限を案内し、解除後に�
  await login.click();
  await expect(page.locator('#viewer-sheet-page')).toBeVisible();
  await expect(page.locator('#viewer-store-name')).toHaveText('テスト店舗');
+});
+
+
+test('スマホ幅：2店舗のPIN・閲覧制限・更新・停止を実際のハンドラーで確認',async({page})=>{
+ test.setTimeout(35000);
+ const origin='http://127.0.0.1:4173';
+ const f=makeFixture({verifiedIpHeader:true,employeeOrigin:origin});
+ for(const [store,pin] of [[f.storeA,'583941'],[f.storeB,'749281']]){
+  expect((await f.adminSet(store,pin)).status).toBe(200);
+  expect((await f.publish(store)).status).toBe(200);
+ }
+ const [a,b]=f.db.tables.employee_viewer_passwords;
+ let ip='192.0.2.10';
+ await page.setViewportSize({width:390,height:844});
+ await page.clock.setFixedTime(new Date(fixtureWeek+'T12:00:00+09:00'));
+ await page.route('https://employee-viewer.invalid/functions/v1/employee-viewer-access**',async route=>{
+  const req=route.request();
+  const headers=new Headers(await req.allHeaders());
+  headers.set('origin',origin);
+  headers.set('cf-connecting-ip',ip);
+  const body=req.postData();
+  const result=await f.access(new Request(req.url(),{
+   method:req.method(),headers,...(body===null?{}:{body})
+  }));
+  await route.fulfill({status:result.status,headers:Object.fromEntries(result.headers),body:await result.text()});
+ });
+ const open=record=>page.goto('/dist-viewer/index.html?code='+record.viewer_code);
+ const login=async pin=>{
+  await page.locator('#viewer-pin').fill(pin);
+  await page.locator('#viewer-login-button').click();
+ };
+ const error=page.locator('#viewer-login-error');
+ await open(a);
+ for(let i=0;i<5;i++){
+  await login('583940');
+  await expect(error).toContainText('パスワードを確認');
+ }
+ await login('583941');
+ await expect(error).toContainText('15分後');
+
+ await open(b);
+ await login('749281');
+ await expect(page.locator('#viewer-store-name')).toHaveText('TEST-STORE-B');
+ ip='192.0.2.11';
+ await open(a);
+ await login('583941');
+ await expect(page.locator('#viewer-store-name')).toHaveText('TEST-STORE-A');
+ await expect(page.locator('#schedule')).not.toContainText('PRIVATE-');
+
+ const row=f.db.tables.shift_app_state[0];
+ row.revision++;
+ row.payload.stores[0].store='更新後のテスト店舗';
+ expect((await f.publish(f.storeA)).status).toBe(200);
+ await page.reload();
+ await expect(page.locator('#viewer-store-name')).toHaveText('更新後のテスト店舗');
+
+ expect((await f.stop(f.storeA)).status).toBe(200);
+ await page.reload();
+ await expect(page.locator('#viewer-login')).toBeVisible();
+ await expect(page.locator('#viewer-sheet-page')).toBeHidden();
+ await login('583941');
+ await expect(error).toContainText('パスワードを確認');
 });

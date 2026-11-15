@@ -30,6 +30,8 @@ jobs:
         run: npm run check
       - name: Lint
         run: npm run lint
+      - name: Viewer grants and concurrent PIN limits on temporary PostgreSQL
+        run: bash scripts/test-employee-viewer-postgres.sh
       - name: Regression tests
         run: npm test
       - name: Cloudflare Pages build
@@ -40,11 +42,3 @@ jobs:
         run: npm run test:e2e
       - name: Service Worker E2E
         run: npm run test:sw
-  viewer-postgres:
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    steps:
-      - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
-      - name: Viewer grants and concurrent PIN limits on temporary PostgreSQL
-        run: bash scripts/test-employee-viewer-postgres.sh

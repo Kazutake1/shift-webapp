@@ -105,7 +105,8 @@ function memoryDatabase(cloud) {
       const key = args.p_owner_id + ':' + args.p_store_id;
       const now = Date.now();
       if (name === 'reserve_employee_viewer_pin_attempt') {
-        for (const [source,max] of [['global',100],[args.p_source_hash,5]]) {
+        const admitted = [];
+        for (const [source,max] of [['global',20],[args.p_source_hash,5]]) {
           const id = key + ':' + source;
           let state = counters.get(id);
           if (!state || now - state.since >= 900000 ||
@@ -118,8 +119,9 @@ function memoryDatabase(cloud) {
             state.until = now + 900000;
             return {data:false,error:null};
           }
-          state.attempts++;
+          admitted.push(state);
         }
+        for (const state of admitted) state.attempts++;
         return {data:true,error:null};
       }
       const state = counters.get(key + ':' + args.p_source_hash);

@@ -49,7 +49,7 @@ grant select,insert,update,delete on table public.employee_viewer_sessions to se
 grant select,insert,update,delete on table public.employee_viewer_pin_limits to service_role;
 
 -- Atomic reservation BEFORE PIN verification, preventing concurrent guesses
--- from bypassing the 5-attempt client threshold. 100 attempts/store/15min
+-- from bypassing the 5-attempt client threshold. 20 attempts/store/15min
 -- provides a second bound when the client's reported IP is unreliable.
 create or replace function public.reserve_employee_viewer_pin_attempt(
  p_owner_id uuid,p_store_id text,p_source_hash text
@@ -66,7 +66,9 @@ begin
   return false;
  end if;
  for v_source,v_limit in
-  select 'global'::text,100 union all select p_source_hash,5
+  select limits.source,limits.budget
+  from (values ('global'::text,20),(p_source_hash,5)) as limits(source,budget)
+  order by case when limits.source='global' then 0 else 1 end
  loop
   insert into employee_viewer_pin_limits(owner_id,store_id,source_hash)
   values(p_owner_id,p_store_id,v_source)
@@ -88,9 +90,12 @@ begin
     where owner_id=p_owner_id and store_id=p_store_id and source_hash=v_source;
    return false;
   end if;
-  update employee_viewer_pin_limits set attempts=attempts+1
-   where owner_id=p_owner_id and store_id=p_store_id and source_hash=v_source;
  end loop;
+ -- Charge both counters only when both checks pass. Both rows remain locked
+ -- until the transaction ends, so parallel requests cannot exceed either cap.
+ update employee_viewer_pin_limits set attempts=attempts+1
+  where owner_id=p_owner_id and store_id=p_store_id
+   and source_hash in ('global',p_source_hash);
  return true;
 end;
 $$;

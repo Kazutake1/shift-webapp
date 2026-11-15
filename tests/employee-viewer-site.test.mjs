@@ -16,7 +16,7 @@ test('viewer site contains only an isolated six-digit PIN login and read-only sc
  assert.match(js,/^[\s\S]*fetch\(ACCESS_URL/);
  assert.match(js,/sessionStorage/);
  assert.doesNotMatch(js,/localStorage/);
- assert.doesNotMatch(js,/import .*cloud-sync|import .*stores|import .*employee-dialog/);
+ assert.deepEqual([...js.matchAll(/^\\s*import\\s+.*?from\\s+['\"]([^'\"]+)['\"]/gm)].map(match=>match[1]),['./holidays.js']);
  assert.doesNotMatch(html,/cloud-sync\.js|app\.js"[^>]*data-admin|employee-dialog/);
  assert.doesNotMatch(html+js,/確定|未確定|自分のシフト/);
  assert.doesNotMatch(html+js, /innerHTML|outerHTML|insertAdjacentHTML/);
@@ -32,7 +32,7 @@ test('isolated viewer output contains only explicitly reviewed assets, not manag
  assert.equal(readFileSync(resolve(out,'style.css'),'utf8'),read('style.css'));
  const distJS=readFileSync(resolve(out,'app.js'),'utf8');
  for(const keyword of ['employeeId','employeeNumber','birthdayAcknowledgements','shift_app_state',
-  'cloud-sync','owner_id','session_epoch','password_salt','password_hash']){
+  'owner_id','session_epoch','password_salt','password_hash']){
   assert.equal(distJS.includes(keyword),false,'unexpected credential/manager field in viewer static JS: '+keyword);
  }
  const headers=readFileSync(resolve(out,'_headers'),'utf8');

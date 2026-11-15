@@ -65,4 +65,22 @@ parallel_reserve store-b 24 ''
 test "$(awk '/^t$/{n++} END{print n+0}' "$tmp"/store-b-*.out)" = 20
 test "$(reserve store-b 100)" = f
 test "$(reserve store-a 44)" = t
-echo 'PASS: RLS, table and function grants, parallel limits, source isolation and store isolation'
+# Advance the stored timestamps only in this disposable cluster. This checks
+# the database's real expiry logic without sleeping for 15 minutes.
+test "$(reserve store-a 42)" = f
+"${psql[@]}" -q <<'SQL'
+do $$
+begin
+ if not exists(
+  select 1 from public.employee_viewer_pin_limits
+  where store_id='store-a' and source_hash=lpad('42',64,'0')
+    and locked_until between now()+interval '14 minutes' and now()+interval '15 minutes'
+ ) then raise exception 'The lock must last 15 minutes'; end if;
+end $$;
+update public.employee_viewer_pin_limits
+ set window_started=now()-interval '16 minutes', locked_until=now()-interval '1 second'
+ where store_id='store-a' and source_hash=lpad('42',64,'0');
+SQL
+test "$(reserve store-a 42)" = t
+test "$("${psql[@]}" -Atq -c "select attempts=1 and locked_until is null from public.employee_viewer_pin_limits where store_id='store-a' and source_hash=lpad('42',64,'0')")" = t
+echo 'PASS: RLS, grants, concurrent limits, source/store isolation and 15-minute recovery'

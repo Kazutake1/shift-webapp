@@ -79,3 +79,33 @@ test('従業員用サイト：連続失敗制限を説明し、間違ったパ�
  await expect(page.locator('#viewer-pin')).toHaveValue('');
  await expect(page.locator('#viewer-sheet-page')).toBeHidden();
 });
+
+test('従業員用サイト：スマホ幅で制限を案内し、解除後に同じ画面からログインできる',async({page})=>{
+ await page.setViewportSize({width:390,height:844});
+ await page.clock.setFixedTime(new Date('2026-11-10T10:00:00+09:00'));
+ let locked=true;
+ await page.route('https://wpyhkewwzsdcstypcbmq.supabase.co/functions/v1/employee-viewer-access**',async route=>{
+  const headers=replies('http://127.0.0.1:4173');
+  const method=route.request().method();
+  if(method==='OPTIONS')return route.fulfill({status:204,headers});
+  if(method==='POST'){
+   if(locked)return route.fulfill({status:429,headers,body:'{}'});
+   return route.fulfill({status:200,headers,body:JSON.stringify({token,expiresAt:'2030-01-01T00:00:00Z'})});
+  }
+  return route.fulfill({status:200,headers,body:JSON.stringify(sample())});
+ });
+ await page.goto('/dist-viewer/index.html?code='+code);
+ const pin=page.locator('#viewer-pin');
+ const login=page.locator('#viewer-login-button');
+ await pin.fill('583941');
+ await login.click();
+ await expect(page.locator('#viewer-login-error')).toContainText('15分後');
+ await expect(pin).toHaveValue('');
+ await expect(page.locator('#viewer-sheet-page')).toBeHidden();
+
+ locked=false;
+ await pin.fill('583941');
+ await login.click();
+ await expect(page.locator('#viewer-sheet-page')).toBeVisible();
+ await expect(page.locator('#viewer-store-name')).toHaveText('テスト店舗');
+});

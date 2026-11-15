@@ -174,3 +174,41 @@ begin
 end $$;
 SQL
 echo 'PASS: publish, revise, withdraw and reject stale revisions'
+
+# Revocation must follow the normal manager write, not a separate client request.
+"${psql[@]}" -q -f employee-viewer/backend/store-removal-draft.sql
+"${psql[@]}" -q <<'SQL'
+update public.shift_app_state set payload='{"stores":[{"id":"store-a"},{"id":"store-b"}]}';
+insert into public.employee_viewer_sessions(token_hash,owner_id,store_id,session_epoch,expires_at)
+select repeat(case when store_id='store-a' then 'a' else 'b' end,64),
+ owner_id,store_id,session_epoch,now()+interval '1 day'
+ from public.employee_viewer_passwords;
+update public.shift_app_state set payload='{"stores":[{"id":"store-b"}]}';
+do $$
+begin
+ if exists(select 1 from public.employee_viewer_passwords where store_id='store-a')
+ or exists(select 1 from public.employee_viewer_sessions where store_id='store-a')
+ or exists(select 1 from public.employee_viewer_pin_limits where store_id='store-a')
+ or exists(select 1 from shift_viewer_private.published_weeks) then
+  raise exception 'Store deletion left credentials, sessions, limits or published copies';
+ end if;
+ if not exists(select 1 from public.employee_viewer_sessions where store_id='store-b') then
+  raise exception 'Deleting another store revoked the wrong sessions';
+ end if;
+ begin
+  insert into public.employee_viewer_passwords(owner_id,store_id,password_salt,password_hash,kdf_iterations)
+  values ('00000000-0000-4000-8000-000000000001','store-a','test','test',600000);
+  raise exception 'Credentials could be recreated for a removed store';
+ exception when check_violation then null;
+ end;
+end $$;
+delete from public.shift_app_state;
+do $$
+begin
+ if exists(select 1 from public.employee_viewer_passwords)
+ or exists(select 1 from public.employee_viewer_sessions) then
+  raise exception 'Removing the manager schedule left viewer access active';
+ end if;
+end $$;
+SQL
+echo 'PASS: store revocation removes credentials, view sessions, PIN limits and published copies'

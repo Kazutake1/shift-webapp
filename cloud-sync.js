@@ -397,8 +397,8 @@ export function createCloudSync({
   await bootstrap();
   return true;
  }
- async function viewerPasswordRequest(storeId,password=null){
-  const method=password===null?'GET':'POST';
+ async function viewerPasswordRequest(storeId,password=null,{stop=false}={}){
+  const method=password===null&&!stop?'GET':'POST';
   if(typeof storeId!=='string'||!storeId||!getRoot().stores.some(store=>store.id===storeId)){
    throw Error('対象の店舗が存在しません。');
   }
@@ -415,7 +415,7 @@ export function createCloudSync({
   const response=await fetchImpl(method==='GET'?`${endpoint}?storeId=${encodeURIComponent(storeId)}`:endpoint,{
    method,
    headers:{...authHeaders(current.access_token),'Cache-Control':'no-store',...(method==='POST'?{'Content-Type':'application/json'}:{})},
-   ...(method==='POST'?{body:JSON.stringify({storeId,password})}:{})
+   ...(method==='POST'?{body:JSON.stringify(stop?{storeId,action:'stopViewer'}:{storeId,password})}:{})
   });
   // Return only non-sensitive metadata, never a password/hash/session token.
   if(!response.ok)throw Error('従業員用パスワード管理サーバーに接続できません。');
@@ -431,6 +431,21 @@ export function createCloudSync({
  }
  async function getViewerPasswordStatus(storeId){return viewerPasswordRequest(storeId);}
  async function changeViewerPassword(storeId,newPassword){return viewerPasswordRequest(storeId,newPassword);}
+ async function stopViewer(storeId){
+  const result=await viewerPasswordRequest(storeId,null,{stop:true});
+  if(result.configured)throw Error('閲覧の停止を確認できません。');
+  const owner=session?.user?.id;
+  for(const [key,job] of pendingViewerWeeks){
+   if(job.storeId!==storeId)continue;
+   if(owner){
+    try{storage.removeItem(viewerStorageKey(owner,key));}
+    catch{viewerPendingStorageError=true;}
+   }
+   pendingViewerWeeks.delete(key);
+  }
+  notifyViewer();
+  return result;
+ }
 
  async function signOut(){
   try{if(session?.access_token)await fetchImpl(`${SUPABASE_URL}/auth/v1/logout`,{method:'POST',headers:authHeaders(session.access_token)});}catch{}
@@ -519,7 +534,7 @@ export function createCloudSync({
 
  return {
   initialize,signIn,signOut,reloadFromCloud,queueSave,checkForRemoteUpdate,
-  getViewerPasswordStatus,changeViewerPassword,retryViewerCopies,
+  getViewerPasswordStatus,changeViewerPassword,stopViewer,retryViewerCopies,
   hasPendingViewerCopies:storeId=>Boolean(session?.user?.id)&&[...pendingViewerWeeks.values()].some(job=>job.storeId===storeId),
   getStatus:()=>({
    signedIn:Boolean(session?.access_token),email:session?.user?.email||'',

@@ -94,6 +94,23 @@ export function createViewerPasswordAdminUi({
    ?`最終変更日：${displayDate(status.lastChangedAt)}${reminder.due?'　変更時期です。':''}`
    :'まだパスワードが設定されていません。';
   save.disabled=false;
+  if(status.configured){
+   const stop=button('従業員向け閲覧を停止',async()=>{
+    if(getStore()?.id!==store.id)return;
+    if(!confirmChange(`${store.name}の従業員向け閲覧を停止しますか？現在のQRコードとログインは無効になります。`))return;
+    stop.disabled=true;save.disabled=true;
+    try{
+     const stopped=await cloudSync.stopViewer(store.id);
+     statusByStore.set(store.id,stopped);
+     renderNotice();
+     await open();
+    }catch{
+     error.textContent='閲覧の停止を確認できませんでした。通信状況を確認してください。';
+     stop.disabled=false;save.disabled=false;
+    }
+   },'danger');
+   body.append(stop);
+  }
   if(status.publishingReady&&store.weekStart){
    const result=el('p',{role:'status',class:'hint'});
    const retry=button('従業員向けシフト表への反映を再試行',async()=>{

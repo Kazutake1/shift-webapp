@@ -73,12 +73,15 @@ function memoryDatabase(cloud) {
     from(name) {
       assert.ok(Object.hasOwn(tables,name), 'unexpected table: ' + name);
       const filters = [];
-      let deleting = false;
+      let deleting = false, patch;
       const query = {
         select() {return this;},
         eq(key,value) {filters.push([key,value]);return this;},
+        update(row) {patch=row;return this;},
         async maybeSingle() {
-          return {data:tables[name].find(row => rowMatches(row,filters)) ?? null,error:null};
+          const row=tables[name].find(row => rowMatches(row,filters)) ?? null;
+          if(row&&patch)Object.assign(row,structuredClone(patch));
+          return {data:row,error:null};
         },
         async insert(row) {
           tables[name].push(structuredClone(row));
@@ -211,6 +214,9 @@ function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_week_read
     adminGet: (storeId,jwt=MANAGER_TOKEN) => admin(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-admin?storeId='+
        encodeURIComponent(storeId),'GET',ADMIN_ORIGIN,null,jwt)),
+    stop: (storeId,jwt=MANAGER_TOKEN) => admin(request(
+       'https://fake-project.supabase.co/functions/v1/employee-viewer-admin',
+       'POST',ADMIN_ORIGIN,{action:'stopViewer',storeId},jwt)),
     publish: (storeId,extra={},jwt=MANAGER_TOKEN) => admin(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-admin',
       'POST',ADMIN_ORIGIN,{action:'syncPublishedWeek',storeId,weekStart:WEEK,...extra},jwt)),
@@ -396,4 +402,21 @@ test('mock backend: publishing uses committed data, checks store ownership and w
   assert.deepEqual(await (await f.publish(f.storeA)).json(),{applied:true});
   assert.equal((await f.view(token)).status,404);
   assert.equal(f.copies.get(f.storeB).storeName,'TEST-STORE-B');
+});
+
+
+test('mock backend: a manager can stop one store without stopping another',async () => {
+  const f=makeFixture();
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  assert.equal((await f.adminSet(f.storeB,'749281')).status,200);
+  const [a,b]=f.db.tables.employee_viewer_passwords;
+  const {token:aToken}=await (await f.login(a.viewer_code,'583941')).json();
+  const {token:bToken}=await (await f.login(b.viewer_code,'749281')).json();
+  assert.equal((await f.stop(f.storeA,aToken)).status,401);
+  assert.equal((await f.stop('unowned-store')).status,403);
+  assert.equal((await f.stop(f.storeA)).status,200);
+  assert.equal((await f.view(aToken)).status,401);
+  assert.equal((await f.login(a.viewer_code,'583941')).status,401);
+  assert.equal((await f.view(bToken)).status,200);
+  assert.equal((await f.stop(f.storeA)).status,200);
 });

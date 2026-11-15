@@ -41,17 +41,18 @@ Deno.serve(async req=>{
    .select('user_id').eq('user_id',owner).maybeSingle();
   if(membershipError||membership?.user_id!==owner)return reply(req,origins,403,{error:'admin permission required'});
 
-  let storeId,pin,weekStart,publish=false;
+  let storeId,pin,weekStart,publish=false,stop=false;
   if(req.method==='GET'){
    storeId=new URL(req.url).searchParams.get('storeId');
   }else{
    const input=await readSmallJson(req);
    storeId=input.storeId;
    publish=input.action==='syncPublishedWeek';
+   stop=input.action==='stopViewer';
    if(publish){
     weekStart=input.weekStart;
     if(!validWeekStart(weekStart))return reply(req,origins,400,{error:'invalid week'});
-   }else{
+   }else if(!stop){
     pin=input.password;
     try{assertServerPin(pin);}catch{return reply(req,origins,400,{error:'invalid six-digit password'});}
    }
@@ -67,6 +68,12 @@ Deno.serve(async req=>{
   if(stateError)return reply(req,origins,503,{error:'store verification unavailable'});
   if(!state?.payload?.stores?.some(s=>s?.id===storeId)){
    return reply(req,origins,403,{error:'store access denied'});
+  }
+  if(stop){
+   // Database cascades remove viewing sessions, limits and published copies.
+   const {error}=await db.from('employee_viewer_passwords').delete().eq('owner_id',owner).eq('store_id',storeId);
+   if(error)return reply(req,origins,503,{error:'viewer access was not stopped'});
+   return reply(req,origins,200,{configured:false,lastChangedAt:null});
   }
   const {data:current,error:readError}=await db.from('employee_viewer_passwords')
    .select('viewer_code,password_hash,password_salt,kdf_iterations,changed_at')
@@ -94,11 +101,20 @@ Deno.serve(async req=>{
   }
   const credential=await hashPin(pin,pepper);
   const changedAt=new Date().toISOString();
-  const {error:saveError}=await db.from('employee_viewer_passwords').upsert({
+  const newCredential={
    owner_id:owner,store_id:storeId,
    viewer_code:current?.viewer_code||crypto.randomUUID(),
    ...credential,session_epoch:crypto.randomUUID(),changed_at:changedAt
-  },{onConflict:'owner_id,store_id'});
+  };
+  let saveError;
+  if(current){
+   const {data,error}=await db.from('employee_viewer_passwords').update(newCredential)
+    .eq('owner_id',owner).eq('store_id',storeId).eq('viewer_code',current.viewer_code)
+    .select('viewer_code').maybeSingle();
+   saveError=error||!data;
+  }else{
+   ({error:saveError}=await db.from('employee_viewer_passwords').insert(newCredential));
+  }
   if(saveError)return reply(req,origins,503,{error:'password was not saved'});
   // Session epoch rotation already invalidates every token even if cleanup fails.
   const {error:sessionError}=await db.from('employee_viewer_sessions')

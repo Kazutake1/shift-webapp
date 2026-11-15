@@ -9,6 +9,7 @@ const $=id=>document.getElementById(id);
 const viewerCode=new URLSearchParams(location.search).get('code')||'';
 const validCode=/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(viewerCode);
 let session=null;
+let requestSequence=0;
 let currentWeek=tokyoWeekStart();
 const el=(tag,attrs={},text='')=>{
  const node=document.createElement(tag);
@@ -77,6 +78,7 @@ function showSheet(){
  $('viewer-logout').hidden=false;
 }
 function clearSession(){
+ requestSequence++;
  session=null;
  try{sessionStorage.removeItem(STORAGE_KEY);}catch{}
 }
@@ -169,21 +171,26 @@ function renderTable(sheet){
 
 async function readWeek(){
  if(!session)return;
+ const serial=++requestSequence;
+ const requestedWeek=currentWeek;
  $('viewer-week-label').textContent=period();
  $('paper-period').textContent=period();
  $('viewer-sheet-message').textContent='読み込み中…';
  try{
-  const response=await fetch(ACCESS_URL+'?weekStart='+encodeURIComponent(currentWeek),{
+  const response=await fetch(ACCESS_URL+'?weekStart='+encodeURIComponent(requestedWeek),{
    method:'GET',headers:{Authorization:'Bearer '+session.token},cache:'no-store'
   });
+  if(serial!==requestSequence)return;
   if(response.status===401){clearSession();showLogin('ログインし直してください。');return;}
   if(response.status===404){renderEmpty('この週のシフト表は表示できません。');return;}
   if(!response.ok)throw Error('schedule access failed');
   const sheet=await response.json();
+  if(serial!==requestSequence)return;
+  if(sheet?.weekStart!==requestedWeek){renderEmpty('シフト表を表示できません。');return;}
   renderTable(sheet);
   showSheet();
  }catch{
-  renderEmpty('通信に失敗しました。接続状況を確認してください。');
+  if(serial===requestSequence)renderEmpty('通信に失敗しました。接続状況を確認してください。');
  }
 }
 $('viewer-login-form').addEventListener('submit',async event=>{

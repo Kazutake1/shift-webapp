@@ -115,7 +115,8 @@ test('従業員用サイト：スマホ幅で制限を案内し、解除後に�
 test('スマホ幅：2店舗のPIN・閲覧制限・更新・停止を実際のハンドラーで確認',async({page})=>{
  test.setTimeout(35000);
  const origin='http://127.0.0.1:4173';
- const f=makeFixture({verifiedIpHeader:true,employeeOrigin:origin});
+ const fixtureOrigin='https://employee.example.invalid';
+ const f=makeFixture({verifiedIpHeader:true,employeeOrigin:fixtureOrigin});
  for(const [store,pin] of [[f.storeA,'583941'],[f.storeB,'749281']]){
   expect((await f.adminSet(store,pin)).status).toBe(200);
   expect((await f.publish(store)).status).toBe(200);
@@ -127,13 +128,19 @@ test('スマホ幅：2店舗のPIN・閲覧制限・更新・停止を実際の�
  await page.route('https://employee-viewer.invalid/functions/v1/employee-viewer-access**',async route=>{
   const req=route.request();
   const headers=new Headers(await req.allHeaders());
-  headers.set('origin',origin);
+  // The handler only trusts HTTPS origins. The intercepted browser is
+  // served over local HTTP; bridge the approved fixture origin at this boundary.
+  headers.set('origin',fixtureOrigin);
   headers.set('cf-connecting-ip',ip);
   const body=req.postData();
   const result=await f.access(new Request(req.url(),{
    method:req.method(),headers,...(body===null?{}:{body})
   }));
-  await route.fulfill({status:result.status,headers:Object.fromEntries(result.headers),body:await result.text()});
+  const responseHeaders=new Headers(result.headers);
+  if(responseHeaders.get('access-control-allow-origin')===fixtureOrigin){
+   responseHeaders.set('access-control-allow-origin',origin);
+  }
+  await route.fulfill({status:result.status,headers:Object.fromEntries(responseHeaders),body:await result.text()});
  });
  const open=record=>page.goto('/dist-viewer/index.html?code='+record.viewer_code);
  const pinField=page.locator('#viewer-pin');

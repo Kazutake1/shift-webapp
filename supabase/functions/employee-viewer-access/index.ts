@@ -36,6 +36,14 @@ Deno.serve(async req=>{
 
   if(req.method==='POST'){
    const input=await readSmallJson(req);
+   if(input.action==='logout'){
+    const token=tokenFromRequest(req);
+    if(!token)return reply(req,origins,401,{error:'ログインしてください。'});
+    const {error}=await db.from('employee_viewer_sessions').delete()
+     .eq('token_hash',await sha256Hex(token));
+    if(error)return reply(req,origins,503,{error:'service unavailable'});
+    return reply(req,origins,200,{ok:true});
+   }
    const viewerCode=input.viewerCode;
    const pin=input.password;
    if(!validViewerCode(viewerCode)||!(/^[0-9]{6}$/.test(pin))){

@@ -195,6 +195,7 @@ async function readWeek(){
 }
 $('viewer-login-form').addEventListener('submit',async event=>{
  event.preventDefault();
+ if($('viewer-login-button').disabled)return;
  if(!validCode){showLogin('店舗のQRコードから開いてください。');return;}
  const password=$('viewer-pin').value;
  if(!/^[0-9]{6}$/.test(password)){$('viewer-login-error').textContent='数字6桁で入力してください。';return;}
@@ -224,8 +225,27 @@ $('viewer-login-form').addEventListener('submit',async event=>{
   submit.disabled=false;
  }
 });
-$('viewer-logout').addEventListener('click',()=>{
+$('viewer-logout').addEventListener('click',async()=>{
+ const token=session?.token;
  clearSession();$('schedule').replaceChildren();showLogin();
+ if(!token)return;
+ const serial=requestSequence;
+ const submit=$('viewer-login-button');
+ submit.disabled=true;
+ try{
+  const response=await fetch(ACCESS_URL,{
+   method:'POST',cache:'no-store',keepalive:true,signal:AbortSignal.timeout(10000),
+   headers:{'Content-Type':'application/json',Authorization:'Bearer '+token},
+   body:JSON.stringify({action:'logout'})
+  });
+  if(!response.ok||(await response.json()).ok!==true)throw Error('logout failed');
+ }catch{
+  if(serial===requestSequence){
+   $('viewer-login-error').textContent='この画面は閉じましたが、通信のため閲覧権限の失効を確認できませんでした。';
+  }
+ }finally{
+  submit.disabled=false;
+ }
 });
 $('viewer-previous').addEventListener('click',()=>{currentWeek=addDays(currentWeek,-7);readWeek();});
 $('viewer-next').addEventListener('click',()=>{currentWeek=addDays(currentWeek,7);readWeek();});

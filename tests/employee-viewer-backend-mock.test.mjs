@@ -187,6 +187,9 @@ function makeFixture() {
     login: (viewerCode,password,ip='192.0.2.10',origin=EMPLOYEE_ORIGIN) => access(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-access',
       'POST',origin,{viewerCode,password},null,ip)),
+    logout: token => access(request(
+      'https://fake-project.supabase.co/functions/v1/employee-viewer-access',
+      'POST',EMPLOYEE_ORIGIN,{action:'logout'},token)),
     view: (token,weekStart=WEEK,extra='') => access(request(
       'https://fake-project.supabase.co/functions/v1/employee-viewer-access?weekStart='+
        weekStart+extra,'GET',EMPLOYEE_ORIGIN,null,token))
@@ -287,4 +290,18 @@ test('mock backend: unconfirmed week, expired token, revoked admin, bad origin d
   const newToken = (await newResult.json()).token;
   f.db.tables.shift_app_admins = [];
   assert.equal((await f.view(newToken)).status,403);
+});
+
+test('mock backend: logout revokes only the current viewing session',async () => {
+  const f = makeFixture();
+  assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
+  const code = f.db.tables.employee_viewer_passwords[0].viewer_code;
+  const {token:first} = await (await f.login(code,'583941')).json();
+  const {token:second} = await (await f.login(code,'583941')).json();
+  assert.equal((await f.view(first)).status,200);
+  assert.equal((await f.logout()).status,401);
+  assert.equal((await f.logout(first)).status,200);
+  assert.equal((await f.view(first)).status,401);
+  assert.equal((await f.logout(first)).status,200);
+  assert.equal((await f.view(second)).status,200);
 });

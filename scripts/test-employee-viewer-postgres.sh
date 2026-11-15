@@ -96,7 +96,7 @@ SQL
 "${psql[@]}" -q -f employee-viewer/backend/published-week-schema-draft.sql
 "${psql[@]}" -q <<'SQL'
 insert into shift_viewer_private.published_weeks
-select viewer_code,'2026-11-09',
+select viewer_code,'2026-11-09',1,
  '{"format":"employee-schedule-only-v1","weekStart":"2026-11-09","storeName":"SYNTHETIC STORE","fixed":[],"days":[]}'
  from public.employee_viewer_passwords where store_id='store-a';
 set role shift_viewer_week_reader;
@@ -127,3 +127,50 @@ begin
 end $$;
 SQL
 echo 'PASS: published shift read role cannot access manager records or modify published shifts'
+
+# Publisher and reader test the full revision sequence with synthetic data.
+"${psql[@]}" -q <<'SQL'
+select viewer_code as test_viewer_code from public.employee_viewer_passwords where store_id='store-a' \gset
+select set_config('shift_test.viewer_code',:'test_viewer_code',false);
+set role shift_viewer_week_publisher;
+do $$
+declare
+ v_code uuid:=current_setting('shift_test.viewer_code')::uuid;
+ v_sheet jsonb:='{"format":"employee-schedule-only-v1","weekStart":"2026-11-09","storeName":"REVISED","fixed":[],"days":[]}';
+begin
+ if not shift_viewer_private.apply_published_week(v_code,'2026-11-09',2,v_sheet) then
+  raise exception 'Publisher could not update a shift';
+ end if;
+ if not shift_viewer_private.apply_published_week(v_code,'2026-11-09',3,null) then
+  raise exception 'Publisher could not withdraw a shift';
+ end if;
+ if shift_viewer_private.apply_published_week(v_code,'2026-11-09',2,v_sheet)
+ or shift_viewer_private.apply_published_week(v_code,'2026-11-09',3,v_sheet) then
+  raise exception 'An old or equal revision was able to revive a withdrawn shift';
+ end if;
+end $$;
+reset role;
+set role shift_viewer_week_reader;
+do $$
+begin
+ if exists(select 1 from shift_viewer_private.published_weeks) then
+  raise exception 'The reader can see a withdrawn shift';
+ end if;
+ if has_function_privilege(current_user,'shift_viewer_private.apply_published_week(uuid,date,bigint,jsonb)','EXECUTE') then
+  raise exception 'The reader has publishing permissions';
+ end if;
+end $$;
+reset role;
+set role shift_viewer_week_publisher;
+select shift_viewer_private.apply_published_week(:'test_viewer_code','2026-11-09',4,
+ '{"format":"employee-schedule-only-v1","weekStart":"2026-11-09","storeName":"REPUBLISHED","fixed":[],"days":[]}');
+reset role;
+set role shift_viewer_week_reader;
+do $$
+begin
+ if (select count(*) from shift_viewer_private.published_weeks where sheet->>'storeName'='REPUBLISHED')<>1 then
+  raise exception 'A newer revision could not republish the shift';
+ end if;
+end $$;
+SQL
+echo 'PASS: publish, revise, withdraw and reject stale revisions'

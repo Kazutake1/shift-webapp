@@ -1,19 +1,21 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {MIN_VIEWER_PASSWORD_LENGTH,validateViewerPassword,viewerRotationState,viewerRotationMessage} from '../employee-viewer/rotation-policy.mjs';
+import {VIEWER_PASSWORD_LENGTH,validateViewerPassword,viewerRotationState,viewerRotationMessage} from '../employee-viewer/rotation-policy.mjs';
 
-test('viewer password: 15 chars minimum, no control chars, and independent of employee number',()=>{
- assert.equal(MIN_VIEWER_PASSWORD_LENGTH,15);
- assert.match(validateViewerPassword('short-12345'),/15文字以上/);
- assert.equal(validateViewerPassword('SomeLongPassword!2026'),'');
- assert.match(validateViewerPassword('x'.repeat(129)),/128文字以内/);
- assert.match(validateViewerPassword('valid-long-pass\nword'),/制御文字/);
- assert.match(validateViewerPassword(' '.repeat(15)),/制御文字/);
+test('viewer PIN: exactly six ASCII digits and not an obvious sequence',()=>{
+ assert.equal(VIEWER_PASSWORD_LENGTH,6);
+ assert.equal(validateViewerPassword('583941'),'');
+ for(const bad of ['12345','1234567','A83941','１２３４５６','583 41','58394\n','']){
+  assert.notEqual(validateViewerPassword(bad),'');
+ }
+ for(const guessable of ['000000','111111','123456','654321','012345','987654','121212','123123']){
+  assert.match(validateViewerPassword(guessable),/推測されやすい/);
+ }
 });
 
 test('viewer password: no secret is written or returned by the reminder policy',()=>{
  const source=JSON.stringify(viewerRotationState({configured:true,lastChangedAt:'2026-11-01T00:00:00+09:00',now:new Date('2026-11-15T03:00:00Z')}));
- assert.equal(source.includes('SomeLongPassword'),false);
+ assert.equal(source.includes('583941'),false);
  assert.deepEqual(viewerRotationState({configured:false}),{kind:'unconfigured',due:true,elapsedDays:null});
  assert.deepEqual(viewerRotationState({configured:true,lastChangedAt:null}),{kind:'unknown',due:false,elapsedDays:null});
 });
@@ -56,7 +58,7 @@ test('viewer admin API: reject unsigned users and foreign-store requests before 
  });
  await assert.rejects(()=>cloud.getViewerPasswordStatus('other-store'),/店舗/);
  await assert.rejects(()=>cloud.getViewerPasswordStatus(root.activeStoreId),/ログイン/);
- await assert.rejects(()=>cloud.changeViewerPassword(root.activeStoreId,'weak'),/15文字以上/);
+ await assert.rejects(()=>cloud.changeViewerPassword(root.activeStoreId,'weak'),/数字6桁/);
  assert.equal(calls,0);
 });
 
@@ -86,7 +88,7 @@ test('viewer admin API: only manager-authorized requests send a password and nev
  };
  const cloud=createCloudSync({getRoot:()=>root,replaceRoot:()=>true,storage,fetchImpl});
  assert.deepEqual(await cloud.getViewerPasswordStatus(root.activeStoreId),{configured:false,lastChangedAt:null});
- const secret='Safe-Synthetic-Password-2026';
+ const secret='583941';
  const result=await cloud.changeViewerPassword(root.activeStoreId,secret);
  assert.equal(result.configured,true);
  assert.equal(requests.some(r=>r.url.includes('/functions/v1/employee-viewer-admin')),true);

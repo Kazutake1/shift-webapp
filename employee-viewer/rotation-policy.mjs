@@ -1,16 +1,17 @@
 // Manager-only policy helpers. No passwords or authentication state are persisted here.
-export const MIN_VIEWER_PASSWORD_LENGTH=15;
-export const MAX_VIEWER_PASSWORD_LENGTH=128;
+export const VIEWER_PASSWORD_LENGTH=6;
+const OBVIOUS_PINS=new Set([
+ '123456','654321','012345','987654','000001','100000','112233','123123',
+ '121212','111222','777777','888888','999999'
+]);
 export const VIEWER_ROTATION_DAYS=30;
 const DAY_MS=86400000;
 const datePattern=/^\d{4}-\d{2}-\d{2}$/;
 
 export function validateViewerPassword(password){
- if(typeof password!=='string')return 'パスワードを入力してください。';
- const length=Array.from(password).length;
- if(length<MIN_VIEWER_PASSWORD_LENGTH)return 'パスワードは15文字以上で設定してください。';
- if(length>MAX_VIEWER_PASSWORD_LENGTH)return 'パスワードは128文字以内で設定してください。';
- if(!password.trim()||/[\u0000-\u001f\u007f]/.test(password))return '制御文字や改行を含まないパスワードを使用してください。';
+ if(typeof password!=='string'||!password)return 'パスワードを入力してください。';
+ if(!/^[0-9]{6}$/.test(password))return 'パスワードは数字6桁で設定してください。';
+ if(OBVIOUS_PINS.has(password)||/^([0-9])\1{5}$/.test(password))return '推測されやすい番号は使えません。別の番号にしてください。';
  return '';
 }
 

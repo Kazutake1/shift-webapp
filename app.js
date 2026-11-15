@@ -7,10 +7,12 @@ import {createEmployeeUi,withinFirstMonth} from './employee-dialog.js';
 import {createStateManager} from './state-manager.js';
 import {createPrintPdf} from './print-pdf.js';
 import {createCloudSync} from './cloud-sync.js';
+import {createViewerPasswordAdminUi} from './employee-viewer/password-admin-ui.mjs';
 import {localToday,hasDueUnconfirmedWeeks,prepareWeekFinalizations,changedSinceConfirmation} from './week-finalization.js';
 const $=s=>document.querySelector(s);
 const CLOUD_CONFLICT_MESSAGE='別の端末でシフトが更新されています。\n\nこの端末からの保存・削除は停止しました。\n設定 → 複数端末共有 →「クラウドから最新を読み込む」を実行してください。';
 let preview=false,activeCell=null,backupAt='';
+let viewerPasswordUi=null;
 try{backupAt=localStorage.getItem('shift-last-backup')||'';}catch{}
 
 function updateTools(){
@@ -184,7 +186,7 @@ function drawRules(){
   host.append(svg);
 }
 
-function render(){const root=stateManager.getRoot(),state=stateManager.getState(),storageError=stateManager.getStorageError();renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');const marked=new Set(changedSinceConfirmation(week()).map(item=>`${item.day}-${item.kind}-${item.row??''}-${item.band??''}`));week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date,b);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else if(extra?.type==='task'){const start=Number.isInteger(extra.start)?extra.start:band.start,end=Number.isInteger(extra.end)?extra.end:band.end;label=timedTextLabel(extra.text,start,end,b);}}else label=shiftLabel(day.shifts[row-1][b],b);const changedKey=row===4?`${d}-extra--${b}`:row>0?`${d}-shift-${row-1}-${b}`:'';const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''} ${marked.has(changedKey)?'post-confirm-change':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(row>=1&&row<=3&&label){const shift=day.shifts[row-1][b];const caption=el('span',{class:'employee-caption'});caption.append(el('span',{class:'employee-name'},shift.name));const suffix=label.slice(shift.name.length);if(suffix)caption.append(el('span',{class:'employee-time'},suffix));btn.replaceChildren(caption);}else if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:'notes-cell'}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?`この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：${holidayYears.join("・")}年）。`:'');renderWeekConfirmation();requestAnimationFrame(fitText);}
+function render(){const root=stateManager.getRoot(),state=stateManager.getState(),storageError=stateManager.getStorageError();renderBirthdays();const table=$('#schedule');table.replaceChildren();const cols=el('colgroup');cols.append(el('col',{class:'date'}),el('col',{class:'day'}));for(let i=0;i<24;i++)cols.append(el('col'));cols.append(el('col',{class:'notes'}));table.append(cols);const head=el('thead'),hr=el('tr');hr.append(el('th',{colspan:2,class:'month'},`${Number(state.current.slice(5,7))}月`));for(let i=0;i<24;i++)hr.append(el('th',{scope:'col',class:[0,3,7,11,16].includes(i)?'boundary':''},String((i+6)%24)));hr.append(el('th',{scope:'col',class:'notes-head'},'備考'));head.append(hr);table.append(head);const body=el('tbody');const marked=new Set(changedSinceConfirmation(week()).map(item=>`${item.day}-${item.kind}-${item.row??''}-${item.band??''}`));week().days.forEach((day,d)=>{const info=dayInfo(day.date);for(let row=0;row<5;row++){const tr=el('tr',{class:row===0?'day-start':row===4?'extra':''});if(row===0){const date=el('td',{rowspan:5,class:`date-cell ${info.color} ${day.date.endsWith("-01")?"month-date":""}`,title:info.holiday},day.date.endsWith('-01')?`${Number(day.date.slice(5,7))}/${Number(day.date.slice(8))}`:String(Number(day.date.slice(8))));date.append(el('small',{},'日'));tr.append(date,el('td',{rowspan:4,class:`day-cell ${info.color}`,title:info.holiday},'日月火水木金土'[info.weekday]));}if(row===4)tr.append(el('td',{class:'day-blank'}));bands.forEach((band,b)=>{let label='';if(row===0)label=fixedTextAt(state.fixed[b],day.date,b);else if(row===4){const extra=day.extras[b];if(extra?.type==='training'){const timed={...extra,start:Number.isInteger(extra.start)?extra.start:band.start,end:Number.isInteger(extra.end)?extra.end:band.end};label=`トレーニング：${shiftLabel(timed,b)}`;}else if(extra?.type==='task'){const start=Number.isInteger(extra.start)?extra.start:band.start,end=Number.isInteger(extra.end)?extra.end:band.end;label=timedTextLabel(extra.text,start,end,b);}}else label=shiftLabel(day.shifts[row-1][b],b);const changedKey=row===4?`${d}-extra--${b}`:row>0?`${d}-shift-${row-1}-${b}`:'';const td=el('td',{colspan:(band.end-band.start)/60,class:`slot ${row>=1&&row<=3?'employee-slot':''} ${label?'occupied':''} ${marked.has(changedKey)?'post-confirm-change':''}`,style:`--hours:${(band.end-band.start)/60}`});const btn=button(label,()=>openCell(d,row,b));btn.setAttribute('aria-label',`${day.date} ${['固定作業','従業員①','従業員②','予備従業員','不定期作業／トレーニング'][row]} ${timeLabel(band.start)}〜${timeLabel(band.end)} ${label||'空欄'}`);if(row>=1&&row<=3&&label){const shift=day.shifts[row-1][b];const caption=el('span',{class:'employee-caption'});caption.append(el('span',{class:'employee-name'},shift.name));const suffix=label.slice(shift.name.length);if(suffix)caption.append(el('span',{class:'employee-time'},suffix));btn.replaceChildren(caption);}else if(label.length>9)btn.classList.add('long');td.append(btn);tr.append(td);});if(row===0){const td=el('td',{rowspan:5,class:'notes-cell'}),btn=button(day.notes,()=>openNotes(d));btn.setAttribute('aria-label',`${day.date} 備考 ${day.notes||'空欄'}`);td.append(btn);tr.append(td);}body.append(tr);}});table.append(body);$('#week-label').textContent=period();$('#paper-period').textContent=period();$('#store-name').textContent=state.store;$('#settings-store').textContent=`選択中の店舗：${state.store}`;$('#store').replaceChildren(...root.stores.map(s=>el('option',{value:s.id},s.store||'名称未設定')));$('#store').value=state.id;const unsupported=week().days.some(d=>!dayInfo(d.date).supported);$('#notice').textContent=storageError||(unsupported?`この週には祝日データ未収録の年が含まれます。祝日の赤表示は未判定です（対応：${holidayYears.join("・")}年）。`:'');renderWeekConfirmation();viewerPasswordUi?.renderNotice();requestAnimationFrame(fitText);}
 function renderWeekConfirmation(){
  const confirmed=week().confirmation;
  const status=$('#week-confirm-status');
@@ -439,12 +441,13 @@ function openCloudSync(){
  body.append(field('メールアドレス',email),field('パスワード',password));
  const error=el('p',{class:'error',role:'alert'}),actions=el('div',{class:'actions'});
  const login=button('ログイン',async()=>{
-  const ok=await runCloudAction(login,()=>cloudSync.signIn(email.value.trim(),password.value),error);if(ok)close();
+  const ok=await runCloudAction(login,()=>cloudSync.signIn(email.value.trim(),password.value),error);if(ok){close();viewerPasswordUi?.refresh();}
  },'primary');
  actions.append(login);body.append(error,actions);
 }
 $('#cloud-sync').onclick=openCloudSync;
-$('#store').onchange=e=>selectStore(e.target.value);
+$('#viewer-password').onclick=()=>viewerPasswordUi?.open();
+$('#store').onchange=e=>{selectStore(e.target.value);viewerPasswordUi?.refresh();};
 let previewObserver=null;
 function closePreview(){
  previewPdfGeneration++;
@@ -575,8 +578,14 @@ cloudSync=createCloudSync({
  onRemoteLoaded:()=>{render();autoConfirmOverdue();},
  canAutoApply:()=>!$('#editor')?.open&&!preview&&!printLayoutActive
 });
+viewerPasswordUi=createViewerPasswordAdminUi({
+ cloudSync,
+ getStore:()=>{const state=stateManager.getState();return {id:state.id,name:state.store};},
+ openDialog,close,el,field,button,hint,
+ noticeHost:$('#viewer-password-notice')
+});
 render();stateManager.save(false,false,false);showSettings();
-cloudSync.initialize().then(()=>{autoConfirmOverdue();showStartupBirthdayPopup();},()=>showStartupBirthdayPopup());
+cloudSync.initialize().then(()=>{autoConfirmOverdue();viewerPasswordUi?.refresh();showStartupBirthdayPopup();},()=>showStartupBirthdayPopup());
 const checkCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate();};
 const retryCloudUpdate=()=>{if(!document.hidden)cloudSync.checkForRemoteUpdate({force:true});};
 window.addEventListener('online',retryCloudUpdate);

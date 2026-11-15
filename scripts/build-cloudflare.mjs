@@ -1,5 +1,5 @@
 import {copyFile,mkdir,rm,stat} from 'node:fs/promises';
-import {join} from 'node:path';
+import {join,dirname} from 'node:path';
 
 const output='dist';
 
@@ -17,6 +17,8 @@ const publicAssets=[
   'state-manager.js',
   'week-finalization.js',
   'cloud-sync.js',
+  'employee-viewer/rotation-policy.mjs',
+  'employee-viewer/password-admin-ui.mjs',
   'schedule-sync.js',
   'supabase-config.js',
   'model.js',
@@ -40,6 +42,8 @@ await mkdir(output,{recursive:true});
 for(const name of publicAssets){
  const info=await stat(name).catch(()=>null);
  if(!info?.isFile())throw Error(`Public build is missing required reviewed asset: ${name}`);
- await copyFile(name,join(output,name));
+ const destination=join(output,name);
+ await mkdir(dirname(destination),{recursive:true});
+ await copyFile(name,destination);
 }
 console.log(`Public build ready: ${output} (${publicAssets.length} reviewed assets)`);

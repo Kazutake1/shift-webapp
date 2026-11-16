@@ -52,6 +52,14 @@ export function createViewerPasswordAdminUi({
   const password=el('input',{type:'password',autocomplete:'new-password',inputmode:'numeric',pattern:'[0-9]{6}',minlength:'6',maxlength:'6',placeholder:'数字6桁'});
   const repeat=el('input',{type:'password',autocomplete:'new-password',inputmode:'numeric',pattern:'[0-9]{6}',minlength:'6',maxlength:'6',placeholder:'数字6桁を再入力'});
   const error=el('p',{role:'alert',class:'error'});
+  const address=el('input',{type:'url',readonly:''});
+  const addressField=field('従業員用の閲覧URL',address);
+  addressField.hidden=true;
+  address.addEventListener('focus',()=>address.select());
+  const renderAddress=status=>{
+   address.value=status.viewerUrl||'';
+   addressField.hidden=!address.value;
+  };
   const save=button('パスワードを設定・変更',async()=>{
    error.textContent='';
    if(getStore()?.id!==store.id){error.textContent='店舗が切り替わっています。開き直してください。';return;}
@@ -64,6 +72,7 @@ export function createViewerPasswordAdminUi({
     const status=await cloudSync.changeViewerPassword(store.id,password.value);
     // The server, not the browser, must verify credentials and revoke all sessions.
     statusByStore.set(store.id,status);
+    renderAddress(status);
     last.textContent=`最終変更日：${displayDate(status.lastChangedAt)}`;
     renderNotice();
     hint(body,'変更を保存しました。バックルームの掲示パスワードを差し替えてください。');
@@ -77,7 +86,7 @@ export function createViewerPasswordAdminUi({
   save.disabled=true;
   hint(body,'店舗の従業員専用バックルームに掲示してください。QRコードにパスワードは含めません。');
   hint(body,'毎月1日を目安に変更し、退職・漏えい時には直ちに変更します。変更時は以前のログインも無効にします。');
-  body.append(last,field('新しい共通パスワード',password),field('確認用パスワード',repeat),error,save);
+  body.append(last,field('新しい共通パスワード',password),field('確認用パスワード',repeat),addressField,error,save);
 
   if(!cloudSync.getStatus().signedIn){
    last.textContent='管理者用の「複数端末共有」にログインしてください。';
@@ -89,6 +98,7 @@ export function createViewerPasswordAdminUi({
    last.textContent='管理サーバーの機能がまだ利用できません。パスワードは保存されません。';
    return;
   }
+  renderAddress(status);
   const reminder=viewerRotationState({...status,now:now()});
   last.textContent=status.configured
    ?`最終変更日：${displayDate(status.lastChangedAt)}${reminder.due?'　変更時期です。':''}`

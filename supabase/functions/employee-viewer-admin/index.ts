@@ -3,8 +3,20 @@
 import {createClient} from 'npm:@supabase/supabase-js@2.95.0';
 import postgres from 'npm:postgres@3.4.7';
 import {projectCloudViewerWeek} from '../_shared/viewer-projection.mjs';
-import {assertServerPin,hashPin,verifyPin,validWeekStart} from '../_shared/viewer-security.mjs';
+import {assertServerPin,hashPin,verifyPin,validWeekStart,validViewerCode} from '../_shared/viewer-security.mjs';
 import {allowedOrigins,corsHeaders,reply,readSmallJson,secureEnvironment} from '../_shared/viewer-http.mjs';
+
+function viewerUrl(code,project,adminOrigins){
+ const configured=Deno.env.get('VIEWER_EMPLOYEE_ORIGIN');
+ if(!configured||!validViewerCode(code))return {};
+ try{
+  const url=new URL(configured);
+  if(url.protocol!=='https:'||url.origin!==configured||
+   url.origin===project||adminOrigins.includes(url.origin))return {};
+  url.searchParams.set('code',code);
+  return {viewerUrl:url.href};
+ }catch{return {};}
+}
 
 let publisher;
 async function writeWeekCopy(viewerCode,weekStart,revision,sheet){
@@ -93,6 +105,7 @@ Deno.serve(async req=>{
    Boolean(Deno.env.get('VIEWER_WEEK_PUBLISHER_DB_URL'));
   if(req.method==='GET'){
    return reply(req,origins,200,{configured:Boolean(current),lastChangedAt:current?.changed_at||null,
+    ...viewerUrl(current?.viewer_code,project,origins),
     ...(publishingReady?{publishingReady:true}:{})});
   }
 
@@ -123,7 +136,8 @@ Deno.serve(async req=>{
   const {error:limitError}=await db.from('employee_viewer_pin_limits')
    .delete().eq('owner_id',owner).eq('store_id',storeId);
   if(limitError)console.error('viewer login-limit cleanup failed');
-  return reply(req,origins,200,{configured:true,lastChangedAt:changedAt,...(publishingReady?{publishingReady:true}:{})});
+  return reply(req,origins,200,{configured:true,lastChangedAt:changedAt,
+   ...viewerUrl(newCredential.viewer_code,project,origins),...(publishingReady?{publishingReady:true}:{})});
  }catch(error){
   // No details to clients, especially never include passwords, keys, or payloads.
   console.error('viewer admin handler failed',error instanceof Error?error.name:'error');

@@ -12,7 +12,7 @@ test('mock backend: administrator permission and store ownership are checked',as
   assert.equal((await f.adminSet(f.storeA,'583941')).status,200);
   const status = await f.adminGet(f.storeA);
   assert.equal(status.status,200);
-  assert.deepEqual(Object.keys(await status.json()).sort(),['configured','lastChangedAt']);
+  assert.deepEqual(Object.keys(await status.json()).sort(),['configured','lastChangedAt','viewerUrl']);
   assert.equal(f.db.tables.employee_viewer_passwords.length,1);
   assert.equal(f.db.tables.employee_viewer_passwords[0].password_hash.includes('583941'),false);
 });
@@ -213,4 +213,18 @@ test('mock backend: the viewer will not run on the manager host or beside publis
     assert.equal((await f.login(viewer_code,'583941')).status,503);
     assert.equal(f.db.tables.employee_viewer_sessions.length,0);
   }
+});
+
+test('mock backend: manager gets a store-specific viewer link without the PIN',async()=>{
+ const f=makeFixture();
+ const initial=await (await f.adminGet(f.storeA)).json();
+ assert.equal(initial.viewerUrl,undefined);
+ const configured=await (await f.adminSet(f.storeA,'583941')).json();
+ const url=new URL(configured.viewerUrl);
+ assert.equal(url.origin,'https://employee.example.invalid');
+ assert.deepEqual([...url.searchParams],[['code',f.db.tables.employee_viewer_passwords[0].viewer_code]]);
+ assert.equal(JSON.stringify(configured).includes('583941'),false);
+ assert.equal((await (await f.adminGet(f.storeA)).json()).viewerUrl,url.href);
+ await f.stop(f.storeA);
+ assert.equal((await (await f.adminGet(f.storeA)).json()).viewerUrl,undefined);
 });

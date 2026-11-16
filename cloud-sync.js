@@ -427,7 +427,19 @@ export function createCloudSync({
   }
   if(status.configured&&status.publishingReady===true)publishingStores.add(storeId);
   else publishingStores.delete(storeId);
-  return {configured:status.configured,lastChangedAt:status.lastChangedAt,...(publishingStores.has(storeId)?{publishingReady:true}:{})};
+  let viewerUrl='';
+  if(status.configured&&typeof status.viewerUrl==='string'){
+   try{
+    const url=new URL(status.viewerUrl);
+    const code=url.searchParams.get('code');
+    if(url.protocol==='https:'&&url.origin!==SUPABASE_URL&&url.origin!==globalThis.location?.origin&&
+       !url.username&&!url.password&&!url.hash&&url.pathname==='/'&&
+       /^[a-f0-9]{8}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{4}-[a-f0-9]{12}$/i.test(code||'')&&
+       Array.from(url.searchParams).length===1)viewerUrl=url.href;
+   }catch{/* Unusable address is omitted. */}
+  }
+  return {configured:status.configured,lastChangedAt:status.lastChangedAt,
+   ...(viewerUrl?{viewerUrl}:{}),...(publishingStores.has(storeId)?{publishingReady:true}:{})};
  }
  async function getViewerPasswordStatus(storeId){return viewerPasswordRequest(storeId);}
  async function changeViewerPassword(storeId,newPassword){return viewerPasswordRequest(storeId,newPassword);}

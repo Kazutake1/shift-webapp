@@ -300,3 +300,28 @@ begin
 end $$;
 SQL
 echo 'PASS: database lookup returns only the live session store and forbids direct reads'
+
+# Check the real connection identities, not only SET ROLE. These passwords
+# are generated for this disposable Unix-socket cluster and are never logged.
+{
+ echo 'local all shift_viewer_auth,shift_viewer_week_reader,shift_viewer_week_publisher scram-sha-256'
+ cat "$tmp/data/pg_hba.conf"
+} > "$tmp/pg_hba.preview"
+mv "$tmp/pg_hba.preview" "$tmp/data/pg_hba.conf"
+"$bin/pg_ctl" -D "$tmp/data" reload >/dev/null
+for role in shift_viewer_auth shift_viewer_week_reader shift_viewer_week_publisher; do
+  temporary_password=$(node -e "process.stdout.write(require('node:crypto').randomBytes(24).toString('hex'))")
+  "${psql[@]}" -q <<SQL
+set password_encryption='scram-sha-256';
+alter role $role login password '$temporary_password';
+SQL
+  actual=$(PGREQUIREAUTH=scram-sha-256 PGPASSWORD="$temporary_password" "$bin/psql" -X -w -h "$tmp" -U "$role" -d postgres -Atq -v ON_ERROR_STOP=1 <<'SQL'
+select current_user || ':' || session_user || ':' ||
+ has_table_privilege(current_user,'public.shift_app_state','SELECT')::text
+ where not (select rolsuper or rolbypassrls or rolcreaterole from pg_roles where rolname=current_user);
+SQL
+  )
+  unset temporary_password
+  test "$actual" = "$role:$role:false"
+done
+echo 'PASS: each dedicated connection logs in as its own restricted database role'

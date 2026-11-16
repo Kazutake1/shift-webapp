@@ -49,18 +49,17 @@ async function viewerAuth(){
 }
 
 let publishedWeekReader;
-async function readPublishedWeek(viewerCode,weekStart){
+async function readPublishedWeek(tokenHash,weekStart){
  const connection=Deno.env.get('VIEWER_WEEK_READER_DB_URL');
  if(!connection)throw Error('viewer week reader not configured');
  publishedWeekReader??=postgres(connection,{
   prepare:false,max:1,connect_timeout:5,idle_timeout:20,ssl:{rejectUnauthorized:true}
  });
  const [result]=await publishedWeekReader`
-  select current_user as reader_role, (
-   select sheet from shift_viewer_private.published_weeks
-   where viewer_code=${viewerCode}::uuid and week_start=${weekStart}::date
-     and current_user='shift_viewer_week_reader'
-  ) as sheet
+  select current_user as reader_role,
+   case when current_user='shift_viewer_week_reader' then
+    shift_viewer_private.read_viewer_week(${tokenHash},${weekStart}::date)
+   end as sheet
  `;
  if(result?.reader_role!=='shift_viewer_week_reader')throw Error('unexpected viewer database role');
  return result.sheet;
@@ -143,7 +142,7 @@ Deno.serve(async req=>{
   }
   const [membership]=await db`select user_id from public.shift_app_admins where user_id=${session.owner_id}::uuid`;
   if(!membership)return reply(req,origins,403,denied);
-  const projection=await readPublishedWeek(credential.viewer_code,weekStart);
+  const projection=await readPublishedWeek(tokenHash,weekStart);
   if(!projection)return reply(req,origins,404,{error:'この週のシフト表は表示できません。'});
   return reply(req,origins,200,projection);
  }catch(error){

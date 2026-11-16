@@ -257,3 +257,46 @@ begin
 end $$;
 SQL
 echo 'PASS: restricted viewer authentication and session operations without manager data access'
+
+"${psql[@]}" -q -f employee-viewer/backend/session-scoped-read-draft.sql
+"${psql[@]}" -q <<'SQL'
+update public.shift_app_state set payload='{"stores":[{"id":"store-auth"},{"id":"store-other"}]}';
+insert into public.employee_viewer_passwords(owner_id,store_id,password_salt,password_hash,kdf_iterations)
+values ('00000000-0000-4000-8000-000000000001','store-other','test','test',600000);
+insert into shift_viewer_private.published_weeks(viewer_code,week_start,source_revision,sheet)
+select viewer_code,'2026-11-09',1,jsonb_build_object(
+ 'format','employee-schedule-only-v1','weekStart','2026-11-09','storeName',store_id)
+from public.employee_viewer_passwords;
+insert into public.employee_viewer_sessions(token_hash,owner_id,store_id,session_epoch,expires_at)
+select repeat(case when store_id='store-auth' then 'a' else 'b' end,64),
+ owner_id,store_id,session_epoch,now()+interval '1 day'
+from public.employee_viewer_passwords;
+set role shift_viewer_week_reader;
+do $$
+begin
+ if has_table_privilege(current_user,'shift_viewer_private.published_weeks','SELECT')
+ or has_table_privilege(current_user,'public.employee_viewer_sessions','SELECT')
+ or has_function_privilege('anon','shift_viewer_private.read_viewer_week(text,date)','EXECUTE')
+ or has_function_privilege('authenticated','shift_viewer_private.read_viewer_week(text,date)','EXECUTE') then
+  raise exception 'The reader or browser roles have excess permissions';
+ end if;
+ if shift_viewer_private.read_viewer_week(repeat('a',64),'2026-11-09')->>'storeName' is distinct from 'store-auth'
+ or shift_viewer_private.read_viewer_week(repeat('b',64),'2026-11-09')->>'storeName' is distinct from 'store-other'
+ or shift_viewer_private.read_viewer_week(repeat('c',64),'2026-11-09') is not null
+ or shift_viewer_private.read_viewer_week(repeat('a',64),'2026-11-16') is not null then
+  raise exception 'Session/store scoping failed';
+ end if;
+end $$;
+reset role;
+update public.employee_viewer_passwords set session_epoch=gen_random_uuid() where store_id='store-auth';
+update public.employee_viewer_sessions set expires_at=now()-interval '1 second' where store_id='store-other';
+set role shift_viewer_week_reader;
+do $$
+begin
+ if shift_viewer_private.read_viewer_week(repeat('a',64),'2026-11-09') is not null
+ or shift_viewer_private.read_viewer_week(repeat('b',64),'2026-11-09') is not null then
+  raise exception 'Revoked or expired session returned a copy';
+ end if;
+end $$;
+SQL
+echo 'PASS: database lookup returns only the live session store and forbids direct reads'

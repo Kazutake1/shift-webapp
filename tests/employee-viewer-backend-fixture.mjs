@@ -206,9 +206,12 @@ export function makeFixture({verifiedIpHeader=false, readerRole='shift_viewer_we
         else copies.set(credential.store_id,JSON.parse(sheet));
         return [{applied:true}];
       }
-      assert.match(query.join(''), /shift_viewer_private\.published_weeks/);
-      const credential = db.tables.employee_viewer_passwords.find(row => row.viewer_code===code);
-      return [{reader_role:readerRole,sheet:week===WEEK?copies.get(credential?.store_id)??null:null}];
+      assert.match(query.join(''), /shift_viewer_private\.read_viewer_week/);
+      const session=db.tables.employee_viewer_sessions.find(row=>row.token_hash===code&&Date.parse(row.expires_at)>Date.now());
+      const credential=session&&db.tables.employee_viewer_passwords.find(row=>
+        row.store_id===session.store_id&&row.owner_id===session.owner_id&&row.session_epoch===session.session_epoch);
+      const member=session&&db.tables.shift_app_admins.some(row=>row.user_id===session.owner_id);
+      return [{reader_role:readerRole,sheet:member&&credential&&week===WEEK?copies.get(credential.store_id)??null:null}];
     }
   };
   function handler(relativePath) {

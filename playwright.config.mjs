@@ -2,7 +2,7 @@ import {defineConfig} from '@playwright/test';
 
 export default defineConfig({
   testDir:'./tests',
-  testMatch:'operations.e2e.spec.mjs',
+  testMatch:['operations.e2e.spec.mjs','viewer.e2e.spec.mjs'],
   timeout:20000,
   expect:{timeout:5000},
   fullyParallel:false,

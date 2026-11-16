@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="ja">
+<head>
+ <meta charset="utf-8">
+ <meta name="viewport" content="width=device-width, initial-scale=1">
+ <meta name="referrer" content="no-referrer">
+ <meta http-equiv="Content-Security-Policy" content="default-src 'none'; base-uri 'none'; object-src 'none'; script-src 'self'; style-src 'self'; font-src 'self'; img-src 'self'; connect-src https://employee-viewer.invalid; form-action 'none'; frame-src 'none'">
+ <meta name="theme-color" content="#193f58">
+ <title>従業員用シフト表</title>
+ <link rel="stylesheet" href="./style.css">
+ <link rel="stylesheet" href="./viewer.css">
+</head>
+<body>
+ <header class="viewer-header">
+  <div class="viewer-title">
+   <span>従業員用シフト表</span>
+   <strong id="viewer-store-name">シフト確認</strong>
+  </div>
+  <button id="viewer-logout" type="button" hidden>ログアウト</button>
+ </header>
+ <main class="viewer-main">
+  <section id="viewer-login" class="viewer-login">
+   <h1>シフト表を確認</h1>
+   <p>店舗に掲示された6桁のパスワードを入力してください。</p>
+   <form id="viewer-login-form" autocomplete="off">
+    <label class="viewer-field" for="viewer-pin">店舗共通パスワード</label>
+    <input id="viewer-pin" type="password" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" autocomplete="off" required placeholder="6桁の数字">
+    <button id="viewer-login-button" class="primary" type="submit">シフト表を見る</button>
+   </form>
+   <p id="viewer-login-error" class="viewer-error" role="alert"></p>
+  </section>
+  <section id="viewer-sheet-page" hidden>
+   <nav class="viewer-week-controls" aria-label="週の切り替え">
+    <button id="viewer-previous" type="button">‹ 前週</button>
+    <strong id="viewer-week-label"></strong>
+    <button id="viewer-next" type="button">次週 ›</button>
+    <button id="viewer-this-week" type="button">今週</button>
+   </nav>
+   <p id="viewer-sheet-message" class="viewer-message" role="status"></p>
+   <section id="paper" aria-label="シフト表">
+    <div class="paper-header">
+     <strong id="store-name"></strong>
+     <span id="paper-period"></span>
+    </div>
+    <div class="table-scroll">
+     <table id="schedule" aria-label="週間シフト表"></table>
+    </div>
+   </section>
+  </section>
+ </main>
+ <script type="module" src="./app.js"></script>
+</body>
+</html>

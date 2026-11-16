@@ -3,12 +3,13 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/regression.test.mjs",
-    "check": "node --check app.js && node --check print-pdf.js && node --check backup-dialog.js && node --check employee-dialog.js && node --check employee-identity.js && node --check store-dialog.js && node --check state-manager.js && node --check cloud-sync.js && node --check schedule-sync.js && node --check supabase-config.js && node --check model.js && node --check stores.js && node --check birthdays.js && node --check birthday-ui.js && node --check crypto-backup.js && node --check sw.js && node --check scripts/update-holidays.mjs && node --check scripts/build-cloudflare.mjs && node --check playwright.config.mjs && node --check playwright.sw.config.mjs && node --check eslint.config.mjs && node --check tests/regression.test.mjs && node --check tests/operations.e2e.spec.mjs && node --check tests/sw.e2e.spec.mjs",
+    "test": "node --test tests/regression.test.mjs tests/employee-viewer-projection.test.mjs tests/employee-viewer-password.test.mjs tests/employee-viewer-gateway.test.mjs tests/employee-viewer-site.test.mjs tests/employee-viewer-backend-mock.test.mjs",
+    "check": "node --check app.js && node --check print-pdf.js && node --check backup-dialog.js && node --check employee-dialog.js && node --check employee-identity.js && node --check store-dialog.js && node --check state-manager.js && node --check cloud-sync.js && node --check schedule-sync.js && node --check supabase-config.js && node --check model.js && node --check stores.js && node --check birthdays.js && node --check birthday-ui.js && node --check crypto-backup.js && node --check sw.js && node --check scripts/update-holidays.mjs && node --check scripts/build-cloudflare.mjs && node --check playwright.config.mjs && node --check playwright.sw.config.mjs && node --check eslint.config.mjs && node --check tests/regression.test.mjs && node --check tests/operations.e2e.spec.mjs && node --check tests/sw.e2e.spec.mjs && node --check employee-viewer/rotation-policy.mjs && node --check employee-viewer/password-admin-ui.mjs && node --check tests/employee-viewer-password.test.mjs && node --check supabase/functions/_shared/viewer-security.mjs && node --check supabase/functions/_shared/viewer-projection.mjs && node --check supabase/functions/_shared/viewer-http.mjs && node --check supabase/functions/employee-viewer-admin/index.ts && node --check supabase/functions/employee-viewer-access/index.ts && node --check tests/employee-viewer-gateway.test.mjs && node --check employee-viewer/site/app.js && node --check tests/employee-viewer-site.test.mjs && node --check scripts/build-employee-viewer.mjs && node --check tests/employee-viewer-backend-mock.test.mjs",
     "test:e2e": "playwright test --config=playwright.config.mjs",
     "lint": "eslint . --max-warnings=0",
     "test:sw": "playwright test --config=playwright.sw.config.mjs",
-    "build:cloudflare": "node scripts/build-cloudflare.mjs"
+    "build:cloudflare": "node scripts/build-cloudflare.mjs",
+    "build:viewer": "node scripts/build-employee-viewer.mjs"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

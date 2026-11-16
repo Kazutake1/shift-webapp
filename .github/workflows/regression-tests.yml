@@ -30,6 +30,8 @@ jobs:
         run: npm run check
       - name: Lint
         run: npm run lint
+      - name: Viewer grants and concurrent PIN limits on temporary PostgreSQL
+        run: bash scripts/test-employee-viewer-postgres.sh
       - name: Regression tests
         run: npm test
       - name: Cloudflare Pages build

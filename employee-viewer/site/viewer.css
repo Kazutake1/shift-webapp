@@ -1,0 +1,57 @@
+/* Overlay on the EXACT manager sheet stylesheet, copied in the isolated build.
+   The sheet table, columns, heavy boundaries, bands, font and row geometry
+   remain sourced from the existing manager CSS. This file styles only the
+   employee navigation and replaces clickable cells with inert text. */
+[hidden]{display:none!important}
+.viewer-header{
+ display:flex;align-items:center;justify-content:space-between;gap:16px;
+ padding:12px 20px;background:#193f58;color:#fff;min-height:68px
+}
+.viewer-title{display:flex;flex-direction:column;gap:4px}
+.viewer-title>span{font-size:12px;opacity:.83}
+.viewer-title>strong{font-size:19px;line-height:1.2}
+.viewer-header button{background:#ffffff14;border-color:#ffffff55;color:#fff}
+.viewer-main{padding:16px 20px;max-width:1800px;margin:0 auto}
+.viewer-login{width:min(100%,440px);margin:50px auto;padding:24px;
+ border:1px solid #d0dbe2;border-radius:16px;background:#fff;box-shadow:0 4px 16px #193f5810}
+.viewer-login h1{font-size:22px;margin:0 0 10px}
+.viewer-login p{color:#455866;font-size:14px;line-height:1.6}
+#viewer-login-form{display:flex;flex-direction:column;gap:14px;margin-top:20px}
+.viewer-field{font-weight:600;font-size:14px}
+#viewer-pin{width:100%;font-size:22px;letter-spacing:.15em;text-align:center;
+ font-variant-numeric:tabular-nums}
+#viewer-login-button{width:100%}
+.viewer-error{color:#a52424!important;font-weight:600;min-height:1.5em}
+.viewer-week-controls{display:flex;justify-content:center;align-items:center;
+ flex-wrap:wrap;gap:12px;margin:0 0 14px}
+.viewer-week-controls strong{font-size:15px;white-space:nowrap}
+.viewer-message{text-align:center;color:#455866;font-size:14px;min-height:20px}
+#paper{min-width:0}
+#schedule td.slot .viewer-cell{
+ display:block;width:100%;height:24px;min-height:24px;
+ padding:0 2px;color:#000;font-size:clamp(11px,1.08vw,18px);
+ font-weight:700;line-height:1.1;text-align:center;background:transparent;
+ white-space:normal;overflow-wrap:anywhere
+}
+#schedule td.slot .viewer-cell.long{font-size:clamp(10px,.92vw,15px)}
+#schedule td.employee-slot .viewer-cell{
+ font-size:clamp(13px,1.25vw,20px);overflow:hidden
+}
+#schedule td.employee-slot .viewer-cell.long{font-size:clamp(11px,1.03vw,17px)}
+#schedule .viewer-cell .employee-caption{
+ display:flex;width:100%;height:100%;justify-content:center;align-items:center;
+ gap:2px;white-space:nowrap
+}
+#schedule .viewer-cell .employee-name{font-weight:700}
+#schedule .viewer-cell .employee-time{font-size:.72em}
+#schedule td.notes-cell{background:white}
+#viewer-sheet-page .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+@media(max-width:680px){
+ .viewer-header{padding:10px 14px}
+ .viewer-main{padding:10px}
+ .viewer-login{margin:24px auto;padding:20px}
+ .viewer-week-controls{gap:6px;justify-content:space-between}
+ .viewer-week-controls button{font-size:13px;padding:8px 11px}
+ .viewer-week-controls strong{font-size:13px}
+ #paper{padding:10px}
+}

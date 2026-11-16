@@ -1,0 +1,9 @@
+# Draft configuration only. Do not deploy while backend security review is open.
+[functions.employee-viewer-admin]
+verify_jwt = true
+
+# Employees do not possess Supabase Auth JWTs. The handler checks the six-digit
+# PIN or an opaque server-issued viewer session, using private tables and
+# store-scoped authorization. Every request remains untrusted until checked.
+[functions.employee-viewer-access]
+verify_jwt = false
